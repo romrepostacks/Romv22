@@ -852,6 +852,8 @@ function movePlayer(dx,dy){
   saveAdv();
 }
 if(typeof document.addEventListener==='function') document.addEventListener('keydown', e=>{
+  const box = document.getElementById('msgBox');
+  if(box && !box.classList.contains('hidden')){ advanceMsgBox(); return; }
   const k = e.key.toLowerCase();
   if(k==='arrowup'||k==='w') movePlayer(0,-1);
   else if(k==='arrowdown'||k==='s') movePlayer(0,1);
@@ -1032,6 +1034,7 @@ function startWildBattle(){
   document.getElementById('adv').classList.add('hidden');
   addLog(`A wild encounter begins! (${wild.length} Pokémon, Lv.${lv})`);
   render();
+  showMsgBox(state.log.slice(-1));
 }
 
 function startTrainerBattle(){
@@ -1047,6 +1050,7 @@ function startTrainerBattle(){
   document.getElementById('adv').classList.add('hidden');
   addLog(`${loc.type==='gym'?'Gym Leader':'Rival'} ${loc.leaderName} challenges you with ${team.length} Pokémon! (Lv.${lv})`);
   render();
+  showMsgBox(state.log.slice(-1));
 }
 
 function continueStory(){
@@ -1164,6 +1168,35 @@ function confirmDraft(){
 }
 
 function addLog(t){ state.log.push(t); const el=document.getElementById('log'); el.innerHTML = state.log.map(l=>`<div>${l}</div>`).join(''); el.scrollTop = el.scrollHeight; }
+
+// Paced message box: reveals a batch of lines one at a time with a tap/keypress-to-continue
+// prompt, like the classic dialogue box, instead of dumping a whole turn's log at once.
+// The full scrollback log (addLog above) still updates immediately in parallel — this only
+// paces what's shown in the popup and gates the Submit button until the player's caught up.
+let msgQueue = [];
+let msgQueueDone = null;
+function showMsgBox(lines, onDone){
+  if(!lines || !lines.length){ if(onDone) onDone(); return; }
+  msgQueue = lines.slice();
+  msgQueueDone = onDone || null;
+  const btn = document.getElementById('submitBtn');
+  if(btn) btn.disabled = true;
+  advanceMsgBox();
+}
+function advanceMsgBox(){
+  const box = document.getElementById('msgBox');
+  if(!box) return;
+  if(msgQueue.length===0){
+    box.classList.add('hidden');
+    const btn = document.getElementById('submitBtn');
+    if(btn) btn.disabled = false;
+    const cb = msgQueueDone; msgQueueDone = null;
+    if(cb) cb();
+    return;
+  }
+  document.getElementById('msgBoxText').innerHTML = msgQueue.shift();
+  box.classList.remove('hidden');
+}
 function alive(side){ return side.filter(m=>!m.fainted && !m.caught); }
 
 function renamePartyMon(i){
@@ -1291,6 +1324,7 @@ function effSpeed(m){ return m.status==='par' ? m.spe/2 : m.spe; }
 function submitTurn(){
   const actorsA = alive(state.sideA);
   if(actorsA.length===0) return;
+  const logStart = state.log.length;
   const actions = [];
   for(const m of actorsA){
     const moveSel = document.getElementById(`move-${m.id}`);
@@ -1368,7 +1402,7 @@ function submitTurn(){
   }
 
   render();
-  checkEnd();
+  showMsgBox(state.log.slice(logStart), checkEnd);
 }
 
 function checkEnd(){

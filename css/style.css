@@ -91,6 +91,9 @@ button.secondary{background:var(--panel2); color:var(--text); text-shadow:none;}
 @keyframes battleFlash{
   0%{opacity:0;} 10%{opacity:1;} 20%{opacity:0;} 35%{opacity:1;} 50%{opacity:0;} 65%{opacity:1;} 100%{opacity:0;}
 }
+#msgBox{position:fixed; left:50%; bottom:16px; transform:translateX(-50%); width:92%; max-width:480px; background:var(--panel); border:3px solid var(--ink); border-radius:8px; padding:14px 16px 10px; box-shadow:5px 5px 0 #00000050; z-index:150; cursor:pointer; font-size:1.15rem; line-height:1.4;}
+.msgbox-next{text-align:right; color:var(--accent); font-size:.9rem; animation:msgBounce .6s infinite;}
+@keyframes msgBounce{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(3px);} }
 .spriteflip{width:26px; height:30px;}
 .spriteflip.flip{transform:scaleX(-1);}
 .sprite{position:relative; width:26px; height:30px;}
