@@ -79,6 +79,18 @@ button.secondary{background:var(--panel2); color:var(--text); text-shadow:none;}
 .treetop{position:absolute; top:0px; left:2px; width:32px; height:26px; background:radial-gradient(circle at 30% 30%,#4f9a45,#2d6a28); border-radius:45% 45% 50% 50%/55% 55% 45% 45%; box-shadow:inset -3px -3px 0 #00000020;}
 .treetrunk{position:absolute; bottom:1px; left:15px; width:6px; height:6px; background:#6b4423; border-radius:1px;}
 .poi{font-size:18px; filter:drop-shadow(0 1px 1px #00000060);}
+.tile.rustling{animation:grassRustle .35s ease-in-out; z-index:2;}
+@keyframes grassRustle{
+  0%,100%{transform:scale(1) rotate(0deg);}
+  25%{transform:scale(1.06) rotate(-4deg);}
+  50%{transform:scale(0.97) rotate(4deg);}
+  75%{transform:scale(1.04) rotate(-2deg);}
+}
+#screenFlash{position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:200;}
+#screenFlash.flash{animation:battleFlash .4s steps(1) forwards;}
+@keyframes battleFlash{
+  0%{opacity:0;} 10%{opacity:1;} 20%{opacity:0;} 35%{opacity:1;} 50%{opacity:0;} 65%{opacity:1;} 100%{opacity:0;}
+}
 .spriteflip{width:26px; height:30px;}
 .spriteflip.flip{transform:scaleX(-1);}
 .sprite{position:relative; width:26px; height:30px;}

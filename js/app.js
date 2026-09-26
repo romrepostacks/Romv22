@@ -792,7 +792,7 @@ function renderTileMap(){
         const icon = (t==='E' && y===Math.floor(MAP_ROWS/2)) ? '➡️' : (poiIcon[t]||'');
         inner = icon ? `<div class="poi">${icon}</div>` : '';
       }
-      html += `<div class="tile ${terrainCls}">${inner}</div>`;
+      html += `<div class="tile ${terrainCls}" data-x="${x}" data-y="${y}">${inner}</div>`;
     }
   }
   html += `<div id="playerSprite" style="transform:translate(${adv.pos.x*TILE_PX}px,${adv.pos.y*TILE_PX}px)">${spriteHtml(adv.facing||'down', false)}</div>`;
@@ -805,6 +805,26 @@ function updatePlayerSprite(walked){
   if(!el) return;
   el.style.transform = `translate(${adv.pos.x*TILE_PX}px,${adv.pos.y*TILE_PX}px)`;
   el.innerHTML = spriteHtml(adv.facing||'down', !!walked);
+}
+// Brief shake on a grass tile the player steps into — classic "something's in there" cue.
+// Guarded: the Node test harness's mock `document` has no querySelector.
+function rustleTile(x,y){
+  if(typeof document.querySelector!=='function') return;
+  const el = document.querySelector(`.tile[data-x="${x}"][data-y="${y}"]`);
+  if(!el) return;
+  el.classList.remove('rustling');
+  void el.offsetWidth; // restart the animation even if it's still mid-play
+  el.classList.add('rustling');
+}
+// Quick full-screen flash on entering a battle — classic Pokémon screen-transition cue.
+// Fire-and-forget: the CSS animation runs on its own, nothing here blocks the actual
+// battle setup that follows (keeps this safe under the test harness's no-op setTimeout).
+function playBattleFlash(){
+  const el = document.getElementById('screenFlash');
+  if(!el) return;
+  el.classList.remove('flash');
+  if(el.offsetWidth !== undefined) void el.offsetWidth;
+  el.classList.add('flash');
 }
 function movePlayer(dx,dy){
   if(!adv) return;
@@ -825,7 +845,10 @@ function movePlayer(dx,dy){
     if(adv.restockedLoc !== adv.loc){ adv.items.pokeball=(adv.items.pokeball||0)+5; adv.restockedLoc=adv.loc; showToast('Party healed! +5 Poké Balls'); }
   }
   updatePlayerSprite(true);
-  if(t==='G' && Math.random()<0.15){ saveAdv(); startWildBattle(); return; }
+  if(t==='G'){
+    rustleTile(nx,ny);
+    if(Math.random()<0.15){ saveAdv(); startWildBattle(); return; }
+  }
   saveAdv();
 }
 if(typeof document.addEventListener==='function') document.addEventListener('keydown', e=>{
@@ -1003,6 +1026,7 @@ function startWildBattle(){
   const lv = Math.max(3, advLevel()-2+Math.floor(Math.random()*4));
   const wild = picks.map(i=>makeMon(DEX[i], id++, 'none', lv));
   state = {sideA: adv.party, sideB: wild, log:[], mode:'story'};
+  playBattleFlash();
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
   document.getElementById('adv').classList.add('hidden');
@@ -1017,6 +1041,7 @@ function startTrainerBattle(){
   const lv = advLevel();
   const team = loc.leaderTeam.map(i=>makeMon(DEX[i], id++, 'leftovers', lv));
   state = {sideA: adv.party, sideB: team, log:[], mode:'story', trainerLoc: loc};
+  playBattleFlash();
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
   document.getElementById('adv').classList.add('hidden');
