@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Party Royale — Gen 7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="title-screen" id="titleScreen">
+    <div class="title-logo">⚔️</div>
+    <h1>Party Royale</h1>
+    <div class="sub" style="margin-bottom:22px">Vellorin region · 806 Pokémon · full-party free-for-all battles</div>
+    <div class="row" style="justify-content:center">
+      <button id="continueBtn" onclick="startAdventure()">▶ Start Adventure</button>
+      <button class="secondary" onclick="showSetup()">Free Battle</button>
+    </div>
+    <div class="row" style="justify-content:center; margin-top:10px">
+      <button id="newAdvBtn" class="secondary hidden" style="font-size:.8rem" onclick="newAdventurePrompt()">🆕 New Adventure</button>
+      <button class="secondary" style="font-size:.8rem" onclick="openImportSave()">📥 Import Save Code</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="setup">
+    <div class="section-title">Set up the battle</div>
+    <div class="row">
+      <div><label>Your side size</label><select id="sizeA"></select></div>
+      <div><label>Enemy side size</label><select id="sizeB"></select></div>
+      <div><button onclick="goToDraft('free')">Draft Team</button></div>
+    </div>
+    <div class="sub" style="margin-top:10px">806 Pokémon in the pool. Any combo, e.g. 2 vs 6, 4 vs 1.</div>
+    <div class="row" style="margin-top:14px; border-top:1px solid var(--panel2); padding-top:14px">
+      <button class="secondary" onclick="startAdventure()">🗺️ Continue/Start Adventure</button>
+      <button class="secondary" id="newGameBtn" onclick="newAdventure()" style="display:none">🆕 New Adventure (erases save)</button>
+      <button class="secondary" onclick="exportSaveCode()">💾 Export Save</button>
+      <button class="secondary" onclick="openImportSave()">📥 Import Save</button>
+      <span class="sub">An original region, built in the shape of a classic Pokémon story — route → town → gym, wild encounters, a Pokémon Center, and a persistent leveling party.</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="secondary" onclick="showTitle()">← Back to title</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="starterSelect">
+    <div class="section-title">Begin your journey</div>
+    <div class="row" style="margin-bottom:14px">
+      <div style="flex:1"><label>Your name</label><input id="apcNameInput" type="text" placeholder="Trainer" maxlength="16" style="width:100%; font-size:1rem; border-radius:10px; border:1px solid var(--panel2); background:var(--panel2); color:var(--text); padding:8px 10px;"></div>
+    </div>
+    <div class="sub" style="margin-bottom:10px">Pick your starting Pokémon:</div>
+    <div id="starterGrid" class="grid"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="secondary" onclick="showTitle()">← Back to title</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="adv">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <div class="section-title" id="advTitle" style="margin-bottom:0"></div>
+      <div class="row" style="gap:6px">
+        <button class="secondary" onclick="togglePartyModal()" style="font-size:.8rem; padding:6px 10px">🎒 Party</button>
+        <button class="secondary" onclick="toggleMap()" style="font-size:.8rem; padding:6px 10px">🗺️ Map</button>
+      </div>
+    </div>
+    <div class="sub" id="advDesc" style="margin:8px 0 12px"></div>
+    <div id="advMap" class="hidden" style="margin-bottom:12px"></div>
+    <div id="tileMap" class="tilemap"></div>
+    <div class="dpad">
+      <div></div><button onclick="movePlayer(0,-1)">▲</button><div></div>
+      <button onclick="movePlayer(-1,0)">◀</button><div></div><button onclick="movePlayer(1,0)">▶</button>
+      <div></div><button onclick="movePlayer(0,1)">▼</button><div></div>
+    </div>
+    <div class="sub" style="text-align:center; margin-top:-4px; margin-bottom:10px">Arrow keys / WASD also work. Walk into tall grass, the gym leader, or the Center.</div>
+    <div class="row" id="advActions" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:10px; border-top:1px solid var(--panel2); padding-top:10px">
+      <button class="secondary" style="font-size:.8rem" onclick="exportSaveCode()">💾 Export Save</button>
+      <button class="secondary" style="font-size:.8rem" onclick="openImportSave()">📥 Import Save</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="boxModal" style="position:fixed; top:8%; left:50%; transform:translateX(-50%); max-width:520px; width:90%; z-index:50; box-shadow:0 10px 40px rgba(0,0,0,.5)">
+    <div class="section-title">Box</div>
+    <div class="sub" style="margin-bottom:8px">Swap a boxed Pokémon in for one on your active party (party max 6).</div>
+    <div id="boxList"></div>
+    <div class="row" style="margin-top:10px"><button class="secondary" onclick="closeBox()">Close</button></div>
+  </div>
+
+  <div class="panel hidden" id="saveCodeModal" style="position:fixed; top:8%; left:50%; transform:translateX(-50%); max-width:520px; width:90%; z-index:50; box-shadow:0 10px 40px rgba(0,0,0,.5)">
+    <div class="section-title" id="saveCodeMode">Save Code</div>
+    <div class="sub" id="saveCodeHint" style="margin-bottom:8px"></div>
+    <textarea id="saveCodeBox" rows="6" style="width:100%; font-family:monospace; font-size:.75rem"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="secondary" onclick="copySaveCode()">Copy</button>
+      <button id="saveCodeAction" class="hidden" onclick="loadSaveCode()">Load</button>
+      <button class="secondary" onclick="closeSaveCode()">Close</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="partyModal" style="position:fixed; top:6%; left:50%; transform:translateX(-50%); max-width:520px; width:90%; max-height:85vh; overflow-y:auto; z-index:50; box-shadow:0 10px 40px rgba(0,0,0,.5)">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <div class="section-title" style="margin-bottom:0">🎒 Your Party</div>
+      <button class="secondary" style="font-size:.75rem" onclick="closePartyModal()">✕ Close</button>
+    </div>
+    <div id="advParty" style="margin-top:10px"></div>
+  </div>
+
+  <div class="panel hidden" id="confirmModal" style="position:fixed; top:30%; left:50%; transform:translateX(-50%); max-width:380px; width:88%; z-index:60; box-shadow:0 10px 40px rgba(0,0,0,.5); text-align:center">
+    <div id="confirmModalMsg" style="margin-bottom:14px"></div>
+    <div id="confirmModalInputWrap" class="hidden" style="margin-bottom:14px">
+      <input id="confirmModalInput" style="width:100%">
+    </div>
+    <div class="row" style="justify-content:center">
+      <button onclick="confirmModalYes()">OK</button>
+      <button class="secondary" onclick="confirmModalNo()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="panel hidden center" id="storyResult">
+    <div class="big" id="storyResultText"></div>
+    <div class="sub" id="storyResultSub" style="margin-bottom:10px"></div>
+    <button onclick="continueStory()">Continue</button>
+  </div>
+
+  <div class="panel hidden" id="draft">
+    <div class="section-title">Draft your side</div>
+    <div class="counter" id="draftCounter"></div>
+    <div class="filter-row">
+      <input id="draftSearch" type="text" placeholder="Search by name…" oninput="renderDraft()">
+      <select id="draftTypeFilter" onchange="renderDraft()"><option value="">All types</option></select>
+      <select id="draftSort" onchange="renderDraft()">
+        <option value="dex">Dex order</option>
+        <option value="name">Name A-Z</option>
+        <option value="total">Total stats (high-low)</option>
+      </select>
+    </div>
+    <div id="draftGrid"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="confirmDraftBtn" onclick="confirmDraft()" disabled>Confirm &amp; Start Battle</button>
+      <button class="secondary" onclick="resetAll()">Back</button>
+    </div>
+  </div>
+
+  <div id="battle" class="hidden">
+    <div class="panel enemy">
+      <div class="section-title">Enemy side</div>
+      <div id="sideB"></div>
+    </div>
+    <div class="panel">
+      <div class="section-title">Your side — choose an action for each Pokémon, then submit the turn</div>
+      <div id="sideA"></div>
+      <div class="row" style="margin-top:8px">
+        <button onclick="submitTurn()" id="submitBtn">Submit Turn</button>
+        <button class="secondary" onclick="resetAll()">Restart</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="section-title">Battle Log</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div id="result" class="panel hidden center">
+    <div class="big" id="resultText"></div>
+    <button onclick="resetAll()">New Battle</button>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
