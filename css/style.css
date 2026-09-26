@@ -38,8 +38,17 @@ button.secondary{background:var(--panel2); color:var(--text); text-shadow:none;}
 .np-lv{font-size:.85rem; color:var(--sub);}
 .np-hprow{display:flex; align-items:center; gap:6px; margin-top:3px;}
 .np-hplabel{font-family:"Press Start 2P",monospace; font-size:.5rem; color:var(--good); letter-spacing:-1px;}
-.movesel{margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;}
-.movesel select{flex:1; min-width:130px;}
+.movesel{margin-top:8px;}
+.movegrid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.movebtn{position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:8px 10px 8px 12px; background:var(--panel2); border:2px solid var(--ink); border-left:6px solid var(--mv-color,#888); border-radius:6px; text-align:left; box-shadow:2px 2px 0 #00000030;}
+.movebtn.ballbtn{grid-column:1/-1; border-left-color:#e0304a;}
+.movebtn.selected{background:var(--accent); box-shadow:inset 0 0 0 2px #fff8, 2px 2px 0 #00000030;}
+.movebtn.selected .mv-name, .movebtn.selected .mv-pow{color:#fff;}
+.mv-name{font-weight:700; font-size:.95rem;}
+.mv-pow{font-size:.75rem; color:var(--sub);}
+.targetrow{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;}
+.targetchip{padding:5px 10px; background:var(--panel2); border:2px solid var(--ink); border-radius:999px; font-size:.85rem;}
+.targetchip.selected{background:var(--accent2); color:#fff;}
 .log{background:var(--panel2); border:2px solid var(--ink); border-radius:6px; padding:10px 12px; height:180px; overflow-y:auto; overflow-x:auto; font-size:1rem; line-height:1.4;}
 .log div{border-bottom:1px solid #00000020; padding:3px 0;}
 .section-title{font-family:"Press Start 2P",monospace; font-weight:400; font-size:.7rem; margin:0 0 12px; color:var(--accent);}

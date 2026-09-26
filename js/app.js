@@ -1256,6 +1256,20 @@ function namePlate(m, extra, corner){
   </div>`;
 }
 
+function selectMove(monId, val, btn){
+  const input = document.getElementById(`move-${monId}`);
+  if(input) input.value = val;
+  const grid = document.getElementById(`moveGrid-${monId}`);
+  if(grid && grid.children) Array.prototype.forEach.call(grid.children, c=>c.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
+function selectTarget(monId, targetId, btn){
+  const input = document.getElementById(`target-${monId}`);
+  if(input) input.value = targetId;
+  const row = document.getElementById(`targetRow-${monId}`);
+  if(row && row.children) Array.prototype.forEach.call(row.children, c=>c.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+}
 function renderSide(elId, side, interactive){
   const el = document.getElementById(elId);
   el.innerHTML = side.map(m=>{
@@ -1264,10 +1278,22 @@ function renderSide(elId, side, interactive){
     let moveOpts = '';
     const isWild = state.mode==='story' && !state.trainerLoc;
     if(interactive && !m.fainted){
-      const ballOpt = isWild ? `<option value="ball">🔴 Throw Poké Ball (${adv.items.pokeball||0} left)</option>` : '';
+      const targets = alive(state.sideB);
+      const defaultTarget = targets[0] ? targets[0].id : '';
+      const moveButtons = m.moves.map((mv,i)=>
+        `<button type="button" class="movebtn ${i===0?'selected':''}" style="--mv-color:${TYPE_COLORS[mv.t]||'#888'}" onclick="selectMove(${m.id},${i},this)">
+          <span class="mv-name">${mv.n}</span><span class="mv-pow">${mv.p?mv.p+' pow':'status'}</span>
+        </button>`).join('');
+      const ballButton = isWild ? `<button type="button" class="movebtn ballbtn" onclick="selectMove(${m.id},'ball',this)">
+          <span class="mv-name">🔴 Poké Ball</span><span class="mv-pow">${adv.items.pokeball||0} left</span>
+        </button>` : '';
+      const targetChips = targets.map((t,i)=>
+        `<button type="button" class="targetchip ${i===0?'selected':''}" onclick="selectTarget(${m.id},${t.id},this)">${dname(t)} ${Math.round(100*t.hp/t.maxhp)}%</button>`).join('');
       moveOpts = `<div class="movesel">
-        <select id="move-${m.id}">${m.moves.map((mv,i)=>`<option value="${i}">${mv.n}${mv.p?` (${mv.p} pow)`:' (status)'}</option>`).join('')}${ballOpt}</select>
-        <select id="target-${m.id}">${alive(state.sideB).map(t=>`<option value="${t.id}">${dname(t)} (${Math.round(100*t.hp/t.maxhp)}%)</option>`).join('')}</select>
+        <input type="hidden" id="move-${m.id}" value="0">
+        <input type="hidden" id="target-${m.id}" value="${defaultTarget}">
+        <div class="movegrid" id="moveGrid-${m.id}">${moveButtons}${ballButton}</div>
+        ${targets.length>1 ? `<div class="targetrow" id="targetRow-${m.id}">${targetChips}</div>` : ''}
       </div>`;
     }
     const itemTag = m.item !== 'none' ? ` · <span style="color:var(--sub)">${ITEMS[m.item].n}</span>` : '';
