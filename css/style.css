@@ -695,3 +695,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
 body{-webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;}
 input, textarea, [contenteditable]{-webkit-user-select:text; user-select:text; -webkit-touch-callout:default;}
 button{touch-action:manipulation;}
+/* Issue #3 (iPhone): Safari still selected the arrow inside a held D-pad button. The labels are now drawn
+   with ::after from data-label, and generated content can't be selected on any browser. */
+.gb-controls [data-label]::after{content:attr(data-label); pointer-events:none;}
+.gb-controls, .gb-controls *{-webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
