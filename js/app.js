@@ -1340,7 +1340,7 @@ function worldTile(x, y){
 // The map you're on right now: the area, or the room you're inside.
 function curMap(){ const loc = LOCATIONS[adv.loc]; return adv.inside!=null ? getInterior(loc, adv.inside) : getMap(loc); }
 // People on the current map. Beaten rivals leave; everyone else stays put (Gym Leaders included).
-function curNpcs(){ const loc = LOCATIONS[adv.loc]; return curMap().npcs.filter(n=>!(n.vanish && adv.cleared[loc.name])); }
+function curNpcs(){ const loc = LOCATIONS[adv.loc]; return curMap().npcs.filter(n=>!(n.vanish && adv.cleared[loc.name] && adv.walkOff!==loc.name)); }
 function activeTrainer(n){ return n.trainer && !adv.cleared[n.id || LOCATIONS[adv.loc].name]; }
 function spawnPlayer(){ adv.inside = null; const map = getMap(LOCATIONS[adv.loc]); adv.pos = {...map.spawn}; adv.facing = 'down'; }
 
@@ -1562,6 +1562,19 @@ function edgeStyle(map, x, y, g){
   if(!sh.length) return '';
   return `box-shadow:${sh.join(',')};border-radius:${t&&l?g.r:0}px ${t&&r?g.r:0}px ${b&&r?g.r:0}px ${b&&l?g.r:0}px`;
 }
+// Shorelines: a path or water tile lists pixel-art overlays for each open side, the rounded outer
+// corner where two open sides meet, and the inner corner where only the diagonal is different. They
+// go in --ov and are drawn by the tile's ::after, so water's frame animation can't wipe them.
+function edgeOverlay(map, x, y, g, kind){
+  const same = (dx,dy)=>{ const nx=x+dx, ny=y+dy; return nx<0||ny<0||nx>=map.w||ny>=map.h || g.same.has(map.tiles[ny][nx]); };
+  const open = {t:!same(0,-1), b:!same(0,1), l:!same(-1,0), r:!same(1,0)}, ov = [];
+  for(const [a,b,dx,dy] of [['t','l',-1,-1],['t','r',1,-1],['b','l',-1,1],['b','r',1,1]]){
+    if(open[a] && open[b]) ov.push(`${kind}_corner_${a}${b}`);
+    else if(!open[a] && !open[b] && !same(dx,dy)) ov.push(`${kind}_inner_${a}${b}`);
+  }
+  for(const s of 'tblr') if(open[s]) ov.push(`${kind}_edge_${s}`);
+  return ov.length ? `--ov:${ov.map(n=>`var(--art-${n})`).join(',')};` : '';
+}
 function tileHtml(map, ch, x, y, wx=x, wy=y){
   let cls = TILE_CLS[ch];
   const v = ((x*73856093) ^ (y*19349663)) >>> 0;   // stable per-tile variation
@@ -1573,8 +1586,8 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   if(cls==='bed' && (y===0 || map.tiles[y-1][x]!=='e')) extra = ' top';   // pillow end
   // Walls: the face you see (wall with floor below it) vs. the dark top/sides.
   if(cls==='wall' && (y+1>=map.h || '#nmwKM'.includes(map.tiles[y+1][x]))) cls = 'walltop';
-  if(cls==='path'||cls==='exit') style = edgeStyle(map,x,y,EDGE_GROUPS.path);
-  else if(cls==='water') style = edgeStyle(map,x,y,EDGE_GROUPS.water);
+  if(cls==='path'||cls==='exit') style = edgeOverlay(map,x,y,EDGE_GROUPS.path,'path');
+  else if(cls==='water' && map.interior!=='gym') style = edgeOverlay(map,x,y,EDGE_GROUPS.water,'water');
   else if(cls==='rug' && map.interior==='gym') style = edgeStyle(map,x,y,EDGE_GROUPS.rug);
   return `<div class="t t-${cls}${extra}" data-x="${wx}" data-y="${wy}" style="left:${wx*T}px;top:${wy*T}px;${style}"></div>`;
 }
@@ -2506,7 +2519,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.9-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.10-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3183,17 +3196,57 @@ function introFinish(name){
 }
 
 // ---- Route 1: "H-help me!" ----
+// Scripted movement, so nobody pops in or out of existence: an NPC walks (or runs) tile by tile in
+// one direction for as long as the ground is open (at most n tiles), optionally fading in while it
+// starts or fading out at the end. onStep(npc) runs after each tile (e.g. something following it).
+function npcOpenRun(map, x, y, dir, n){
+  let k = 0;
+  while(k<n){ const nx = x+DIRS[dir][0]*(k+1), ny = y+DIRS[dir][1]*(k+1); if(!WALKABLE.has(tileAt(map,nx,ny)) || (nx===adv.pos.x && ny===adv.pos.y)) break; k++; }
+  return k;
+}
+function npcMove(npc, dir, n, {run=false, fadeIn=false, fadeOut=false, onStep=null}={}, done){
+  const el = document.getElementById(`npc-${curMap().npcs.indexOf(npc)}`), ms = run ? RUN_MS : WALK_MS;
+  let foot = 1;
+  if(el){ el.style.transition = `transform ${ms}ms linear, opacity ${3*ms}ms linear`; if(fadeIn){ el.style.opacity = 0; void el.offsetWidth; el.style.opacity = 1; } }
+  const step = ()=>{
+    if(n-- <= 0){
+      if(el && el.isConnected) el.firstElementChild.outerHTML = charSvg(npc.kind, npc.facing, 0);
+      if(fadeOut && el){ el.style.opacity = 0; return setTimeout(()=>done && done(), 3*ms); }
+      return done && done();
+    }
+    npc.facing = dir; npc.x += DIRS[dir][0]; npc.y += DIRS[dir][1];
+    if(el && el.isConnected){
+      el.firstElementChild.outerHTML = charSvg(npc.kind, dir, foot = 3-foot, run);
+      el.style.transform = `translate(${npc.x*T+4}px,${npc.y*T-6}px)`; el.style.zIndex = 20 + 2*npc.y;
+    }
+    if(onStep) onStep(npc);
+    setTimeout(step, ms);
+  };
+  step();
+}
 function starterEvent(){
-  if(owBusy && document.getElementById('evChaser')) return;
+  if(curMap().npcs.some(n=>n.event)) return;   // already running
   const map = curMap(), near = [[3,0],[3,-1],[3,1],[4,0],[2,0]].map(([dx,dy])=>({x:adv.pos.x+dx, y:adv.pos.y+dy}))
     .find(p=>WALKABLE.has(tileAt(map,p.x,p.y)) && WALKABLE.has(tileAt(map,p.x+1,p.y)));
   const spot = near || {x:adv.pos.x+2, y:adv.pos.y};
-  map.npcs.push({kind:'prof', x:spot.x, y:spot.y, facing:'left', event:true, lines:["Please! In my BAG!"], home:{...spot}});
-  renderAdventure();
-  const zig = dexByName('Zigzagoon');
-  document.getElementById('owTiles').insertAdjacentHTML('afterend',
-    `<div class="ow-actor ev-chaser" id="evChaser" style="transform:translate(${(spot.x+1)*T}px,${spot.y*T-12}px); z-index:${20+2*spot.y}"><img src="${spritePath(zig)}" alt=""></div>`);
-  owSay(['H-help me!', `${PROF}: Hello! You over there! Please! Help me!`, "A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!"], starterBag);
+  held.length = 0; owBusy = true;
+  // He starts as far up the open ground to the east as possible (off-screen if it's clear) and runs in.
+  const back = npcOpenRun(map, spot.x, spot.y, 'right', 8);
+  const prof = {kind:'prof', x:spot.x+back, y:spot.y, facing:'left', event:true, lines:["Please! In my BAG!"], home:{...spot}};
+  map.npcs.push(prof);
+  owSay(['H-help me!'], ()=>{
+    owBusy = true;
+    renderAdventure();
+    const zig = dexByName('Zigzagoon'), zigAt = x=>`translate(${(x+1)*T}px,${spot.y*T-12}px)`;
+    document.getElementById('owTiles').insertAdjacentHTML('afterend',
+      `<div class="ow-actor ev-chaser" id="evChaser" style="transform:${zigAt(prof.x)}; z-index:${20+2*spot.y}; transition:transform ${RUN_MS}ms linear, opacity .4s"><img src="${spritePath(zig)}" alt=""></div>`);
+    const chaser = document.getElementById('evChaser');
+    if(back){ chaser.style.opacity = 0; void chaser.offsetWidth; chaser.style.opacity = 1; }
+    npcMove(prof, 'left', back, {run:true, fadeIn:back>0, onStep:p=>{ chaser.style.transform = zigAt(p.x); }}, ()=>{
+      owBusy = false;
+      owSay([`${PROF}: Hello! You over there! Please! Help me!`, "A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!"], starterBag);
+    });
+  });
 }
 // Emerald's Bag screen: the open Bag with three Poké Balls; Left/Right to choose, A to look.
 function starterBag(){
@@ -3220,11 +3273,16 @@ function starterBag(){
 // After the first battle, the professor thanks you and heads off.
 function starterThanks(){
   adv.starterThanks = false;
-  const map = getMap(LOCATIONS[1]);
-  map.npcs = map.npcs.filter(n=>!n.event);
+  const map = getMap(LOCATIONS[1]), prof = map.npcs.find(n=>n.event);
+  const gone = ()=>{ map.npcs = map.npcs.filter(n=>!n.event); owBusy = false; renderAdventure(); };
   saveAdv();
   owSay([`${PROF}: Whew... I went into the tall grass to look at wild POKéMON, and it jumped me!`, "You saved me. Thanks a lot!",
-    `That ${adv.party[0].name.toUpperCase()} seems to like you. Please, keep it!`, "Travel with it and fill up your POKéDEX. I'll be watching your progress!"], ()=>renderAdventure());
+    `That ${adv.party[0].name.toUpperCase()} seems to like you. Please, keep it!`, "Travel with it and fill up your POKéDEX. I'll be watching your progress!"], ()=>{
+    if(!prof || curMap()!==map) return gone();
+    owBusy = true;
+    const dir = prof.x>=adv.pos.x ? 'right' : 'left';
+    npcMove(prof, dir, npcOpenRun(map, prof.x, prof.y, dir, 6), {run:true, fadeOut:true}, gone);
+  });
 }
 
 function showAdvScreens(){
@@ -3362,6 +3420,15 @@ function startTrainerBattle(npc){
 function continueStory(){
   document.getElementById('storyResult').classList.add('hidden');
   renderAdventure();
+  const rival = adv.walkOff && curMap().npcs.find(n=>n.vanish);
+  if(rival){
+    owBusy = true;
+    const dir = rival.x>adv.pos.x ? 'right' : rival.x<adv.pos.x ? 'left' : rival.y>adv.pos.y ? 'down' : 'up';
+    return npcMove(rival, dir, npcOpenRun(curMap(), rival.x, rival.y, dir, 3), {fadeOut:true}, ()=>{
+      adv.walkOff = null; owBusy = false; saveAdv(); renderAdventure(); dexRegisterNext();
+    });
+  }
+  adv.walkOff = null;
   if(adv.starterThanks) return starterThanks();
   dexRegisterNext();
 }
@@ -3926,6 +3993,7 @@ function checkEnd(){
         const head = state.trainerLoc ? `You defeated ${state.trainerLoc.type==='gym'?'Gym Leader ':''}${state.trainerLoc.leaderName}! (+${xpAmount} XP)` : `The wild Pokémon retreated. (+${xpAmount} XP)`;
         if(state.trainerLoc){
           adv.cleared[state.trainerLoc.name] = true;
+          if(state.trainerLoc===LOCATIONS[adv.loc] && getMap(state.trainerLoc).npcs.some(n=>n.vanish)) adv.walkOff = state.trainerLoc.name;   // rival: leaves on foot
           const top = Math.max(...state.sideB.map(m=>m.level)), rate = state.trainerLoc.type==='gym' ? 100 : state.trainerLoc.type==='route' ? 20 : 60;
           adv.money = (adv.money ?? 3000) + top*rate;
           grew.unshift(`${adv.playerName} got ₽${top*rate} for winning!`);

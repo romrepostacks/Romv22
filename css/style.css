@@ -810,3 +810,22 @@ button{touch-action:manipulation;}
 .bld .door,.bld .door-center,.bld .door-mart,.bld .door-gym{bottom:auto; width:32px; height:32px; border:none; background:none; box-shadow:none; z-index:1;}
 .bld .door.open,.bld .door-center.open,.bld .door-mart.open,.bld .door-gym.open{background:none; box-shadow:none;}
 .bld .door.open::after{content:""; position:absolute; left:8px; right:8px; top:6px; bottom:0; background:#201818; box-shadow:inset 0 3px 0 #000; animation:doorOpen .2s steps(3);}
+
+/* ---------- Last pixel-art pieces (tools/art/finish.js) ---------- */
+/* Shoreline overlays (edgeOverlay → --ov); corners are drawn in the art, so no CSS rounding or grass underlay. */
+.t-path::after,.t-exit::after,.t-water::after{content:""; position:absolute; inset:0; background-image:var(--ov,none); background-size:32px 32px; background-repeat:no-repeat; image-rendering:pixelated; pointer-events:none;}
+.t-water::before,.t-path::before,.t-exit::before{display:none;}
+/* Beyond the map's edge: dense forest canopy (scrolls with the camera). */
+.ow-view{background-color:#1e4a1c; background-image:var(--art-forest_fill); background-size:32px 32px; image-rendering:pixelated;}
+.ow-view.indoors{background-image:none;}
+/* Gyms: themed floors and maze walls. */
+.gym-fire :is(.t-floor,.t-gymwall,.t-statue){background:var(--art-gymfloor_fire) 0 0/32px 32px !important;}
+.gym-ground :is(.t-floor,.t-gymwall,.t-statue){background:var(--art-gymfloor_ground) 0 0/32px 32px !important;}
+.gym-ghost :is(.t-floor,.t-gymwall,.t-statue){background:var(--art-gymfloor_ghost) 0 0/32px 32px !important;}
+.gym-water :is(.t-floor,.t-gymwall,.t-statue){background:var(--art-gymfloor_water) 0 0/32px 32px !important;}
+.room-gym .t{image-rendering:pixelated;}
+.room-gym .t-gymwall::before{inset:0; border-radius:0; box-shadow:none; background:var(--gw) 0 0/32px 32px no-repeat;}
+.gym-fire .t-gymwall{--gw:var(--art-gymwall_fire);} .gym-ground .t-gymwall{--gw:var(--art-gymwall_ground);} .gym-ghost .t-gymwall{--gw:var(--art-gymwall_ghost);}
+/* Ledge-landing dust: three frames. */
+.ow-dust{height:16px; background:var(--art-dust_1) 0 0/32px 16px no-repeat; image-rendering:pixelated; animation:dustArt .4s steps(1) forwards;}
+@keyframes dustArt{0%{background-image:var(--art-dust_1);} 33%{background-image:var(--art-dust_2);} 66%{background-image:var(--art-dust_3);} 100%{background-image:var(--art-dust_3); opacity:0;}}
