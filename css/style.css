@@ -906,3 +906,27 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .start-btn{left:50%; transform:translateX(-50%); bottom:30px;}
 .start-btn:active{transform:translate(-50%,2px);}
 .gb-controls::before{right:10%; bottom:22px; width:36px; height:36px; background:radial-gradient(circle,#6a080e 0 2px,transparent 2.6px) 0 0/9px 9px;}
+
+/* ---------- Handheld colourways (OPTION > FRAME → #adv[data-shell]) ----------
+   --s1..--s4 shell light→deep, --shi highlight, --slbl label text, --b1/--b2 button dome, --bt button letters. */
+#adv{--s1:#e8424a; --s2:#cc222a; --s3:#a8121a; --s4:#6a080e; --shi:#ff8a8e66; --slbl:#ffd0d4; --b1:#4a4a54; --b2:#18181e; --bt:#c8c8d0;}
+#adv[data-shell="black"]{--s1:#4a4a54; --s2:#303038; --s3:#1e1e24; --s4:#08080c; --shi:#ffffff26; --slbl:#c8c8d0; --b1:#5a5a66; --b2:#202028; --bt:#d0d0d8;}
+#adv[data-shell="white"]{--s1:#fdfdfe; --s2:#eceef3; --s3:#cfd3dc; --s4:#8a90a0; --shi:#ffffffcc; --slbl:#5a6070; --b1:#f4f6fa; --b2:#c4cad6; --bt:#5a6a80;}
+#adv[data-shell="blue"]{--s1:#4a78e8; --s2:#2c56c8; --s3:#1c3a98; --s4:#0e1f5a; --shi:#9ab8ff66; --slbl:#d0dcff; --b1:#4a4a54; --b2:#18181e; --bt:#c8c8d0;}
+#adv[data-shell="silver"]{--s1:#e8eaee; --s2:#cdd1d7; --s3:#a6abb3; --s4:#5a5e66; --shi:#ffffffaa; --slbl:#3a3e46; --b1:#4a4a54; --b2:#18181e; --bt:#c8c8d0;}
+#adv[data-shell="pink"]{--s1:#fac2d4; --s2:#ef9ab4; --s3:#d0708e; --s4:#7a3048; --shi:#ffe4ee88; --slbl:#5a2034; --b1:#fdf0f4; --b2:#e6b8c8; --bt:#7a3048;}
+#adv[data-shell="yellow"]{--s1:#ffe066; --s2:#f5c518; --s3:#c99a00; --s4:#6a5000; --shi:#fff4b088; --slbl:#4a3a00; --b1:#4a4a54; --b2:#18181e; --bt:#e8e0c0;}
+#adv[data-shell="teal"]{--s1:#70d8cc; --s2:#3cb6a8; --s3:#1f8a7e; --s4:#0c4a44; --shi:#c8fff866; --slbl:#0c3a34; --b1:#fdfdfd; --b2:#c8e8e4; --bt:#1f6a62;}
+.sp-lid{background:linear-gradient(165deg,var(--s1) 0%,var(--s2) 55%,var(--s3) 100%); box-shadow:inset 0 2px 0 var(--shi), inset 0 -2px 0 var(--s4), 0 8px 18px #0008;}
+.sp-lid .ow-screen{box-shadow:0 0 0 2px var(--s4), 0 2px 0 3px var(--shi);}
+.sp-lid::after{background:linear-gradient(var(--s3) 0%,var(--s1) 35%,var(--s2) 60%,var(--s4) 100%);}
+.gb-controls{background:linear-gradient(170deg,var(--s1) 0%,var(--s2) 50%,var(--s3) 100%); box-shadow:inset 0 -3px 0 var(--s4), 0 8px 18px #0008;}
+.gb-controls::before{background:radial-gradient(circle,var(--s4) 0 2px,transparent 2.6px) 0 0/9px 9px;}
+.sp-deco::before,.sp-deco::after{box-shadow:inset 0 1px 0 #ffffff22, 0 1px 0 var(--shi);}
+.dpad::before{background:radial-gradient(circle,var(--s3) 0 60%,var(--s2) 100%); box-shadow:inset 0 3px 6px #0006, 0 1px 0 var(--shi);}
+.ab-btns::before{background:linear-gradient(var(--s3),var(--s2)); box-shadow:inset 0 3px 6px #0006, 0 1px 0 var(--shi);}
+.dpad button,.dpad-hub{background:linear-gradient(var(--b1),var(--b2));}
+.dpad-hub{background:radial-gradient(circle,var(--b2) 0 8px,var(--b1) 9px);}
+.ab{background:radial-gradient(circle at 38% 30%,var(--b1),var(--b2) 72%); color:var(--bt);}
+.start-btn{background:radial-gradient(circle at 40% 35%,var(--b1),var(--b2) 75%); box-shadow:0 2px 0 var(--s4), inset 0 1px 0 #ffffff33;}
+.start-btn::after{color:var(--slbl);}

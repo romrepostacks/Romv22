@@ -2496,8 +2496,11 @@ function bagDraw(anim){
 
 // OPTION: only the rows that mean something here. Left/Right change the value (wraps); the
 // chosen value is red; B or CANCEL saves and closes. Emerald plays no sounds on this page.
+// The handheld's colourway (OPTION > FRAME), kept in the save; the stylesheet colours #adv by data-shell.
+const SHELLS = ['RED', 'BLACK', 'WHITE', 'BLUE', 'SILVER', 'PINK', 'YELLOW', 'TEAL'];
+function applyShell(){ const el = document.getElementById('adv'); if(el) el.dataset.shell = ((adv && adv.shell) || 'RED').toLowerCase(); }
 function optionOpen(){
-  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON']];
+  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
   const val = r=> r[1]==='sound' ? (adv.sound===false ? 'OFF' : 'ON') : (adv[r[1]] || r[3]);
   const s = scrOpen('opt', k=>{
     if(k==='b' || k==='a' && s.i===rows.length){ saveAdv(); return scrClose(); }
@@ -2506,12 +2509,13 @@ function optionOpen(){
     if(r && (k==='left' || k==='right')){
       const v = r[2][(r[2].indexOf(val(r)) + (k==='left' ? r[2].length-1 : 1)) % r[2].length];
       if(r[1]==='sound') adv.sound = v==='ON'; else adv[r[1]] = v;
+      if(r[1]==='shell') applyShell();
     }
     draw();
   });
   s.silent = true;   // Emerald plays no sounds on this page
   const draw = ()=>{ s.el.innerHTML = `<div class="opt-title">OPTION</div><div class="opt-rows">
-    ${rows.map((r,k)=>`<div class="${s.i===k?'on':''}">${r[0]}<span>${r[2].map(v=>`<em class="${v===val(r)?'sel':''}">${v}</em>`).join('')}</span></div>`).join('')}
+    ${rows.map((r,k)=>`<div class="${s.i===k?'on':''}">${r[0]}<span>${r[2].length>3 ? `<em class="sel">◀ ${val(r)} ▶</em>` : r[2].map(v=>`<em class="${v===val(r)?'sel':''}">${v}</em>`).join('')}</span></div>`).join('')}
     <div class="${s.i===rows.length?'on':''}">CANCEL</div></div>`; };
   s.i = 0; draw();
 }
@@ -2521,7 +2525,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.12-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.13-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3332,6 +3336,7 @@ function renderMap(){
 
 function renderAdventure(){
   showAdvScreens();
+  applyShell();
   const loc = LOCATIONS[adv.loc];
   adv.visited[loc.name] = true;
   adv.party.concat(adv.box.filter(Boolean)).forEach(markOwned);   // saves from before the Pokédex
