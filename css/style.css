@@ -1002,3 +1002,13 @@ body:has(#adv:not(.hidden)){background:#141418;}
 /* Tidewarden tablet (tools/art/story.js): stands 8 art px over the tile above. */
 .t-tablet{background:var(--art-grass_v0) 0 0/32px 32px; image-rendering:pixelated;}
 .t-tablet::before{content:""; position:absolute; left:0; top:-16px; width:32px; height:48px; z-index:2; background:var(--art-tablet) 0 0/32px 48px no-repeat; image-rendering:pixelated;}
+
+/* Message of the day (title) and the What's New page (over the handheld's screen, like setup). */
+.tt-motd{max-width:84%; margin-top:16px; font:18px/1.4 "Pixelify Sans",sans-serif; color:#fff; text-shadow:1px 1px 0 #1a3a70;}
+.sp-lid > #newsPage{position:absolute; z-index:6; margin:0; border-radius:4px; overflow:auto; box-sizing:border-box; overscroll-behavior:contain; padding-bottom:0;}
+.news-motd{background:#fff6d0; border:2px solid #e0c060; border-radius:6px; padding:8px 10px; margin-bottom:10px; font-size:.9em;}
+.news-entry{margin-bottom:12px;}
+.news-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px; border-bottom:2px solid #d8dce8; padding-bottom:2px; margin-bottom:4px;}
+.news-head small{opacity:.65; white-space:nowrap;}
+.news-entry ul{margin:0; padding-left:18px;} .news-entry li{margin:2px 0; font-size:.9em;}
+#newsPage .draft-foot{bottom:0; margin-bottom:0; border-radius:8px 8px 0 0;}

@@ -1,0 +1,53 @@
+{
+  "_howto": "Edit this file to change the title screen message (motd) or add a changelog entry. Newest entry first. Each entry: version, date (YYYY-MM-DD), title, changes (short bullet points, player-facing). The game fetches this file fresh on every launch.",
+  "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
+  "changelog": [
+    {
+      "version": "0.10.0",
+      "date": "2026-09-27",
+      "title": "Story Phase 1: Storm Clouds",
+      "changes": [
+        "Team Tempest arrives: grunts on Marrow Pass, Hollow Bluffs and Emberflow Delta",
+        "Portmere Harbour replaces the unfinished ??? town, with Admin Vesper's scene at the docks",
+        "Tidewarden stone tablets on four side areas tell the legend of a guardian beneath the sea",
+        "PROF. HAWTHORN calls on your POKéNAV after badges 1, 2 and 4",
+        "Story townsfolk in every gym town, and new lines from your rival Wren"
+      ]
+    },
+    {
+      "version": "0.9.17–0.9.23",
+      "date": "2026-09-27",
+      "title": "The Handheld",
+      "changes": [
+        "The whole game plays on a GBA SP-style handheld: title, intro, overworld, battles and Free Battle",
+        "Eight shell colours to choose from in OPTION > FRAME",
+        "SELECT opens the map; B, SELECT or START closes it",
+        "A FEEDBACK button right on the controller",
+        "Phones get a taller screen that shows more of the world",
+        "Nearby areas' people stay put when you cross between areas"
+      ]
+    },
+    {
+      "version": "0.9.8–0.9.10",
+      "date": "2026-09-27",
+      "title": "Pixel-Art Overworld",
+      "changes": [
+        "Trees, ground, water, signs, buildings and interiors redrawn as pixel art",
+        "New battle backdrop and platforms",
+        "Smooth entrances and exits: no more characters popping in or out",
+        "Mom at home heals your party"
+      ]
+    },
+    {
+      "version": "0.9.x",
+      "date": "2026-09-27",
+      "title": "Playtest Fixes",
+      "changes": [
+        "Anonymous in-game feedback, plus automatic crash reports",
+        "Fixed: START sometimes ignored, text highlighting on iPhone, caught Pokémon never getting a turn",
+        "Easier first route: early trainers never outnumber you",
+        "Clearer multi-Pokémon battles, and signposts at every town exit"
+      ]
+    }
+  ]
+}

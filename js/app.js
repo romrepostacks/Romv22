@@ -2577,7 +2577,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.10.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.10.1-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3128,6 +3128,12 @@ if(typeof document.addEventListener==='function'){
 // The handheld's buttons also drive the title screen and the opening intro, where there is no overworld.
 const visible = id=>{ const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
 function offWorldButton(k){
+  if(visible('newsPage')){
+    const el = document.getElementById('newsPage');
+    if(k==='up' || k==='down') el.scrollBy({top: k==='up' ? -90 : 90, behavior:'smooth'});
+    else if(k==='a' || k==='b' || k==='start') newsClose();
+    return true;
+  }
   if(mapOpen && adv){ if(k==='b' || k==='start' || k==='select') closeMap(); return true; }
   if(onTitle){ titleKey(k); return true; }
   for(const id of ['setup', 'draft']) if(visible(id)){
@@ -3691,26 +3697,49 @@ function titleShow(){
   const t = document.getElementById('owTitle');
   titleReady = true;
   t.className = 'ow-title';
-  t.innerHTML = '<div class="title-ball"></div><h1 class="logo">Party<br>Royale</h1><div class="version">Vellorin Version</div><div class="press-start">PRESS START</div><div class="tt-build">build ' + GAME_VERSION + '</div>';
+  t.innerHTML = '<div class="title-ball"></div><h1 class="logo">Party<br>Royale</h1><div class="version">Vellorin Version</div><div class="press-start">PRESS START</div><div class="tt-motd"></div><div class="tt-build">build ' + GAME_VERSION + '</div>';
+  newsTitle();
 }
 function titleKey(k){
   if(!titleReady){ clearTimeout(titleTimer); return titleShow(); }   // any button skips the splash
   if(uiMenus.length || !['a','start'].includes(k)) return;
   sfx('select');
   const sv = loadAdv(), has = !!(sv && sv.party && (sv.party.length || sv.starterPending));   // same test as startAdventure
-  const items = (has ? ['CONTINUE'] : []).concat(['NEW GAME', 'FREE BATTLE', 'IMPORT SAVE']);
+  const items = (has ? ['CONTINUE'] : []).concat(['NEW GAME', 'FREE BATTLE', newsUnread() ? "WHAT'S NEW ★" : "WHAT'S NEW", 'IMPORT SAVE']);
   document.getElementById('owTitle').classList.add('menu');   // Emerald: the menu replaces the title art
   uiMenu(document.getElementById('owView'), items, i=>{
     document.getElementById('owTitle')?.classList.remove('menu');
     const pick = items[i];
     if(!pick) return;
     if(pick==='IMPORT SAVE') return openImportSave();
+    if(pick.startsWith("WHAT'S NEW")) return newsOpen();
     leaveTitle();
     if(pick==='CONTINUE') return startAdventure();
     if(pick==='NEW GAME') return has ? newAdventurePrompt() : startAdventure();
     showSetup();
   }, 'gm-title');
 }
+// Message of the day + changelog, from news.json (edited and pushed whenever; fetched fresh each launch).
+let NEWS = null;
+function newsTitle(){ const el = document.querySelector('#owTitle .tt-motd'); if(el) el.textContent = (NEWS && NEWS.motd) || ''; }
+function newsLatest(){ return NEWS && NEWS.changelog && NEWS.changelog[0] ? NEWS.changelog[0].version : ''; }
+function newsUnread(){ try{ return !!newsLatest() && localStorage.getItem('partyroyale_news_seen') !== newsLatest(); }catch(e){ return false; } }
+function newsOpen(){
+  let el = document.getElementById('newsPage');
+  if(!el){ el = document.createElement('div'); el.id = 'newsPage'; el.className = 'panel'; document.querySelector('.sp-lid').appendChild(el); }
+  const esc = s=>String(s).replace(/[&<>"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[ch]);
+  const log = (NEWS && NEWS.changelog) || [];
+  el.innerHTML = `<div class="section-title">What's New</div>
+    ${NEWS && NEWS.motd ? `<div class="news-motd">${esc(NEWS.motd)}</div>` : ''}
+    ${log.map(e=>`<div class="news-entry"><div class="news-head"><b>${esc(e.title)}</b><small>v${esc(e.version)} · ${esc(e.date)}</small></div>
+      <ul>${(e.changes||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('') || '<p class="note">No news yet.</p>'}
+    <div class="row draft-foot"><button class="primary" onclick="newsClose()">Back</button></div>`;
+  el.classList.remove('hidden'); el.scrollTop = 0;
+  fitPage();
+  try{ localStorage.setItem('partyroyale_news_seen', newsLatest()); }catch(e){}
+}
+function newsClose(){ document.getElementById('newsPage')?.classList.add('hidden'); }
+if(typeof fetch!=='undefined') fetch('news.json', {cache:'no-cache'}).then(r=>r.ok ? r.json() : null).then(n=>{ if(n){ NEWS = n; newsTitle(); } }).catch(()=>{});
 function leaveTitle(){ onTitle = false; clearTimeout(titleTimer); document.getElementById('owTitle')?.remove(); document.getElementById('adv').classList.remove('on-title'); }
 function showSetup(){
   document.getElementById('titleScreen').classList.add('hidden');
@@ -4268,7 +4297,7 @@ function fitBattle(){
 // scale (not the game's pixel scale) and scroll inside it.
 function fitPage(){
   const scr = document.getElementById('owScreen');
-  for(const id of ['setup', 'draft']){
+  for(const id of ['setup', 'draft', 'newsPage']){
     const el = document.getElementById(id);
     if(!el || el.classList.contains('hidden') || !scr) continue;
     Object.assign(el.style, {left: scr.offsetLeft + scr.clientLeft + 'px', top: scr.offsetTop + scr.clientTop + 'px', width: scr.clientWidth + 'px', height: scr.clientHeight + 'px'});
