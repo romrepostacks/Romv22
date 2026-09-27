@@ -2058,6 +2058,19 @@ function nurseHeal(n){
 
 // ---------- START menu (Emerald: a window on the right, cursor remembered) ----------
 let startIdx = 0;
+// Touch screens get the phone layout (css: pointer:coarse): just the screen and controls, so the page's
+// save and title-screen buttons move to START > SYSTEM.
+const PHONE = typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches;
+function systemMenu(){
+  owBusy = true;
+  uiMenu(document.getElementById('owView'), ['EXPORT SAVE', 'IMPORT SAVE', 'TITLE SCREEN', 'CANCEL'], k=>{
+    owBusy = false;
+    if(k===0) return exportSaveCode();
+    if(k===1) return openImportSave();
+    if(k===2) return showConfirm('Return to the title screen? Your progress is saved.', ok=>{ if(ok){ saveAdv(); resetAll(); } else startMenu(); });
+    startMenu();
+  }, 'gm-start');
+}
 let startQueued = false;
 function startMenu(){
   if(owMoving && owActive() && !uiMenus.length){ startQueued = true; held.length = 0; return; }   // open when this step lands
@@ -2065,7 +2078,7 @@ function startMenu(){
   owBusy = true; held.length = 0;
   const name = adv.playerName.toUpperCase();
   // POKéDEX shows up once you've seen something.
-  const items = (Object.keys(adv.seen||{}).length ? ['POKéDEX'] : []).concat((adv.party.length ? ['POKéMON'] : []).concat(['BAG', 'POKéNAV', name, 'SAVE', 'OPTION', 'FEEDBACK', 'EXIT']));
+  const items = (Object.keys(adv.seen||{}).length ? ['POKéDEX'] : []).concat((adv.party.length ? ['POKéMON'] : []).concat(['BAG', 'POKéNAV', name, 'SAVE', 'OPTION'], PHONE ? ['SYSTEM'] : [], ['FEEDBACK', 'EXIT']));
   sfx('open');
   const m = uiMenu(document.getElementById('owView'), items, k=>{
     owBusy = false;
@@ -2076,6 +2089,7 @@ function startMenu(){
     if(pick==='BAG') return bagOpen();
     if(pick==='OPTION') return optionOpen();
     if(pick==='FEEDBACK') return feedbackOpen();
+    if(pick==='SYSTEM') return systemMenu();
     if(pick==='POKéNAV') return toggleMap();
     if(pick===name){
       return cardOpen();
@@ -2434,7 +2448,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.5-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.6-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -2443,6 +2457,22 @@ function feedbackContext(){
   return ['', '', '---', `Version: ${GAME_VERSION}`, `Where: ${loc ? loc.name : '?'}${adv.inside ? ' (inside '+adv.inside+')' : ''} @ ${adv.pos ? adv.pos.x+','+adv.pos.y : '?'}`,
     `Party: ${(adv.party||[]).map(m=>m.name+' L'+m.level).join(', ') || 'none'}`, `Badges: ${LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length}`,
     `Device: ${innerWidth}×${innerHeight} @${devicePixelRatio}x, ${matchMedia('(display-mode: standalone)').matches ? 'installed' : 'browser'}`, `UA: ${navigator.userAgent}`].join('\n');
+}
+// Crash reports: an uncaught error files itself through the relay with the build and where the player
+// was, so testers never have to describe a crash. Each message once, at most 3 per session.
+const crashSent = new Set();
+function reportCrash(msg, stack){
+  msg = String(msg || 'Unknown error');
+  if(!FEEDBACK_ENDPOINT || msg==='Script error.' || crashSent.size>=3 || crashSent.has(msg)) return;
+  crashSent.add(msg);
+  let ctx = '';
+  try{ ctx = adv ? feedbackContext() : `\n\n---\nVersion: ${GAME_VERSION} (before the adventure started)`; }catch(e){ ctx = `\n\n---\nVersion: ${GAME_VERSION}`; }
+  const text = `Crash: ${msg}`.slice(0, 200) + '\n\n```\n' + String(stack || '(no stack)').slice(0, 1200) + '\n```';
+  fetch(FEEDBACK_ENDPOINT, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind:'Bug', text, context:ctx})}).catch(()=>{});
+}
+if(typeof window!=='undefined' && window.addEventListener){
+  window.addEventListener('error', e=>reportCrash(e.message, e.error && e.error.stack));
+  window.addEventListener('unhandledrejection', e=>reportCrash(e.reason && e.reason.message || e.reason, e.reason && e.reason.stack));
 }
 function feedbackOpen(){
   owBusy = true;
@@ -2953,6 +2983,14 @@ if(typeof document.addEventListener==='function'){
 }
 
 function saveAdv(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){} }
+// Phones close backgrounded apps without warning, so save the moment the game is hidden (the game
+// already saves whenever you stop walking and after most events). And ask the browser to keep the
+// save: Safari otherwise clears a site's storage after about a week without a visit.
+if(typeof document!=='undefined' && document.addEventListener){
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && adv) saveAdv(); });
+  window.addEventListener('pagehide', ()=>{ if(adv) saveAdv(); });
+  if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+}
 function patchAdv(a){
   if(!a) return a;
   for(const m of [...(a.party||[]), ...(a.box||[])]) if(m) delete m.caught;
