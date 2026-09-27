@@ -995,8 +995,13 @@ function buildTown(loc){
   }));
   // Roads: west/east on the centre's road rows, a 3-wide lane north/south; openings in the border.
   const OPEN = {left:{x:0,y:OY+5,len:4}, right:{x:W-1,y:OY+5,len:4}, up:{x:LANE,y:0,len:3}, down:{x:LANE,y:H-1,len:3}};
-  const exits = [];
+  const exits = [], ARROW = {left:'←', right:'→', up:'↑', down:'↓'};
+  const signs = [{x:P(3), y:8+OY, text:loc.name.toUpperCase()}];
   for(const l of loc.links){
+    // A sign beside the road just inside each exit, as on routes.
+    const [sx, sy] = {left:[3, OY+5], right:[W-4, OY+5], up:[LANE-1, 3], down:[LANE+3, H-4]}[l.dir];
+    tiles[sy][sx] = 'N';
+    signs.push({x:sx, y:sy, route:true, text:`${loc.name.toUpperCase()}\n${ARROW[l.dir]} ${LOCATIONS[l.to].name.toUpperCase()}`});
     if(l.dir==='left')  for(let x=0; x<=OX; x++) tiles[OY+6][x] = tiles[OY+7][x] = ':';
     if(l.dir==='right') for(let x=OX+21; x<W; x++) tiles[OY+6][x] = tiles[OY+7][x] = ':';
     if(l.dir==='up')    for(let y=0; y<OY+6; y++) for(let x=LANE; x<LANE+3; x++) tiles[y][x] = ':';
@@ -1022,7 +1027,7 @@ function buildTown(loc){
   const npcs = [[14,8],[5,10]].map(([x,y])=>({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:P(x), y:y+OY, facing:'down', wander:true,
     lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:P(x), y:y+OY}}));
   npcs.push({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:OX+24, y:OY+15, facing:'left', wander:true, lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:OX+24, y:OY+15}});
-  const map = finishMap(tiles, b, npcs, exits, {x:P(5), y:7+OY}, [{x:P(3), y:8+OY, text:loc.name.toUpperCase()}]);
+  const map = finishMap(tiles, b, npcs, exits, {x:P(5), y:7+OY}, signs);
   // Trees and flowers in the outskirts, kept two tiles clear of roads, buildings and people, and
   // undone if they'd cut anything off.
   const near = (x,y)=>{
@@ -2429,7 +2434,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.4-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.5-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -2950,6 +2955,7 @@ if(typeof document.addEventListener==='function'){
 function saveAdv(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){} }
 function patchAdv(a){
   if(!a) return a;
+  for(const m of [...(a.party||[]), ...(a.box||[])]) if(m) delete m.caught;
   if(!a.cleared) a.cleared={};
   if(!a.items) a.items = {pokeball:10};
   if(!a.box) a.box=[];
@@ -3061,13 +3067,19 @@ function beginNewStory(){
   document.addEventListener('keydown', key);
   say();
 }
+// Which way ROUTE 1 lies from home, in compass and on-screen terms (towns can be mirrored).
+function routeOneWay(){
+  const l = LOCATIONS[0].links.find(l=>/^route 1\b/i.test(LOCATIONS[l.to].name)) || LOCATIONS[0].links[0];
+  const way = {right:['east', 'right'], left:['west', 'left'], up:['north', 'up'], down:['south', 'down']}[l.dir];
+  return `ROUTE 1 is ${way[0]} of town. Follow the road ${l.dir==='up'||l.dir==='down' ? way[1] : 'to the '+way[1]}!`;
+}
 function introFinish(name){
   document.getElementById('starterSelect').classList.add('hidden');
   adv = {playerName:name, party:[], loc:0, cleared:{}, visited:{}, items:{pokeball:10}, box:[], money:3000,
     starterPending:true, starterTrio:starterOptions.map(d=>d.name)};
   saveAdv();
   renderAdventure();
-  owSay([`${PROF} went out toward ROUTE 1 to study wild POKéMON.`, "Maybe you should go and find him! ROUTE 1 is east of town."]);
+  owSay([`${PROF} went out toward ROUTE 1 to study wild POKéMON.`, `Maybe you should go and find him! ${routeOneWay()}`]);
 }
 
 // ---- Route 1: "H-help me!" ----
@@ -3429,6 +3441,8 @@ function advanceMsgBox(){
   if(cmd) cmd.classList.add('hidden');
 }
 function alive(side){ return side.filter(m=>!m.fainted && !m.caught); }
+// Once its battle is over, a caught Pokémon is just a party (or Box) member.
+function clearCaught(){ if(adv) for(const m of [...adv.party, ...adv.box]) if(m) delete m.caught; }
 
 function renamePartyMon(i){
   const m = adv.party[i];
@@ -3633,7 +3647,7 @@ function cmdRun(){
   if(state.mode==='free'){ showConfirm('Forfeit this battle?', ok=>{ if(ok){ cmd=null; resetAll(); } }); return; }
   if(state.trainerLoc){ showMsgBox(["No! There's no running from a Trainer battle!"], ()=>renderCmd(3)); return; }
   showMsgBox(['Got away safely!'], ()=>{
-    cmd = null; state = null;
+    cmd = null; state = null; clearCaught();
     document.getElementById('battle').classList.add('hidden');
     saveAdv(); renderAdventure();
   });
@@ -3722,7 +3736,7 @@ function submitTurn(){
   actions.sort((a,b)=>(b.item?1:0) - (a.item?1:0) || effSpeed(b.user) - effSpeed(a.user));   // items go first
 
   for(const act of actions){
-    if(act.user.fainted || act.target.fainted || act.target.caught) continue;
+    if(act.user.fainted || act.user.caught || act.target.fainted || act.target.caught) continue;
     if(act.item){ const said = useItem(act.item, act.user); addLog(said ? `${adv.playerName} used a ${ITEM_INFO[act.item].name}! ${said}` : `It won't have any effect.`); continue; }
     if(act.ball){
       if(!adv.items.pokeball){ addLog(`No Poké Balls left!`); continue; }
@@ -3786,6 +3800,7 @@ function submitTurn(){
 function checkEnd(){
   const a = alive(state.sideA).length, b = alive(state.sideB).length;
   if(a===0 || b===0){
+    clearCaught();
     document.getElementById('battle').classList.add('hidden');
     if(state.mode==='story'){
       document.getElementById('storyResult').classList.remove('hidden');
