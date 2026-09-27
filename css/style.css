@@ -984,7 +984,7 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .tt-build{position:absolute; right:10px; bottom:8px; font:10px "Press Start 2P",monospace; color:#ffffffaa;}   /* which build is running */
 
 /* FEEDBACK: its own controller button, right side (below A/B on phones). */
-#btnFeedback{left:auto; right:96px; bottom:30px; transform:none;}
+#btnFeedback{left:auto; right:160px; bottom:30px; transform:none;}   /* left of the speaker grille */
 #btnFeedback:active{transform:translateY(2px);}
 @media (pointer:coarse){ #adv #btnFeedback{top:208px; bottom:auto; right:15%;} }
 
@@ -998,3 +998,7 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .dpad>button:nth-child(8){box-shadow:inset 0 -3px 0 #0000002e;}
 .dpad [data-label]::after{content:attr(data-label); color:#00000040; font-size:12px; text-shadow:0 1px 0 #ffffff14;}
 .dpad button:active{background:var(--b2);}
+
+/* Tidewarden tablet (tools/art/story.js): stands 8 art px over the tile above. */
+.t-tablet{background:var(--art-grass_v0) 0 0/32px 32px; image-rendering:pixelated;}
+.t-tablet::before{content:""; position:absolute; left:0; top:-16px; width:32px; height:48px; z-index:2; background:var(--art-tablet) 0 0/32px 48px no-repeat; image-rendering:pixelated;}

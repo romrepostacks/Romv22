@@ -886,7 +886,7 @@ const LOCATIONS=[
  {type:'route', name:"Route 5: Cragmoor Trail", at:[2,2], desc:"Loose scree and echoing caves. Wild Pokémon lurk in the dark.", pool:['Machop','Geodude','Gastly','Onix','Cubone'], theme:'rocky'},
  {type:'gym', name:"Wispgate City", at:[3,2], desc:"Lantern-lit streets wind up to a gym wreathed in fog. Leader Sable's successor, Iska, trains ghosts and psychics.", center:true, leaderName:"Iska", leaderTeam:['Haunter','Kadabra','Gengar']},
  {type:'route', name:"Route 6: Emberflow Delta", at:[4,2], desc:"Steam vents hiss where river meets old lava rock.", pool:['Charmander','Growlithe','Numel','Krabby','Magikarp','Slugma']},
- {type:'town', name:"???", at:[5,2], desc:"The trail ahead hasn't been charted yet — more of Vellorin is on the way in a future update.", center:true, endOfContent:true},
+ {type:'town', name:"Portmere Harbour", at:[5,2], desc:"A busy port under a stubborn storm. Blue-uniformed figures guard the docks, and no ferry has sailed in days.", center:true, endOfContent:true},
  // Side areas (optional; `tier` sets their level cap to match where they branch off)
  {type:'route', name:"Whisperwood", at:[0,-1], tier:1, desc:"Old trees crowd out the sky. Bug and Grass Pokémon thrive in the shade.", pool:['Caterpie','Weedle','Oddish','Bellsprout','Wurmple','Seedot','Grubbin'], theme:'forest'},
  {type:'route', name:"Mirror Lake", at:[1,1], tier:2, desc:"A still lake reflects the sky. Water Pokémon splash near the shore.", pool:['Psyduck','Poliwag','Lotad','Marill','Surskit','Wooper'], theme:'lake'},
@@ -908,6 +908,28 @@ function linkAreas(i, j, gate){
 for(let i=0;i<13;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 for(const [i,j] of [[0,14],[1,15],[5,16],[6,17]]) linkAreas(i, j, false);
 
+// ---------- Story: Team Tempest, the Tidewardens and Wren (see STORY.md) ----------
+// grunts: Tempest grunts among a route's trainers; tablet: a Tidewarden stone to read; storyNpc: a
+// townsperson with story lines; rivalAfter: what Wren says before leaving; scene: plays on first entry.
+Object.assign(LOCATIONS[2], {rivalAfter:["Not bad at all! I'm heading for Cindergate's Gym.", "Bet I get my badge before you do!"]});
+Object.assign(LOCATIONS[9], {rivalAfter:["...You're really something, you know that?", "Hey. Ever heard of TEAM TEMPEST? Their Admin says she can make me the strongest trainer in Vellorin.", "I haven't said yes. ...Yet. See you around."]});
+Object.assign(LOCATIONS[4], {grunts:2, scene:'tempestRun'});
+Object.assign(LOCATIONS[6], {grunts:2});
+Object.assign(LOCATIONS[12], {grunts:2});
+Object.assign(LOCATIONS[13], {scene:'portmere', storyNpc:{kind:'fisher', lines:["The ferry's shut while this storm hangs over the harbour.", "TEAM TEMPEST took over the docks. Nobody sails until they're gone."]}});
+Object.assign(LOCATIONS[3], {storyNpc:{kind:'boy', lines:["A trainer called WREN blew through here, set on being the strongest in Vellorin.", "Something tells me you'll run into them again."]}});
+Object.assign(LOCATIONS[5], {storyNpc:{kind:'fisher', lines:["Folks in blue uniforms were down at the sea wall, asking about the TIDEWARDENS.", "TEAM TEMPEST, they called themselves. Gave me the creeps."]}});
+Object.assign(LOCATIONS[7], {storyNpc:{kind:'hiker', lines:["See those old stone tablets around Vellorin? The TIDEWARDENS carved them, long before any town stood here.", "Nobody's read them all. Maybe you could!"]}});
+Object.assign(LOCATIONS[11], {storyNpc:{kind:'oldwoman', lines:["My grandmother spoke of a silver-winged guardian sleeping beneath the sea.", "When it stirs, the storms come... and lately the skies have been restless."]}});
+Object.assign(LOCATIONS[14], {tablet:["The stone is carved in old TIDEWARDEN script...", "\"When sky and sea raged as one, we sang the silver guardian to sleep.\""]});
+Object.assign(LOCATIONS[15], {tablet:["The stone is carved in old TIDEWARDEN script...", "\"The guardian dreams in a shrine beneath the waves. Let none disturb its rest.\""]});
+Object.assign(LOCATIONS[16], {tablet:["The stone is carved in old TIDEWARDEN script...", "\"Only one who can walk beneath the sea will find the shrine.\""]});
+Object.assign(LOCATIONS[17], {tablet:["The stone is carved in old TIDEWARDEN script...", "\"Should greed wake the guardian, the storms will never end.\""]});
+const TEMPEST_POOL = ['Poochyena','Zubat','Carvanha','Wingull','Electrike','Koffing'];
+const GRUNT_INTRO = ["Team Tempest doesn't take kindly to snoops!", "The storm's coming, kid. Out of our way!", "You saw nothing, got it? ...No? Then we battle!"];
+const GRUNT_AFTER = ["Tch... The Admin won't like this.", "Laugh while you can. When the guardian wakes, the skies are ours!", "Whatever. Tempest has bigger fish to fry."];
+const ADMIN = 'ADMIN VESPER';
+
 // --- Overworld (GBA style) ---
 // Hand-laid towns / generated routes with painted buildings, a 15×10-tile camera that follows the
 // player, exits on any side leading to neighbouring areas, and frame-synced hold-to-walk movement.
@@ -927,7 +949,7 @@ function seedRand(str){
 // Ledges: the direction you can hop over them.
 const LEDGE_DIR = {'L':'down', '>':'right', '<':'left'};
 const TILE_CLS = {'x':'gymwall','I':'item','L':'ledge','>':'ledge-e','<':'ledge-w','N':'rsign','r':'rock','b':'bush','T':'tree','.':'grass',':':'path','"':'tall','~':'water','*':'flower','F':'fence','S':'sign','E':'exit','B':'grass','D':'path',
-  '#':'wall','_':'floor','o':'rug','M':'mat','c':'counter','h':'healer','P':'pc','k':'bookshelf','v':'tv','e':'bed','t':'table','p':'plant','s':'shelf','u':'statue',
+  '#':'wall','_':'floor','o':'rug','M':'mat','c':'counter','h':'healer','P':'pc','k':'bookshelf','v':'tv','e':'bed','t':'table','p':'plant','s':'shelf','u':'statue','^':'tablet',
   'n':'wall wmon','m':'wall wmap','w':'wall wwin','K':'wall wclock','C':'counter cend','q':'seat','Q':'seat yellow','g':'glasstable'};
 const WALKABLE = new Set(['.',':','"','*','E','D','_','o','M']);
 const TOWN_ROWS = [
@@ -1002,7 +1024,7 @@ function buildTown(loc){
   const signs = [{x:P(3), y:8+OY, text:loc.name.toUpperCase()}];
   for(const l of loc.links){
     // A sign beside the road just inside each exit, as on routes.
-    const [sx, sy] = {left:[3, OY+5], right:[W-4, OY+5], up:[LANE-1, 3], down:[LANE+3, H-4]}[l.dir];
+    const [sx, sy] = {left:[3, OY+4], right:[W-4, OY+4], up:[LANE-1, 3], down:[LANE+3, H-4]}[l.dir];   // just outside the opening, never in it
     tiles[sy][sx] = 'N';
     signs.push({x:sx, y:sy, route:true, text:`${loc.name.toUpperCase()}\n${ARROW[l.dir]} ${LOCATIONS[l.to].name.toUpperCase()}`});
     if(l.dir==='left')  for(let x=0; x<=OX; x++) tiles[OY+6][x] = tiles[OY+7][x] = ':';
@@ -1032,6 +1054,7 @@ function buildTown(loc){
   const npcs = [[14,8],[5,10]].map(([x,y])=>({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:P(x), y:y+OY, facing:'down', wander:true,
     lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:P(x), y:y+OY}}));
   npcs.push({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:OX+24, y:OY+15, facing:'left', wander:true, lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:OX+24, y:OY+15}});
+  if(loc.storyNpc) npcs.push({kind:loc.storyNpc.kind, x:P(9), y:OY+12, facing:'down', lines:loc.storyNpc.lines, home:{x:P(9), y:OY+12}});
   const map = finishMap(tiles, b, npcs, exits, {x:P(5), y:7+OY}, signs);
   // Trees and flowers in the outskirts, kept two tiles clear of roads, buildings and people, and
   // undone if they'd cut anything off.
@@ -1219,7 +1242,7 @@ function buildRoute(loc){
   }
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
   const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS']}[loc.theme||'plain'];
-  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher'};
+  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt'};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
   const TR_INTRO = ["Our eyes met! That means we battle!", "Hey! You look tough. Let's see!", "I just caught these guys. Try them out!", "You're not getting past without a battle!", "My Pokémon and I trained all day for this!"];
@@ -1234,10 +1257,13 @@ function buildRoute(loc){
     let clear = true;   // an open line of sight from them back to the path
     for(let s=1; s<dist; s++) if(!WALKABLE.has(tiles[y-dy*s][x-dx*s])) clear = false;
     if(!clear) continue;
-    const cls = TR_CLASSES[Math.floor(rnd()*TR_CLASSES.length)];
-    const size = 2 + Math.floor(rnd()*4), team = Array.from({length:size}, ()=>pool[Math.floor(rnd()*pool.length)]);
-    npcs.push({kind:TR_KIND[cls], x, y, facing:OPPOSITE[d], trainer:true, id:`${loc.name}#${made}`, title:`${cls} ${(names=>names[Math.floor(rnd()*names.length)])(TR_NAMES[cls==='LASS' ? 'girl' : 'boy'])}`,
-      team, intro:TR_INTRO[Math.floor(rnd()*TR_INTRO.length)], after:TR_AFTER[Math.floor(rnd()*TR_AFTER.length)], home:{x,y}});
+    const grunt = made < (loc.grunts||0), pick = TR_CLASSES[Math.floor(rnd()*TR_CLASSES.length)], cls = grunt ? 'TEMPEST GRUNT' : pick;
+    const tp = grunt ? TEMPEST_POOL : pool;
+    const size = 2 + Math.floor(rnd()*4), team = Array.from({length:size}, ()=>tp[Math.floor(rnd()*tp.length)]);
+    const named = `${cls} ${(names=>names[Math.floor(rnd()*names.length)])(TR_NAMES[cls==='LASS' ? 'girl' : 'boy'])}`;
+    const ii = Math.floor(rnd()*TR_INTRO.length), ai = Math.floor(rnd()*TR_AFTER.length);
+    npcs.push({kind:TR_KIND[cls], x, y, facing:OPPOSITE[d], trainer:true, id:`${loc.name}#${made}`, title:grunt ? 'TEMPEST GRUNT' : named,
+      team, intro:grunt ? GRUNT_INTRO[ii % GRUNT_INTRO.length] : TR_INTRO[ii], after:grunt ? GRUNT_AFTER[ai % GRUNT_AFTER.length] : TR_AFTER[ai], home:{x,y}});
     made++;
   }
   // Item balls lying in the grass (A picks them up, once).
@@ -1246,6 +1272,7 @@ function buildRoute(loc){
     const sp = freeSpot(); if(!sp) break;
     tiles[sp.y][sp.x] = 'I'; items.push(sp);
   }
+  if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
   const first = spots[exits[0].dir];
   return finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
@@ -1380,6 +1407,8 @@ const CHARS = {
   oldman:   {head:'bald',  K:'#282830',R:'#e04040',W:'#f0f0f0',S:'#f0c098',H:'#b8b8c0',B:'#907050',D:'#504030',Y:'#907050'},
   oldwoman: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#c8c8d0',B:'#8870b0',D:'#8870b0',Y:'#8870b0'},
   mom:      {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d0b0',H:'#8a4a28',B:'#e8a0b8',D:'#5068a8',Y:'#f8f0e0'},
+  grunt:    {head:'cap',   K:'#282830',R:'#2c3e62',W:'#48d0c8',S:'#f0c098',H:'#1e1e24',B:'#2c3e62',D:'#1a2438',Y:'#48d0c8'},
+  admin:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d0b0',H:'#c8d0e8',B:'#18233a',D:'#18233a',Y:'#e0c040'},
   nurse:    {head:'nurse', K:'#282830',R:'#e04848',W:'#f8f8f8',S:'#f8d0b0',H:'#f890b0',B:'#f8c0d0',D:'#f8c0d0',Y:'#f8c0d0'},
   prof:     {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#6a5040',B:'#f0f0f0',D:'#5a4a38',Y:'#c8c8d0'},
   clerk:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#302018',B:'#4878d8',D:'#30406a',Y:'#4878d8'},
@@ -1870,7 +1899,7 @@ function crossArea(){
   adv.visited[LOCATIONS[adv.loc].name] = true;
   saveAdv();
   renderAdventure();
-  if(adv.starterPending && adv.loc===1){ held.length = 0; starterEvent(); }
+  if(adv.starterPending && adv.loc===1){ held.length = 0; starterEvent(); } else storyEnter();
 }
 function owArrive(ch, endedAt){
   if(!curMap().interior && !inMap(curMap(), adv.pos.x, adv.pos.y)) crossArea();
@@ -1998,7 +2027,7 @@ function owInteract(){
   const npc = npcAt(tx, ty);
   if(npc) return talkTo(npc);
   const sign = map.signs.find(s=>s.x===tx && s.y===ty);
-  if(sign) return owSay(sign.route ? [sign.text] : [sign.text, loc.desc.replace(/\s*"[^"]*"\s*/g,' ').trim()]);
+  if(sign) return owSay(sign.lines || (sign.route ? [sign.text] : [sign.text, loc.desc.replace(/\s*"[^"]*"\s*/g,' ').trim()]));
   const ch = tileAt(map, adv.pos.x+dx, adv.pos.y+dy);
   if(ch==='P') return usePC();
   // An item ball: take it (Emerald: "Obtained ..." then "put away ... in the ... POCKET.").
@@ -2548,7 +2577,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.23-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.10.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3196,7 +3225,7 @@ function startAdventure(){
   if(saved && saved.party && (saved.party.length || saved.starterPending)){
     adv = saved;
     showAdvScreens(); renderAdventure();
-    if(adv.starterPending && adv.loc===1) starterEvent();
+    if(adv.starterPending && adv.loc===1) starterEvent(); else storyEnter();
     return;
   }
   beginNewStory();
@@ -3296,6 +3325,71 @@ function npcMove(npc, dir, n, {run=false, fadeIn=false, fadeOut=false, onStep=nu
   };
   step();
 }
+const PROF_CALLS = [
+  {flag:'call1', badges:1, lines:["Congratulations on your first badge!", "I've been studying stone tablets left around Vellorin by an ancient people, the TIDEWARDENS.", "If you find one, read it! Every line helps."]},
+  {flag:'call2', badges:2, lines:["Have you run into TEAM TEMPEST? They've been asking about the TIDEWARDENS too.", "I don't like it. Whatever they're after, please be careful."]},
+  {flag:'call3', badges:4, lines:["The tablets speak of a guardian asleep in a shrine beneath the sea.", "PORTMERE HARBOUR is the closest port to where the shrine should be... and TEAM TEMPEST is heading there."]}];
+function badgeCount(){ return LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length; }
+function storyEnter(){
+  if(!adv || adv.inside!=null || adv.starterPending || !owActive()) return;
+  adv.story ||= {};
+  const loc = LOCATIONS[adv.loc];
+  // A scene that can't be staged (no room) returns false and plays on a later visit instead.
+  if(loc.scene && !adv.story[loc.scene] && SCENES[loc.scene] && SCENES[loc.scene]()!==false){ adv.story[loc.scene] = true; saveAdv(); return; }
+  const call = PROF_CALLS.find(k=>badgeCount()>=k.badges && !adv.story[k.flag]);
+  if(call){ adv.story[call.flag] = true; saveAdv(); sfx('open'); owSay([`Beep beep beep! Incoming call from ${PROF}...`, ...call.lines.map(l=>`${PROF}: ${l}`)]); }
+}
+// A scene NPC placed n open tiles ahead of the player (null if there isn't room).
+function sceneNpc(npc, n, min=n){
+  const map = curMap(), dir = adv.facing, room = npcOpenRun(map, adv.pos.x, adv.pos.y, dir, n);
+  if(room < min) return null;
+  n = room;
+  Object.assign(npc, {x:adv.pos.x + DIRS[dir][0]*n, y:adv.pos.y + DIRS[dir][1]*n, facing:OPPOSITE[dir], event:true});
+  map.npcs.push(npc);
+  return npc;
+}
+function sceneEnd(...npcs){ const map = curMap(); map.npcs = map.npcs.filter(n=>!npcs.includes(n)); owBusy = false; renderAdventure(); }
+const SCENES = {
+  // Marrow Pass: a grunt barrels down the pass, warns you off and runs on.
+  tempestRun(){
+    held.length = 0;
+    const g = sceneNpc({kind:'grunt'}, 5, 3);
+    if(!g) return owSay(["Somewhere up the pass, someone shouts: \"Move it! TEAM TEMPEST has business on the coast!\""]);
+    owBusy = true; renderAdventure(); owBusy = true;
+    npcMove(g, g.facing, Math.abs(g.x-adv.pos.x)+Math.abs(g.y-adv.pos.y)-1, {run:true, fadeIn:true}, ()=>{
+      owBusy = false;
+      owSay(["TEMPEST GRUNT: Hey! Outta the way, kid!", "TEMPEST GRUNT: TEAM TEMPEST has business on the coast. Don't you dare follow me!"], ()=>{
+        owBusy = true;
+        const dir = OPPOSITE[g.facing];
+        npcMove(g, dir, npcOpenRun(curMap(), g.x, g.y, dir, 6), {run:true, fadeOut:true}, ()=>sceneEnd(g));
+      });
+    });
+  },
+  // Portmere Harbour: Admin Vesper briefs a grunt, spots you and leaves the grunt to stop you.
+  portmere(){
+    held.length = 0;
+    const a = sceneNpc({kind:'admin'}, 5, 3);
+    if(!a) return false;
+    const g = sceneNpc({kind:'grunt', trainer:true, id:'Portmere Harbour#tempest', title:'TEMPEST GRUNT', team:['Poochyena','Carvanha','Zubat'],
+      intro:"The Admin said nobody gets past. That means you!", after:"Go ahead, then. You'll never reach the shrine without a way to dive."}, Math.abs(a.x-adv.pos.x)+Math.abs(a.y-adv.pos.y)-2, 1);
+    a.facing = OPPOSITE[a.facing];   // talking to the grunt, back to you
+    owBusy = true; renderAdventure(); owBusy = false;
+    owSay([`${ADMIN}: The TIDEWARDENS' shrine lies somewhere beneath these very waves.`,
+      `${ADMIN}: Once we can reach it, the guardian of the sea and sky will answer to TEAM TEMPEST!`,
+      "TEMPEST GRUNT: Storms for the skies! Tempest rises!"], ()=>{
+      faceNpcToPlayer(a);
+      owSay([`${ADMIN}: ...A child? You've been trailing my grunts since MARROW PASS, haven't you?`,
+        `${ADMIN}: How tiresome. Grunt, make sure this one stays on dry land.`], ()=>{
+        owBusy = true;
+        const dir = adv.facing;
+        npcMove(a, dir, npcOpenRun(curMap(), a.x, a.y, dir, 6), {fadeOut:true}, ()=>{
+          const map = curMap(); map.npcs = map.npcs.filter(n=>n!==a); owBusy = false; renderAdventure();
+          const gg = map.npcs.find(n=>n.id==='Portmere Harbour#tempest');
+          if(gg && activeTrainer(gg)) triggerTrainer(gg);
+        });
+      });
+    });
+  }};
 function starterEvent(){
   if(curMap().npcs.some(n=>n.event)) return;   // already running
   const map = curMap(), near = [[3,0],[3,-1],[3,1],[4,0],[2,0]].map(([dx,dy])=>({x:adv.pos.x+dx, y:adv.pos.y+dy}))
@@ -3499,11 +3593,15 @@ function continueStory(){
   renderAdventure();
   const rival = adv.walkOff && curMap().npcs.find(n=>n.vanish);
   if(rival){
-    owBusy = true;
-    const dir = rival.x>adv.pos.x ? 'right' : rival.x<adv.pos.x ? 'left' : rival.y>adv.pos.y ? 'down' : 'up';
-    return npcMove(rival, dir, npcOpenRun(curMap(), rival.x, rival.y, dir, 3), {fadeOut:true}, ()=>{
-      adv.walkOff = null; owBusy = false; saveAdv(); renderAdventure(); dexRegisterNext();
-    });
+    const loc = LOCATIONS[adv.loc];
+    const leave = ()=>{
+      owBusy = true;
+      const dir = rival.x>adv.pos.x ? 'right' : rival.x<adv.pos.x ? 'left' : rival.y>adv.pos.y ? 'down' : 'up';
+      npcMove(rival, dir, npcOpenRun(curMap(), rival.x, rival.y, dir, 3), {fadeOut:true}, ()=>{
+        adv.walkOff = null; owBusy = false; saveAdv(); renderAdventure(); dexRegisterNext();
+      });
+    };
+    return loc.rivalAfter ? owSay(loc.rivalAfter.map(l=>`${loc.leaderName.toUpperCase()}: ${l}`), leave) : leave();
   }
   adv.walkOff = null;
   if(adv.starterThanks) return starterThanks();
