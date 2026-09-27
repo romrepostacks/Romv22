@@ -709,3 +709,18 @@ button{touch-action:manipulation;}
   #adv .ow-screen{margin-bottom:0;}
   #adv .gb-controls{flex:none; height:230px; margin:auto 0; position:relative;}   /* one compact group, centred below the screen */
 }
+
+/* Whose turn (several Pokémon to order): the acting one's HP box bobs with it, as in Emerald; the others
+   dim; ordered ones get a ✓; pips under "What will X do?" count through the team. */
+.hpbox.active{animation:activeBob .5s steps(2) infinite;}
+#battle.choosing [id^="hb-A"]:not(.active), #battle.choosing [id^="bs-A"]:not(.active){filter:brightness(.72) saturate(.8);}
+#battle.choosing .hpbox.ordered{position:relative;}
+#battle.choosing .hpbox.ordered::after{content:'✓'; position:absolute; right:-7px; top:-7px; width:16px; height:16px; border-radius:50%; background:#30a050; color:#fff; font:11px/16px sans-serif; text-align:center; box-shadow:0 1px 0 #0004;}
+.turn-pips{display:flex; align-items:center; gap:4px; margin-top:6px; font-size:.8em;}
+.turn-pips i{width:9px; height:9px; border-radius:50%; background:#fff4; border:1px solid #fff9;}
+.turn-pips i.done{background:#78d878;}
+.turn-pips i.now{background:#f8d030; transform:scale(1.25);}
+.turn-pips b{margin-left:4px;}
+.turn-pips small{margin-left:auto; opacity:.7;}
+/* Feedback: the optional "what were you trying to do?" line */
+.fb .fb-goal{width:100%; box-sizing:border-box; font-family:inherit; font-size:14px; border:2px solid var(--frame); border-radius:4px; padding:6px; margin-bottom:6px;}

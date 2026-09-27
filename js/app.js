@@ -1024,6 +1024,8 @@ function buildTown(loc){
     if(free) b.push(house(x, y));
   }
   for(const h of b) if(h.kind==='house') h.resident = TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)];
+  // In the home town, the house beside the Pokémon Center is yours, and Mom is in (Emerald: she heals you).
+  if(loc===LOCATIONS[0]){ const home = b.find(h=>h.kind==='house'); if(home) home.home = true; }
   const npcs = [[14,8],[5,10]].map(([x,y])=>({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:P(x), y:y+OY, facing:'down', wander:true,
     lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:P(x), y:y+OY}}));
   npcs.push({kind:TOWNSFOLK[Math.floor(rnd()*TOWNSFOLK.length)], x:OX+24, y:OY+15, facing:'left', wander:true, lines:TOWN_TALK[Math.floor(rnd()*TOWN_TALK.length)], home:{x:OX+24, y:OY+15}});
@@ -1293,7 +1295,8 @@ function getInterior(loc, bi){
   if(b.kind==='center') npcs.push({kind:'nurse', x:7, y:2, facing:'down', role:'nurse'});
   if(b.kind==='mart') npcs.push({kind:'clerk', x:1, y:6, facing:'right', role:'clerk'},
     {kind:'girl', x:7, y:3, facing:'up', wander:true, lines:["Poké Balls are the one thing you can never have too many of."]});
-  if(b.kind==='house') npcs.push({kind:b.resident || 'oldwoman', x:3, y:5, facing:'down', wander:true, lines:b.lines});
+  if(b.kind==='house' && b.home) npcs.push({kind:'mom', x:3, y:5, facing:'down', role:'mom'});
+  else if(b.kind==='house') npcs.push({kind:b.resident || 'oldwoman', x:3, y:5, facing:'down', wander:true, lines:b.lines});
   if(b.kind==='gym'){
     const g = GYM_STYLE[loc.leaderName] || {kind:'leaderFire', type:'tough'};
     npcs.push({kind:g.kind, x:7, y:2, facing:'down', trainer:true, gymLeader:true},
@@ -1373,6 +1376,7 @@ const CHARS = {
   gentleman:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#a0a0a8',B:'#484858',D:'#383840',Y:'#484858'},
   oldman:   {head:'bald',  K:'#282830',R:'#e04040',W:'#f0f0f0',S:'#f0c098',H:'#b8b8c0',B:'#907050',D:'#504030',Y:'#907050'},
   oldwoman: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#c8c8d0',B:'#8870b0',D:'#8870b0',Y:'#8870b0'},
+  mom:      {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d0b0',H:'#8a4a28',B:'#e8a0b8',D:'#5068a8',Y:'#f8f0e0'},
   nurse:    {head:'nurse', K:'#282830',R:'#e04848',W:'#f8f8f8',S:'#f8d0b0',H:'#f890b0',B:'#f8c0d0',D:'#f8c0d0',Y:'#f8c0d0'},
   prof:     {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#6a5040',B:'#f0f0f0',D:'#5a4a38',Y:'#c8c8d0'},
   clerk:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#302018',B:'#4878d8',D:'#30406a',Y:'#4878d8'},
@@ -1925,6 +1929,7 @@ function talkTo(n){
   if(n.id) return owSay([`${n.title}: "${n.after}"`]);
   if(n.gymLeader) return owSay([`${loc.leaderName}: "You've already beaten me. The road ahead is waiting for you!"`]);
   if(n.role==='nurse') return nurseTalk(n);
+  if(n.role==='mom') return momTalk();
   if(n.role==='clerk'){
     if(adv.restockedLoc !== adv.loc){
       adv.restockedLoc = adv.loc; adv.items.pokeball = (adv.items.pokeball||0) + 5; saveAdv();
@@ -2448,7 +2453,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.6-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.7-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -2480,6 +2485,7 @@ function feedbackOpen(){
   el.className = 'fb gba-menu';
   el.innerHTML = `<div class="fb-title">FEEDBACK</div>
     <div class="fb-kinds">${FEEDBACK_KINDS.map((k,i)=>`<label><input type="radio" name="fbk" value="${k}" ${i?'':'checked'}>${k}</label>`).join('')}</div>
+    <input class="fb-goal" maxlength="200" placeholder="What were you trying to do? (optional)">
     <textarea maxlength="2000" placeholder="What happened, or what should feel different?"></textarea>
     <input class="fb-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="fb-btns"><button class="fb-send">SEND</button><button class="fb-cancel">CANCEL</button></div>
@@ -2495,13 +2501,16 @@ function feedbackOpen(){
     const text = ta.value.trim();
     if(!text){ ta.focus(); return; }
     const kind = el.querySelector('input[name=fbk]:checked').value;
-    const q = new URLSearchParams({title: `[${kind}] ${text.split('\n')[0].slice(0, 60)}`, body: text + feedbackContext()});
+    const goal = el.querySelector('.fb-goal').value.trim();
+    const title = `[${kind}] ${text.split('\n')[0].slice(0, 60)}`;
+    const full = goal ? `${text}\n\n**Trying to:** ${goal}` : text;
+    const q = new URLSearchParams({title, body: full + feedbackContext()});
     const github = `https://github.com/${FEEDBACK_REPO}/issues/new?${q}`;
     const thanks = ()=>{ close(); owSay(['Thanks! Your feedback helps shape the game.']); };
     if(!FEEDBACK_ENDPOINT){ window.open(github, '_blank', 'noopener'); return thanks(); }
     send.disabled = true; send.textContent = 'SENDING…';
     fetch(FEEDBACK_ENDPOINT, {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({kind, text, context: feedbackContext(), website: el.querySelector('.fb-hp').value})})
+      body: JSON.stringify({kind, text: full, context: feedbackContext(), website: el.querySelector('.fb-hp').value})})
       .then(r=>{ if(!r.ok) throw new Error(r.status); thanks(); })
       .catch(()=>{   // the popup has to come from a tap, so offer the GitHub link rather than opening it
         send.disabled = false; send.textContent = 'SEND';
@@ -3170,6 +3179,14 @@ function showAdvScreens(){
   document.getElementById('adv').classList.remove('hidden');
 }
 
+// Mom: a rest at home heals everyone (no Pokémon yet: just a word of encouragement).
+function momTalk(){
+  if(!adv.party.length) return owSay([`MOM: ${adv.playerName}! The professor went out toward ROUTE 1. Go on, catch up with him!`]);
+  owSay([`MOM: Welcome home, ${adv.playerName}! You and your POKéMON look worn out. Sit down and rest a while.`], ()=>{
+    healParty(); adv.lastHeal = adv.loc; saveAdv(); sfx('heal');
+    setTimeout(()=>owSay(['MOM: There, all better! Come home whenever you need a rest. Take care out there!']), 900);
+  });
+}
 function healParty(){
   for(const m of adv.party){ m.hp=m.maxhp; m.status=null; m.fainted=false; m.usedDisguise=false; m.sashUsed=false; m.sleepTurns=0; }
 }
@@ -3610,7 +3627,10 @@ function renderCmd(focusIdx){
   document.querySelectorAll('#battle .active').forEach(e=>e.classList.remove('active'));
   for(const id of [`bs-A${ai}`, `hb-A${ai}`]){ const e = document.getElementById(id); if(e) e.classList.add('active'); }
   const who = dname(m).toUpperCase();
-  const step = cmd.queue.length>1 ? `<small>Pokémon ${cmd.pos+1} of ${cmd.queue.length}${cmd.pos>0?' · Esc: back':''}</small>` : '';
+  const step = cmd.queue.length>1 ? `<div class="turn-pips">${cmd.queue.map((q,k)=>`<i class="${k<cmd.pos?'done':k===cmd.pos?'now':''}"></i>`).join('')}<b>${cmd.pos+1}/${cmd.queue.length}</b>${cmd.pos>0?'<small>B: back</small>':''}</div>` : '';
+  // With several Pokémon to order, the others dim and those already ordered get a ✓.
+  document.getElementById('battle').classList.toggle('choosing', cmd.queue.length>1);
+  cmd.queue.forEach(q=>{ const hb = document.getElementById(`hb-A${q}`); if(hb) hb.classList.toggle('ordered', q in cmd.choices); });
   const balls = adv && adv.items ? (adv.items.pokeball||0) : 0;
   let left, right;
   if(cmd.view==='fight'){
@@ -3764,6 +3784,8 @@ function submitTurn(){
     actions.push({user:m, move:m.moves[ch.move], target});
   }
   cmd = null;
+  document.getElementById('battle').classList.remove('choosing');
+  document.querySelectorAll('#battle .active, #battle .ordered').forEach(e=>e.classList.remove('active', 'ordered'));
   for(const m of alive(state.sideB)){
     const opts = alive(state.sideA);
     if(opts.length===0) continue;
