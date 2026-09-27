@@ -976,3 +976,8 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .ow-view > #battle{position:absolute; left:0; top:0; z-index:36; transform-origin:0 0; transform:scale(var(--bk,1)); background:#10141c; box-sizing:border-box;}
 .ow-view > #battle .battle-scene{border-radius:0; border-left:none; border-right:none; border-top:none;}
 .ow-view > :is(#storyResult,#result){position:absolute; inset:0; z-index:37; margin:0; border-radius:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;}
+
+/* Free Battle setup + draft over the handheld's screen area (fitPage sets the box). */
+.sp-lid > :is(#setup,#draft){position:absolute; z-index:5; margin:0; border-radius:4px; overflow:auto; box-sizing:border-box; overscroll-behavior:contain;}
+.sp-lid > #setup .divider{display:none;}   /* adventure options live on the title menu now */
+.sp-lid > #draft{padding-bottom:0;} .sp-lid > #draft .draft-foot{bottom:0; margin-bottom:0; border-radius:8px 8px 0 0;}

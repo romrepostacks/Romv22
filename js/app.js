@@ -2537,7 +2537,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.18-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.19-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3055,7 +3055,7 @@ if(typeof document.addEventListener==='function'){
   // On-screen D-pad (hold to walk), A (read / talk / advance text) and B (hold to run).
   if(typeof document.querySelectorAll==='function') document.querySelectorAll('.gb-controls [data-dir]').forEach(btn=>{
     const d = btn.dataset.dir;
-    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); btn.setPointerCapture && btn.setPointerCapture(e.pointerId); if(uiKey(d) || offWorldButton(d) || owTextOpen()) return; pressDir(d); });
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); try{ btn.setPointerCapture(e.pointerId); }catch(_){}   /* capture can fail (no active pointer); never lose the press */ if(uiKey(d) || offWorldButton(d) || owTextOpen()) return; pressDir(d); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev, ()=>releaseDir(d)));
   });
   // iPhone: cancelling pointer events doesn't stop a held touch selecting text, showing the loupe or the
@@ -3083,6 +3083,13 @@ if(typeof document.addEventListener==='function'){
 const visible = id=>{ const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
 function offWorldButton(k){
   if(onTitle){ titleKey(k); return true; }
+  for(const id of ['setup', 'draft']) if(visible(id)){
+    const el = document.getElementById(id);
+    if(k==='up' || k==='down') el.scrollBy({top: k==='up' ? -90 : 90, behavior:'smooth'});
+    else if(k==='a' || k==='start'){ const p = el.querySelector('button.primary'); if(p && !p.disabled) p.click(); }
+    else if(k==='b') [...el.querySelectorAll('button')].find(b=>b.textContent.trim()==='Back')?.click();
+    return true;
+  }
   for(const id of ['storyResult', 'result']) if(visible(id)){
     if(k==='a' || k==='start') document.querySelector(`#${id} button.primary`)?.click();
     return true;
@@ -3579,14 +3586,15 @@ function titleKey(k){
     leaveTitle();
     if(pick==='CONTINUE') return startAdventure();
     if(pick==='NEW GAME') return has ? newAdventurePrompt() : startAdventure();
-    document.getElementById('adv').classList.add('hidden');
     showSetup();
   }, 'gm-title');
 }
 function leaveTitle(){ onTitle = false; clearTimeout(titleTimer); document.getElementById('owTitle')?.remove(); document.getElementById('adv').classList.remove('on-title'); }
 function showSetup(){
   document.getElementById('titleScreen').classList.add('hidden');
+  showOnHandheld();
   document.getElementById('setup').classList.remove('hidden');
+  fitPage();
   document.getElementById('newGameBtn').style.display = loadAdv() ? '' : 'none';
 }
 function newAdventure(){
@@ -3609,6 +3617,7 @@ function goToDraft(mode){
   document.getElementById('draftSearch').value='';
   document.getElementById('draftTypeFilter').value='';
   renderDraft();
+  fitPage();
 }
 
 function itemOptions(sel){
@@ -4133,9 +4142,22 @@ function fitBattle(){
   b.style.width = vw/k + 'px'; b.style.minHeight = vh/k + 'px';
   b.style.setProperty('--bk', k);
 }
+// Free Battle's setup and draft are long lists, so they cover the handheld's screen area at page
+// scale (not the game's pixel scale) and scroll inside it.
+function fitPage(){
+  const scr = document.getElementById('owScreen');
+  for(const id of ['setup', 'draft']){
+    const el = document.getElementById(id);
+    if(!el || el.classList.contains('hidden') || !scr) continue;
+    Object.assign(el.style, {left: scr.offsetLeft + scr.clientLeft + 'px', top: scr.offsetTop + scr.clientTop + 'px', width: scr.clientWidth + 'px', height: scr.clientHeight + 'px'});
+  }
+}
+function showOnHandheld(){ const box = document.getElementById('adv'); box.classList.remove('hidden'); box.classList.add('on-title'); owFit(); }
 function mountScreens(){
-  const v = document.getElementById('owView');
+  const v = document.getElementById('owView'), lid = document.querySelector('.sp-lid');
   for(const id of ['battle', 'storyResult', 'result']){ const el = document.getElementById(id); if(el && el.parentNode!==v) v.appendChild(el); }
+  for(const id of ['setup', 'draft']){ const el = document.getElementById(id); if(el && lid && el.parentNode!==lid) lid.appendChild(el); }
+  window.addEventListener('resize', fitPage);
   if(typeof ResizeObserver!=='undefined'){
     const ro = new ResizeObserver(()=>requestAnimationFrame(fitBattle));
     ro.observe(document.getElementById('battle'));
