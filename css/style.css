@@ -687,3 +687,5 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
 .fb-btns{display:flex; gap:8px; margin-top:8px;}
 .fb-btns button{font:inherit; padding:4px 12px; border:2px solid var(--frame); border-radius:4px; background:#fff; cursor:pointer;}
 .fb-note{font-size:11px; opacity:.7; margin-top:6px;}
+.fb-hp{position:absolute; left:-9999px; width:1px; height:1px; opacity:0;}   /* bot trap: people never see or fill it */
+.fb-send:disabled{opacity:.6; cursor:wait;}

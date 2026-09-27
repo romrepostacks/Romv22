@@ -2422,10 +2422,13 @@ function optionOpen(){
 }
 
 // ---------- Playtest feedback ----------
-// No token can live in a public web game, so SEND opens a pre-filled GitHub issue on FEEDBACK_REPO
-// (the tester needs a GitHub account); the game adds where they are and what they carry.
+// SEND posts to FEEDBACK_ENDPOINT, a relay (relay/worker.js, a Cloudflare Worker) that files the GitHub
+// issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
+// can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
+// Either way the game adds where they are and what they carry.
 const GAME_VERSION = '0.9-playtest';
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
+const FEEDBACK_ENDPOINT = '';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
 function feedbackContext(){
   const loc = LOCATIONS[adv.loc];
@@ -2440,22 +2443,32 @@ function feedbackOpen(){
   el.innerHTML = `<div class="fb-title">FEEDBACK</div>
     <div class="fb-kinds">${FEEDBACK_KINDS.map((k,i)=>`<label><input type="radio" name="fbk" value="${k}" ${i?'':'checked'}>${k}</label>`).join('')}</div>
     <textarea maxlength="2000" placeholder="What happened, or what should feel different?"></textarea>
+    <input class="fb-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="fb-btns"><button class="fb-send">SEND</button><button class="fb-cancel">CANCEL</button></div>
-    <div class="fb-note">Opens GitHub with your note and game details filled in.</div>`;
+    <div class="fb-note">${FEEDBACK_ENDPOINT ? 'Sent anonymously, no account needed. Game details are included.' : 'Opens GitHub with your note and game details filled in.'}</div>`;
   document.getElementById('owView').appendChild(el);
   const ta = el.querySelector('textarea');
   setTimeout(()=>ta.focus(), 0);
   const close = ()=>{ el.remove(); owBusy = false; startMenu(); };
   el.querySelector('.fb-cancel').onclick = close;
   el.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
-  el.querySelector('.fb-send').onclick = ()=>{
+  const send = el.querySelector('.fb-send'), note = el.querySelector('.fb-note');
+  send.onclick = ()=>{
     const text = ta.value.trim();
     if(!text){ ta.focus(); return; }
     const kind = el.querySelector('input[name=fbk]:checked').value;
     const q = new URLSearchParams({title: `[${kind}] ${text.split('\n')[0].slice(0, 60)}`, body: text + feedbackContext()});
-    window.open(`https://github.com/${FEEDBACK_REPO}/issues/new?${q}`, '_blank', 'noopener');
-    close();
-    owSay(['Thanks! Your feedback helps shape the game.']);
+    const github = `https://github.com/${FEEDBACK_REPO}/issues/new?${q}`;
+    const thanks = ()=>{ close(); owSay(['Thanks! Your feedback helps shape the game.']); };
+    if(!FEEDBACK_ENDPOINT){ window.open(github, '_blank', 'noopener'); return thanks(); }
+    send.disabled = true; send.textContent = 'SENDING…';
+    fetch(FEEDBACK_ENDPOINT, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kind, text, context: feedbackContext(), website: el.querySelector('.fb-hp').value})})
+      .then(r=>{ if(!r.ok) throw new Error(r.status); thanks(); })
+      .catch(()=>{   // the popup has to come from a tap, so offer the GitHub link rather than opening it
+        send.disabled = false; send.textContent = 'SEND';
+        note.innerHTML = `Couldn't send just now. Try again in a minute, or <a href="${github}" target="_blank" rel="noopener">post it on GitHub</a>.`;
+      });
   };
 }
 
