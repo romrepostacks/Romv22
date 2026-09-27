@@ -786,3 +786,27 @@ button{touch-action:manipulation;}
 /* Rounded path/water corners (edgeStyle) clip the tile, so a plain grass square sits underneath
    to show through the corner instead of the dark backdrop behind the map. */
 .t-water::before,.t-path::before,.t-exit::before{content:""; position:absolute; inset:0; background:#48d890; z-index:-1;}
+
+/* ---------- Battle scene art (tools/art/battle.js) ----------
+   The backdrop repeats sideways over its fill colour; each platform is a left cap, a middle piece
+   tiled across whatever width the team needs, and a right cap (the middle is clipped between the caps). */
+.battle-scene{background:var(--art-battle_bg) 0 0/128px 192px repeat-x, #d4f2c4; image-rendering:pixelated;}
+.bs-field.enemy{min-height:150px; padding-bottom:4px;}
+.bs-field.player{padding-bottom:6px;}
+.bs-field::before{height:48px; left:0; right:0; border:none; border-radius:0; box-shadow:none; box-sizing:border-box; padding:0 48px;
+  background:var(--art-plat_enemy_l) left top/48px 48px no-repeat, var(--art-plat_enemy_r) right top/48px 48px no-repeat, var(--art-plat_enemy_m) left top/16px 48px repeat-x;
+  background-origin:border-box, border-box, content-box; background-clip:border-box, border-box, content-box; image-rendering:pixelated;}
+.bs-field.player::before{height:56px; left:-8%; padding:0 64px;
+  background:var(--art-plat_player_l) left top/64px 56px no-repeat, var(--art-plat_player_r) right top/64px 56px no-repeat, var(--art-plat_player_m) left top/16px 56px repeat-x;
+  background-origin:border-box, border-box, content-box; background-clip:border-box, border-box, content-box;}
+.bs-field.enemy .bmon{margin-bottom:-8px;} .bs-field.player .bmon{margin-bottom:-18px;}   /* feet mid-platform */
+
+/* ---------- Building exteriors as tile grids (buildingHtml, tools/art/buildings.js) ---------- */
+.bld::before{display:none;}   /* Emerald's buildings cast no drop shadow */
+.bld .bp{position:absolute; width:32px; height:32px; background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated;}
+.bld .bp.tall{height:48px;}
+.bld .plate{top:48px;}   /* centred on the lower roof row */
+/* The door element sits over the door tile: invisible until the game opens it. */
+.bld .door,.bld .door-center,.bld .door-mart,.bld .door-gym{bottom:auto; width:32px; height:32px; border:none; background:none; box-shadow:none; z-index:1;}
+.bld .door.open,.bld .door-center.open,.bld .door-mart.open,.bld .door-gym.open{background:none; box-shadow:none;}
+.bld .door.open::after{content:""; position:absolute; left:8px; right:8px; top:6px; bottom:0; background:#201818; box-shadow:inset 0 3px 0 #000; animation:doorOpen .2s steps(3);}

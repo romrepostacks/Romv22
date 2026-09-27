@@ -1503,16 +1503,47 @@ if(typeof TILE_ART!=='undefined' && typeof document!=='undefined' && document.do
     document.documentElement.style.setProperty(`--art-${name}`, `url("data:image/svg+xml,${encodeURIComponent(artSvg(a))}")`);
 
 // ---------- Buildings ----------
+// Buildings are tile grids from tools/art/buildings.js: two roof rows (the top one rises 8 art px above
+// its tile), then wall rows with windows and the door. Roof pieces use palette keys '1'-'4' and walls
+// 'A'-'C', swapped per building; each recoloured piece becomes a CSS class once (bldPiece).
+const ROOF_SWAP = {green:['#c8f8a8','#88d878','#50a858','#2e6c40'], brown:['#f0c890','#d09860','#a86c40','#704028'],
+  purple:['#e0c8f8','#b890e0','#8860b8','#583888'], orange:['#ffd8a0','#f8a858','#d07830','#904818'],
+  red:['#ffb0a0','#f07060','#c84040','#882830'], blue:['#b8e0ff','#70b0f0','#4080d0','#285098'], slate:['#c8d0e0','#98a4b8','#6c7890','#444c64']};
+const WALL_SWAP = {cream:['#fcf4dc','#e4d0a0','#b89c70'], grey:['#e8ecf4','#c0c8d8','#8890a8']};
+const HOUSE_ROOF_NAMES = ['green', 'brown', 'purple', 'orange'];   // same order as HOUSE_ROOFS
+const bldMade = new Set();
+function bldPiece(name, roof, wall){
+  const cls = `bp-${name}-${roof}-${wall}`;
+  if(!bldMade.has(cls) && typeof TILE_ART!=='undefined' && typeof document!=='undefined'){
+    bldMade.add(cls);
+    const a = TILE_ART[name], r = ROOF_SWAP[roof], w = WALL_SWAP[wall];
+    const pal = {...a.pal, 1:r[0], 2:r[1], 3:r[2], 4:r[3], A:w[0], B:w[1], C:w[2]};
+    let sheet = document.getElementById('bldArt');
+    if(!sheet){ sheet = document.createElement('style'); sheet.id = 'bldArt'; document.head.appendChild(sheet); }
+    sheet.textContent += `.${cls}{background-image:url("data:image/svg+xml,${encodeURIComponent(artSvg({...a, pal}))}");}\n`;
+  }
+  return cls;
+}
 function buildingHtml(b, ox=0, oy=0, bi=null){
-  const wins = [];
-  for(let i=0;i<b.w;i++) if(b.x+i!==b.door.x) wins.push(`<div class="win" style="left:${i*T+7}px"></div>`);
-  const roof = b.kind==='center' ? ['#e05050','#c03838'] : b.kind==='mart' ? ['#4878d8','#3060b8'] : b.kind==='gym' ? ['#708898','#586878'] : b.roof;
+  const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' ? 'slate' : HOUSE_ROOF_NAMES[HOUSE_ROOFS.indexOf(b.roof)] || 'green';
+  const wall = b.kind==='gym' ? 'grey' : 'cream';
+  const dc = b.door.x - b.x, cell = (name, c, r, tall)=>`<div class="bp ${bldPiece(name, roof, wall)}${tall ? ' tall' : ''}" style="left:${c*T}px; top:${r*T - (tall ? 16 : 0)}px"></div>`;
+  let html = '';
+  for(let c=0; c<b.w; c++){
+    const end = c===0 ? 'l' : c===b.w-1 ? 'r' : 'm';
+    html += cell({l:'roof_tl', m:'roof_t', r:'roof_tr'}[end], c, 0, true) + cell({l:'roof_bl', m:'roof_b', r:'roof_br'}[end], c, 1);
+    for(let r=2; r<b.h; r++){
+      const isDoor = r===b.h-1 && c===dc;
+      html += cell(isDoor ? {house:'door_house', gym:'door_gym'}[b.kind] || 'door_glass' : 'wall_'+end, c, r);
+      if(!isDoor && c>0) html += cell('window', c, r);
+    }
+  }
+  if(b.kind==='house') html += cell('chimney', Math.min(2, b.w-1), 0, true);
   const plate = b.kind==='center' ? '<div class="plate plate-center"><span class="pc-ball"></span>POKéMON</div>'
     : b.kind==='mart' ? '<div class="plate plate-mart">MART</div>'
-    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : '<div class="chimney"></div>';
-  return `<div class="bld bld-${b.kind}"${bi!=null ? ` data-bi="${bi}"` : ''} style="left:${(b.x+ox)*T}px; top:${(b.y+oy)*T}px; width:${b.w*T}px; height:${b.h*T}px; --roof:${roof[0]}; --roof2:${roof[1]}">
-    <div class="roof"></div><div class="wall">${wins.join('')}</div>${plate}
-    <div class="door door-${b.kind}" style="left:${(b.door.x-b.x)*T+5}px"></div></div>`;
+    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : '';
+  return `<div class="bld bld-${b.kind}"${bi!=null ? ` data-bi="${bi}"` : ''} style="left:${(b.x+ox)*T}px; top:${(b.y+oy)*T}px; width:${b.w*T}px; height:${b.h*T}px">
+    ${html}${plate}<div class="door door-${b.kind}" style="left:${dc*T}px; top:${(b.h-1)*T}px"></div></div>`;
 }
 
 // ---------- Rendering + camera ----------
@@ -2475,7 +2506,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.8-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.9-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
