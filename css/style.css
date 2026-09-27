@@ -724,3 +724,65 @@ button{touch-action:manipulation;}
 .turn-pips small{margin-left:auto; opacity:.7;}
 /* Feedback: the optional "what were you trying to do?" line */
 .fb .fb-goal{width:100%; box-sizing:border-box; font-family:inherit; font-size:14px; border:2px solid var(--frame); border-radius:4px; padding:6px; margin-bottom:6px;}
+
+/* ---------- Pixel-art tiles (js/tileart.js → --art-<name>) ----------
+   Trees: 16x24 art at 2x; the top 8 art px overhang the tile above, so a lower row's canopy covers
+   the trunks of the row above and forest borders read as one canopy (as in Emerald). */
+.t-tree::before{top:-16px; height:48px; border-radius:0; box-shadow:none; background:var(--art-tree) 0 0/32px 48px no-repeat; image-rendering:pixelated;}
+.t-tree.alt::before{background-image:var(--art-tree2);}
+.t-tree::after{display:none;}
+.t-bush::before{left:0; top:0; width:32px; height:32px; border:none; border-radius:0; box-shadow:none; background:var(--art-bush) 0 0/32px 32px no-repeat; image-rendering:pixelated;}
+/* Ground, water and outdoor objects from tools/art/others.js. Path/water edge rims and rounded corners
+   still come from edgeStyle (inline box-shadow/border-radius). */
+.t-grass,.t-path,.t-exit,.t-water,.t-flower,.t-fence,.t-sign,.t-rsign,.t-rock,.t-item,.t-ledge,.t-ledge-e,.t-ledge-w{
+  background-size:32px 32px; background-position:0 0; background-repeat:no-repeat; image-rendering:pixelated;}
+.t-grass.v0{background-image:var(--art-grass_v0);} .t-grass.v1{background-image:var(--art-grass_v1);}
+.t-grass.v2{background-image:var(--art-grass_v2);} .t-grass.v3{background-image:var(--art-grass_v3);}
+.t-path,.t-exit{background-image:var(--art-path);}
+.t-water{background-image:var(--art-water); animation:artWater 1s steps(1) infinite;}
+@keyframes artWater{50%{background-image:var(--art-water_b);}}
+.t-flower{background-image:var(--art-flower); animation:artFlower 1s steps(1) infinite;}
+@keyframes artFlower{50%{background-image:var(--art-flower_b);}}
+.t-fence{background-image:var(--art-fence);}
+.t-sign{background-image:var(--art-sign);} .t-rsign{background-image:var(--art-rsign);}
+.t-rock{background-image:var(--art-rock);} .t-item{background-image:var(--art-item);}
+.t-ledge{background-image:var(--art-ledge);} .t-ledge-e{background-image:var(--art-ledge_e);} .t-ledge-w{background-image:var(--art-ledge_w);}
+.t-sign::before,.t-sign::after,.t-rsign::before,.t-rsign::after,.t-rock::before,.t-item::before,.t-item::after,
+.t-ledge::before,.t-ledge::after,.t-ledge-e::before,.t-ledge-e::after,.t-ledge-w::before,.t-ledge-w::after{display:none;}
+/* The gym statue stands 8 art px taller than its tile. */
+.t-statue::before{left:0; top:-16px; width:32px; height:48px; border:none; border-radius:0; z-index:2; background:var(--art-statue) 0 0/32px 48px no-repeat; image-rendering:pixelated;}
+.t-statue::after{display:none;}
+
+/* Interiors (houses, Pokémon Centers, Marts) from tools/art/interiors.js. Every tile shows the room's
+   floor; walls, wall decorations and furniture are drawn on top. Tall pieces (bookshelf, plant, bed
+   head, shelves, healer, PC) overhang 8 art px into the tile above, against the wall. Gyms keep their
+   type-themed CSS look. */
+.ow-view.room-house{--floorart:var(--art-floor_house); --wallart:var(--art-wall_house); --counterart:var(--art-counter); --cendart:var(--art-counter_end);}
+.ow-view.room-center{--floorart:var(--art-floor_center); --wallart:var(--art-wall_center); --counterart:var(--art-counter); --cendart:var(--art-counter_end);}
+.ow-view.room-mart{--floorart:var(--art-floor_mart); --wallart:var(--art-wall_mart); --counterart:var(--art-counter_mart); --cendart:var(--art-counter_end_mart);}
+:is(.room-house,.room-center,.room-mart) .t{background:var(--floorart) 0 0/32px 32px !important; box-shadow:none !important; image-rendering:pixelated;}
+:is(.room-house,.room-center,.room-mart) .t-wall{background:var(--wallart) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) .t-walltop{background:var(--art-walltop) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) .t-wall.wwin{background:var(--art-deco_window) 0 0/32px 32px, var(--wallart) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) .t-wall.wmon{background:var(--art-deco_poster) 0 0/32px 32px, var(--wallart) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) .t-wall.wmap{background:var(--art-deco_map) 0 0/32px 32px, var(--wallart) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) .t-wall.wclock{background:var(--art-deco_clock) 0 0/32px 32px, var(--wallart) 0 0/32px 32px !important;}
+:is(.room-house,.room-center,.room-mart) :is(.t-wall,.t-walltop)::before, :is(.room-house,.room-center,.room-mart) :is(.t-wall,.t-walltop)::after{display:none !important;}
+:is(.room-house,.room-center,.room-mart) :is(.t-bookshelf,.t-tv,.t-bed,.t-table,.t-plant,.t-shelf,.t-counter,.t-healer,.t-pc,.t-seat,.t-glasstable,.t-mat,.t-rug)::before{
+  content:""; position:absolute; left:0; top:0; right:auto; bottom:auto; width:32px; height:32px; margin:0; border:none; border-radius:0;
+  box-shadow:none; transform:none; z-index:1; background:var(--piece) 0 0/100% 100% no-repeat; image-rendering:pixelated;}
+:is(.room-house,.room-center,.room-mart) :is(.t-bookshelf,.t-tv,.t-bed,.t-table,.t-plant,.t-shelf,.t-counter,.t-healer,.t-pc,.t-seat,.t-glasstable,.t-mat,.t-rug)::after{display:none !important;}
+:is(.room-house,.room-center,.room-mart) :is(.t-bookshelf,.t-bed.top,.t-plant,.t-shelf,.t-healer,.t-pc)::before{top:-16px; height:48px;}
+:is(.room-house,.room-center,.room-mart) .t-bookshelf{--piece:var(--art-bookshelf);}  :is(.room-house,.room-center,.room-mart) .t-tv{--piece:var(--art-tv);}
+:is(.room-house,.room-center,.room-mart) .t-bed.top{--piece:var(--art-bed_top);}      :is(.room-house,.room-center,.room-mart) .t-bed:not(.top){--piece:var(--art-bed_bottom);}
+:is(.room-house,.room-center,.room-mart) .t-table.left{--piece:var(--art-table_left);} :is(.room-house,.room-center,.room-mart) .t-table.right{--piece:var(--art-table_right);}
+:is(.room-house,.room-center,.room-mart) .t-shelf.left{--piece:var(--art-shelf_left);} :is(.room-house,.room-center,.room-mart) .t-shelf.right{--piece:var(--art-shelf_right);}
+:is(.room-house,.room-center,.room-mart) .t-plant{--piece:var(--art-plant);}          :is(.room-house,.room-center,.room-mart) .t-healer{--piece:var(--art-healer);}
+:is(.room-house,.room-center,.room-mart) .t-pc{--piece:var(--art-pc);}                :is(.room-house,.room-center,.room-mart) .t-glasstable{--piece:var(--art-glasstable);}
+:is(.room-house,.room-center,.room-mart) .t-counter{--piece:var(--counterart);}       :is(.room-house,.room-center,.room-mart) .t-counter.cend{--piece:var(--cendart);}
+:is(.room-house,.room-center,.room-mart) .t-seat{--piece:var(--art-seat);}            :is(.room-house,.room-center,.room-mart) .t-seat.yellow{--piece:var(--art-seat_yellow);}
+:is(.room-house,.room-center,.room-mart) .t-mat{--piece:var(--art-mat);}              :is(.room-house,.room-center,.room-mart) .t-rug{--piece:var(--art-rug);}
+.heal-ball{z-index:2;}
+/* Rounded path/water corners (edgeStyle) clip the tile, so a plain grass square sits underneath
+   to show through the corner instead of the dark backdrop behind the map. */
+.t-water::before,.t-path::before,.t-exit::before{content:""; position:absolute; inset:0; background:#48d890; z-index:-1;}

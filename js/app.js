@@ -1483,6 +1483,25 @@ function tallGrassSvg(){
 if(typeof document!=='undefined' && document.documentElement && document.documentElement.style)
   document.documentElement.style.setProperty('--tallgrass', `url("data:image/svg+xml,${encodeURIComponent(tallGrassSvg())}")`);
 
+// Pixel-art tiles (js/tileart.js, built from tools/art/): each becomes an SVG in a CSS variable
+// --art-<name>, which the stylesheet draws at 2x like everything else. Same-colour runs on a row
+// share one rect to keep the SVGs small.
+function artSvg(a){
+  let r = '';
+  a.rows.forEach((row,y)=>{
+    for(let x=0; x<a.w;){
+      const ch = row[x]; let n = 1;
+      while(x+n<a.w && row[x+n]===ch) n++;
+      if(ch!=='.') r += `<rect x="${x}" y="${y}" width="${n}" height="1" fill="${a.pal[ch]}"/>`;
+      x += n;
+    }
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${a.w} ${a.h}" shape-rendering="crispEdges">${r}</svg>`;
+}
+if(typeof TILE_ART!=='undefined' && typeof document!=='undefined' && document.documentElement && document.documentElement.style)
+  for(const [name, a] of Object.entries(TILE_ART))
+    document.documentElement.style.setProperty(`--art-${name}`, `url("data:image/svg+xml,${encodeURIComponent(artSvg(a))}")`);
+
 // ---------- Buildings ----------
 function buildingHtml(b, ox=0, oy=0, bi=null){
   const wins = [];
@@ -1517,12 +1536,15 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   const v = ((x*73856093) ^ (y*19349663)) >>> 0;   // stable per-tile variation
   let extra = '', style = '';
   if(cls==='grass') extra = ` v${v%4}`;
+  if(cls==='tree' && (x+y)%2) extra = ' alt';
+  // Two-tile furniture (tables 'tt', Mart shelves 'ss'): left and right halves alternate along a run.
+  if(cls==='table' || cls==='shelf'){ let n = 0; while(x-n-1>=0 && map.tiles[y][x-n-1]===ch) n++; extra = n%2 ? ' right' : ' left'; }
   if(cls==='bed' && (y===0 || map.tiles[y-1][x]!=='e')) extra = ' top';   // pillow end
   // Walls: the face you see (wall with floor below it) vs. the dark top/sides.
   if(cls==='wall' && (y+1>=map.h || '#nmwKM'.includes(map.tiles[y+1][x]))) cls = 'walltop';
   if(cls==='path'||cls==='exit') style = edgeStyle(map,x,y,EDGE_GROUPS.path);
   else if(cls==='water') style = edgeStyle(map,x,y,EDGE_GROUPS.water);
-  else if(cls==='rug') style = edgeStyle(map,x,y,EDGE_GROUPS.rug);
+  else if(cls==='rug' && map.interior==='gym') style = edgeStyle(map,x,y,EDGE_GROUPS.rug);
   return `<div class="t t-${cls}${extra}" data-x="${wx}" data-y="${wy}" style="left:${wx*T}px;top:${wy*T}px;${style}"></div>`;
 }
 function npcHtml(n, i){
@@ -2453,7 +2475,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.7-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.8-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
