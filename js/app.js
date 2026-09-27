@@ -2525,7 +2525,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.14-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.15-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
