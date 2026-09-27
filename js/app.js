@@ -1659,7 +1659,9 @@ function keepTilesAround(){
 let owK = 1, owDpr = 1;
 function owFit(){
   const scr = document.getElementById('owScreen'), view = document.getElementById('owView');
-  const avail = scr && scr.parentNode ? scr.parentNode.clientWidth - 10 : 0;   // minus the 5px frame
+  // The room inside the parent (the handheld lid) less the screen bezel.
+  const px = (el, ...props)=>{ const s = getComputedStyle(el); return props.reduce((t,p)=>t + (parseFloat(s[p])||0), 0); };
+  const avail = scr && scr.parentNode ? scr.parentNode.clientWidth - px(scr.parentNode, "paddingLeft", "paddingRight") - px(scr, "borderLeftWidth", "borderRightWidth") : 0;
   if(!avail) return;
   owDpr = (typeof window!=='undefined' && window.devicePixelRatio) || 1;
   const tileDev = Math.min(Math.floor(avail*owDpr/VIEW_W), Math.floor(1.5*T*owDpr));
@@ -2519,7 +2521,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.11-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.12-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];

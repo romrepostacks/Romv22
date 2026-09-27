@@ -858,3 +858,51 @@ button{touch-action:manipulation;}
   #adv .ab{width:60px; height:60px; font-size:21px;}
   #adv .ab-btns{gap:14px;}
 }
+
+/* ---------- Handheld: a clamshell in the spirit of the GBA SP (shape only, no logos) ----------
+   Dark surroundings; the screen sits in a black bezel on a red lid; a hinge bar joins the lid to the
+   base, which holds the D-pad, A/B, a small round START under the D-pad, a speaker grille and a power light. */
+body:has(#adv:not(.hidden)){background:#141418;}
+.sp-lid{position:relative; max-width:760px; margin:0 auto; padding:18px 18px 24px; box-sizing:border-box; border-radius:22px 22px 10px 10px;
+  background:linear-gradient(165deg,#e8424a 0%,#cc222a 55%,#a8121a 100%); box-shadow:inset 0 2px 0 #ff8a8e66, inset 0 -2px 0 #6a080e88, 0 8px 18px #0008;}
+.sp-lid .ow-screen{margin:0 auto; border:8px solid #0c0c10; border-radius:6px; box-shadow:0 0 0 2px #7a0c12, inset 0 0 0 1px #000;}
+.sp-lid::after{content:""; position:absolute; left:8%; right:8%; bottom:-12px; height:16px; border-radius:8px; z-index:2; pointer-events:none;   /* hinge */
+  background:linear-gradient(#a8121a 0%,#e4464e 35%,#c01c24 60%,#7e0a12 100%); box-shadow:0 3px 4px #0007;}
+.gb-controls{border-radius:10px 10px 30px 30px; margin-top:4px; padding-top:30px;
+  background:linear-gradient(170deg,#e23a42 0%,#cc222a 50%,#a8121a 100%); box-shadow:inset 0 -3px 0 #6a080eaa, 0 8px 18px #0008;}
+.gb-controls::after{content:""; position:absolute; left:24px; top:22px; width:8px; height:8px; border-radius:50%; background:#8cf28c; box-shadow:0 0 6px #8cf28c, inset 0 -1px 0 #3a9a3a;}   /* power light */
+.gb-controls::before{left:auto; right:12%; bottom:26px; transform:none; width:44px; height:44px; background:radial-gradient(circle,#6a080e 0 2px,transparent 2.6px) 0 0/9px 9px;}   /* speaker */
+.start-btn{left:24%; bottom:30px; width:24px; height:24px; padding:0; border-radius:50%; font-size:0; transform:none;
+  background:radial-gradient(circle at 40% 35%,#3a3a44,#18181e 75%); box-shadow:0 2px 0 #6a080e, inset 0 1px 0 #ffffff33;}
+.start-btn:active{transform:translateY(2px); box-shadow:inset 0 2px 3px #0008;}
+.start-btn::after{position:absolute; top:28px; left:50%; transform:translateX(-50%); font:600 10px "Pixelify Sans",sans-serif; letter-spacing:1px; color:#ffd0d4; white-space:nowrap;}
+@media (pointer:coarse){
+  .sp-lid{padding:12px 12px 18px; border-radius:18px 18px 8px 8px;}
+  #adv .gb-controls{margin-top:6px;}
+}
+/* Handheld, refined to the SP references: black controls on the red shell. */
+.sp-lid{width:100%;}   /* fixed width: the screen sizes itself from the lid */
+.sp-lid .ow-screen{border-width:10px; border-radius:10px; box-shadow:0 0 0 2px #6a080e, 0 2px 0 3px #ff8a8e33;}
+/* Shoulder strips and power light under the hinge (decoration only). */
+.sp-deco{position:absolute; left:18px; right:18px; top:14px; height:10px; pointer-events:none;}
+.sp-deco::before,.sp-deco::after{content:""; position:absolute; top:0; width:30%; height:10px; border-radius:3px; background:linear-gradient(#2a2a32,#141418); box-shadow:inset 0 1px 0 #ffffff22, 0 1px 0 #ff8a8e44;}
+.sp-deco::before{left:0;} .sp-deco::after{right:0;}
+.gb-controls{padding-top:44px;}
+.gb-controls::after{left:auto; right:22px; top:32px;}
+/* D-pad: black cross in a round recess. */
+.dpad{position:relative; filter:drop-shadow(0 3px 0 #0006);}
+.dpad::before{content:""; position:absolute; inset:-9px; border-radius:50%; z-index:-1;
+  background:radial-gradient(circle,#b0141c 0 60%,#c01a22 100%); box-shadow:inset 0 3px 6px #0006, 0 1px 0 #ff8a8e55;}
+.dpad button,.dpad-hub{background:linear-gradient(#34343c,#1a1a20);}
+.dpad button:active{background:linear-gradient(#141418,#0c0c10);}
+.dpad-hub{background:radial-gradient(circle,#101014 0 8px,#24242a 9px);}
+/* A/B: black domes in a tilted pill recess. */
+.ab-btns{position:relative;}
+.ab-btns::before{content:""; position:absolute; inset:-12px -14px; border-radius:60px; z-index:-1;
+  background:linear-gradient(#b0141c,#c01a22); box-shadow:inset 0 3px 6px #0006, 0 1px 0 #ff8a8e55;}
+.ab{background:radial-gradient(circle at 38% 30%,#4a4a54,#18181e 72%); color:#c8c8d0; box-shadow:0 3px 0 #000a, inset 0 2px 0 #ffffff22; text-shadow:none;}
+.ab:active{box-shadow:0 1px 0 #000a, inset 0 2px 4px #000;}
+/* START: a small black button along the bottom edge. */
+.start-btn{left:50%; transform:translateX(-50%); bottom:30px;}
+.start-btn:active{transform:translate(-50%,2px);}
+.gb-controls::before{right:10%; bottom:22px; width:36px; height:36px; background:radial-gradient(circle,#6a080e 0 2px,transparent 2.6px) 0 0/9px 9px;}
