@@ -2929,10 +2929,18 @@ if(typeof document.addEventListener==='function'){
     btn.addEventListener('pointerdown', e=>{ e.preventDefault(); btn.setPointerCapture && btn.setPointerCapture(e.pointerId); if(uiKey(d) || owTextOpen()) return; pressDir(d); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev, ()=>releaseDir(d)));
   });
+  // iPhone: cancelling pointer events doesn't stop a held touch selecting text, showing the loupe or the
+  // callout (issue #3); only cancelling the touch itself does. Pointer events still arrive, so every
+  // control below listens for pointerdown, never click (a cancelled touch sends no click).
+  const pad = document.querySelector('.gb-controls');
+  if(pad){
+    pad.addEventListener('touchstart', e=>e.preventDefault(), {passive:false});
+    pad.addEventListener('contextmenu', e=>e.preventDefault());
+  }
   const sBtn = document.getElementById('btnStart');
   if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(!owTextOpen()) startMenu(); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
-  if(aBtn) aBtn.addEventListener('click', ()=>{ if(uiKey('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
+  if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
     bBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('b')) return; owRun = true; if(owTextOpen()) owAdvance(); });
     ['pointerup','pointercancel','pointerleave'].forEach(ev=>bBtn.addEventListener(ev, ()=>{ owRun = false; }));
