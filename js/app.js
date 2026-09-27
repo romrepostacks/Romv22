@@ -2549,7 +2549,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.20-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.21-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3581,7 +3581,7 @@ function titleShow(){
   const t = document.getElementById('owTitle');
   titleReady = true;
   t.className = 'ow-title';
-  t.innerHTML = '<div class="title-ball"></div><h1 class="logo">Party<br>Royale</h1><div class="version">Vellorin Version</div><div class="press-start">PRESS START</div>';
+  t.innerHTML = '<div class="title-ball"></div><h1 class="logo">Party<br>Royale</h1><div class="version">Vellorin Version</div><div class="press-start">PRESS START</div><div class="tt-build">build ' + GAME_VERSION + '</div>';
 }
 function titleKey(k){
   if(!titleReady){ clearTimeout(titleTimer); return titleShow(); }   // any button skips the splash
