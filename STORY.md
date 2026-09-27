@@ -22,6 +22,21 @@ All names are placeholders the owner can change. Original story; Pokémon specie
 4. **Dive.** DIVE from the 6th/7th gym; dark-water dive spots on sea routes; underwater maps (seaweed works like
    tall grass, their own Pokémon, pixel-art seabed); the **Sunken Shrine** and the Lugia climax with Wren's help.
 5. **Ending.** Victory Road, the Pokémon League (four elite trainers + Champion Wren), credits.
+6. **Platform-specific UI (planned — not started).** The interface adapts to the device instead of one layout for all:
+   - Phone portrait: the handheld as now; phone landscape: a wide layout (screen in the middle, D-pad left, A/B right).
+   - Tablet: a larger screen and controls, split layouts where there is room.
+   - Desktop: keyboard-first (key hints on screen, no need for on-screen buttons), mouse support in menus.
+   - Game controllers via the Gamepad API (D-pad/stick, A/B, START/SELECT) on any platform.
+   - Detected from input type and screen size (pointer, orientation, touch points), with a manual override in OPTION.
+7. **Nuzlocke mode (planned — not started).** Chosen when starting a new story (NORMAL / NUZLOCKE), plus a
+   SKIP STORY TEXT option for players who already know the route:
+   - Classic rules, enforced by the game: a Pokémon that faints is dead (moved to a graveyard; it can't be used
+     or revived); only the first wild encounter in each area can be caught (a failed catch or a knockout uses it
+     up); every catch must be nicknamed; whiting out (the whole party dead) ends the run.
+   - Common clauses: dupes clause (skip species you already have), shiny clause; level caps at each gym leader.
+   - A Nuzlocke HUD: encounters used per area on the map, deaths and a run summary on the trainer card.
+   - Skip story text: scenes and calls fast-forward or complete themselves, and key story items (e.g. SURF, DIVE)
+     are still granted at the same story points so the run can be finished.
 
 ## Tablets (in order of the legend)
 1. Whisperwood — "When sky and sea raged as one, we sang the silver guardian to sleep."
