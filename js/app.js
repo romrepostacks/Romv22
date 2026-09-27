@@ -2428,7 +2428,7 @@ function optionOpen(){
 // Either way the game adds where they are and what they carry.
 const GAME_VERSION = '0.9-playtest';
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
-const FEEDBACK_ENDPOINT = '';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
+const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
 function feedbackContext(){
   const loc = LOCATIONS[adv.loc];
