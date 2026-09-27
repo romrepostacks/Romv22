@@ -2175,7 +2175,7 @@ function startMenu(){
   owBusy = true; held.length = 0;
   const name = adv.playerName.toUpperCase();
   // POKéDEX shows up once you've seen something.
-  const items = (Object.keys(adv.seen||{}).length ? ['POKéDEX'] : []).concat((adv.party.length ? ['POKéMON'] : []).concat(['BAG', 'POKéNAV', name, 'SAVE', 'OPTION'], PHONE ? ['SYSTEM'] : [], ['FEEDBACK', 'EXIT']));
+  const items = (Object.keys(adv.seen||{}).length ? ['POKéDEX'] : []).concat((adv.party.length ? ['POKéMON'] : []).concat(['BAG', 'POKéNAV', name, 'SAVE', 'OPTION'], PHONE ? ['SYSTEM'] : [], ['EXIT']));
   sfx('open');
   const m = uiMenu(document.getElementById('owView'), items, k=>{
     owBusy = false;
@@ -2185,7 +2185,6 @@ function startMenu(){
     if(pick==='POKéMON') return partyOpen();
     if(pick==='BAG') return bagOpen();
     if(pick==='OPTION') return optionOpen();
-    if(pick==='FEEDBACK') return feedbackOpen();
     if(pick==='SYSTEM') return systemMenu();
     if(pick==='POKéNAV') return toggleMap();
     if(pick===name){
@@ -2549,11 +2548,12 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.21-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.22-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
 function feedbackContext(){
+  if(!adv) return `\n\n---\nVersion: ${GAME_VERSION}\nWhere: ${onTitle ? 'title screen' : state ? 'Free Battle' : 'menus'}\nDevice: ${innerWidth}×${innerHeight} @${devicePixelRatio}x, ${matchMedia('(display-mode: standalone)').matches ? 'installed' : 'browser'}\nUA: ${navigator.userAgent}`;
   const loc = LOCATIONS[adv.loc];
   return ['', '', '---', `Version: ${GAME_VERSION}`, `Where: ${loc ? loc.name : '?'}${adv.inside ? ' (inside '+adv.inside+')' : ''} @ ${adv.pos ? adv.pos.x+','+adv.pos.y : '?'}`,
     `Party: ${(adv.party||[]).map(m=>m.name+' L'+m.level).join(', ') || 'none'}`, `Badges: ${LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length}`,
@@ -2576,6 +2576,8 @@ if(typeof window!=='undefined' && window.addEventListener){
   window.addEventListener('unhandledrejection', e=>reportCrash(e.reason && e.reason.message || e.reason, e.reason && e.reason.stack));
 }
 function feedbackOpen(){
+  if(document.querySelector('.fb')) return;
+  const wasBusy = owBusy;
   owBusy = true;
   const el = document.createElement('div');
   el.className = 'fb gba-menu';
@@ -2589,7 +2591,7 @@ function feedbackOpen(){
   document.getElementById('owView').appendChild(el);
   const ta = el.querySelector('textarea');
   setTimeout(()=>ta.focus(), 0);
-  const close = ()=>{ el.remove(); owBusy = false; startMenu(); };
+  const close = ()=>{ el.remove(); owBusy = wasBusy; };
   el.querySelector('.fb-cancel').onclick = close;
   el.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   const send = el.querySelector('.fb-send'), note = el.querySelector('.fb-note');
@@ -3081,6 +3083,8 @@ if(typeof document.addEventListener==='function'){
   const sBtn = document.getElementById('btnStart');
   if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(offWorldButton('start')) return; else if(!owTextOpen()) startMenu(); });
   // SELECT: a shortcut to the POKéNAV map (Emerald uses it for a registered key item; there are none here).
+  const fbBtn = document.getElementById('btnFeedback');
+  if(fbBtn) fbBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); sfx('open'); feedbackOpen(); });
   const selBtn = document.getElementById('btnSelect');
   if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); toggleMap(); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
