@@ -1759,6 +1759,7 @@ function owFrame(t){
   if(a.inPlace) owTryStep(a.start + a.dur, true);
   else owArrive(a.ch, a.start + a.dur);
   if(!owMoving) drawPlayer(0);   // stopped: stand up straight
+  if(startQueued && !owMoving){ startQueued = false; startMenu(); }
 }
 // Stepped over the edge into a connected area: it becomes the current map, with no fade.
 function crossArea(){
@@ -2052,7 +2053,9 @@ function nurseHeal(n){
 
 // ---------- START menu (Emerald: a window on the right, cursor remembered) ----------
 let startIdx = 0;
+let startQueued = false;
 function startMenu(){
+  if(owMoving && owActive() && !uiMenus.length){ startQueued = true; held.length = 0; return; }   // open when this step lands
   if(!owActive() || owMoving || uiMenus.length) return;
   owBusy = true; held.length = 0;
   const name = adv.playerName.toUpperCase();
@@ -2910,7 +2913,7 @@ if(typeof document.addEventListener==='function'){
     if(KEYDIR[k]){ e.preventDefault(); if(!e.repeat) pressDir(KEYDIR[k]); }
     else if((k==='enter'||k===' '||k==='z') && !e.repeat){
       const f = document.activeElement;
-      if(k!=='z' && f && /^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(f.tagName)) return; // let focused controls work
+      if(k!=='z' && f && /^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(f.tagName) && !f.closest('.gb-controls')) return; // let focused controls work
       e.preventDefault(); if(k==='enter') startMenu(); else owInteract();
     }
   });
@@ -2927,7 +2930,7 @@ if(typeof document.addEventListener==='function'){
     ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev, ()=>releaseDir(d)));
   });
   const sBtn = document.getElementById('btnStart');
-  if(sBtn) sBtn.addEventListener('click', ()=>{ if(uiMenus.length) uiKey('b'); else if(!owTextOpen()) startMenu(); });
+  if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(!owTextOpen()) startMenu(); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
   if(aBtn) aBtn.addEventListener('click', ()=>{ if(uiKey('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
@@ -3209,7 +3212,7 @@ function startTrainerBattle(npc){
   let id=9000;
   const lv = rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
   // Rivals and Leaders field six: their signature team, filled out with type-fitting Pokémon.
-  const names = rt ? npc.team : loc.leaderTeam.slice();
+  const names = rt ? npc.team.slice(0, Math.max(1, adv.party.length)) : loc.leaderTeam.slice();
   if(!rt){
     const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
