@@ -36,9 +36,9 @@ party-royale/
 ├── server.js          zero-dependency static file server
 ├── package.json
 └── sprites/
-    ├── front/          enemy + menu sprites — sprites/front/<slug>.png
-    ├── back/           your party's battle sprites — sprites/back/<slug>.png
-    └── README.md        naming convention + details
+    ├── pokemon/        enemy + menu sprites — sprites/pokemon/<num>.png
+    │   └── back/       your party's battle sprites — sprites/pokemon/back/<num>.png
+    └── README.md        numbering + details
 ```
 
 Everything in `js/app.js` runs as plain global-scope script (no bundler, no
@@ -47,10 +47,24 @@ its own file.
 
 ## Custom sprites
 
-See `sprites/README.md`. Short version: drop a PNG named after the species
-into `sprites/front/` and/or `sprites/back/`, matching the slug convention
-(lowercase, hyphenated — e.g. `mr-mime.png`). Missing files fall back to a
+See `sprites/README.md`. Short version: sprites follow the PokeAPI/sprites
+layout — `sprites/pokemon/<num>.png` and `sprites/pokemon/back/<num>.png`,
+where `<num>` is the National Dex number (e.g. `25.png`). Missing files fall back to a
 ❔ placeholder automatically, so you can fill the roster in over time.
+
+## Pokémon data
+
+`js/dexdata.js` holds real types, base stats, abilities, level-up learnsets
+(Ultra Sun/Moon) and level-based evolutions for every species, generated from
+[PokeAPI](https://pokeapi.co)'s CSV dump. To rebuild it, download the CSVs from
+<https://github.com/PokeAPI/pokeapi/tree/master/data/v2/csv> into a folder and run:
+
+```
+node tools/build-dexdata.js path/to/csv-folder
+```
+
+Only moves the battle engine can simulate are kept (damaging moves, and status
+moves that inflict burn/poison/paralysis/sleep/freeze).
 
 ## Save data
 
