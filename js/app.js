@@ -2537,7 +2537,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.17-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.18-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3080,8 +3080,18 @@ if(typeof document.addEventListener==='function'){
 }
 
 // The handheld's buttons also drive the title screen and the opening intro, where there is no overworld.
+const visible = id=>{ const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
 function offWorldButton(k){
   if(onTitle){ titleKey(k); return true; }
+  for(const id of ['storyResult', 'result']) if(visible(id)){
+    if(k==='a' || k==='start') document.querySelector(`#${id} button.primary`)?.click();
+    return true;
+  }
+  if(visible('battle')){
+    const key = {up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight', a:'z', start:'z', b:'x'}[k];
+    if(key) document.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles:true, cancelable:true}));
+    return true;
+  }
   const intro = document.getElementById('starterSelect');
   if(intro && !intro.classList.contains('hidden') && intro.closest('#owView')){
     const naming = !document.getElementById('introName') || !document.getElementById('introName').classList.contains('hidden');
@@ -3422,7 +3432,6 @@ function startWildBattle(fixed){
   battleIntro(()=>{
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
-  document.getElementById('adv').classList.add('hidden');
   addLog(`Wild ${wild.map(m=>`${m.name.toUpperCase()} (Lv${m.level})`).join(' and ')} appeared!`);
   startBattleUI();
   });
@@ -3449,7 +3458,6 @@ function startTrainerBattle(npc){
   battleIntro(()=>{
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
-  document.getElementById('adv').classList.add('hidden');
   addLog(rt ? `${npc.title} would like to battle!` : `${loc.type==='gym'?'Gym Leader':'Rival'} ${loc.leaderName} challenges you with ${team.length} Pokémon! (Lv.${lv})`);
   startBattleUI();
   });
@@ -3653,6 +3661,7 @@ function confirmDraft(){
   state = {sideA, sideB, log:[], mode:'free'};
   document.getElementById('draft').classList.add('hidden');
   document.getElementById('result').classList.add('hidden');
+  document.getElementById('adv').classList.remove('hidden'); document.getElementById('adv').classList.add('on-title');   // no world: hide the page chrome
   document.getElementById('battle').classList.remove('hidden');
   addLog(`Battle start: ${sideA.length} vs ${sideB.length}!`);
   startBattleUI();
@@ -4113,5 +4122,26 @@ function resetAll(){
 // Installable (PWA): the service worker keeps a copy of the game for offline play.
 if('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 
+// Battles and their result screens live on the handheld's screen too. The battle keeps its layout
+// and scales down (--bk) only when it's taller than the screen (the desktop's 480x320 view).
+function fitBattle(){
+  const b = document.getElementById('battle'), v = document.getElementById('owView');
+  if(!b || !v || b.classList.contains('hidden') || b.parentNode!==v) return;
+  const vw = v.offsetWidth, vh = v.offsetHeight;
+  b.style.width = vw + 'px'; b.style.minHeight = '0';
+  const k = Math.min(1, vh / b.scrollHeight);
+  b.style.width = vw/k + 'px'; b.style.minHeight = vh/k + 'px';
+  b.style.setProperty('--bk', k);
+}
+function mountScreens(){
+  const v = document.getElementById('owView');
+  for(const id of ['battle', 'storyResult', 'result']){ const el = document.getElementById(id); if(el && el.parentNode!==v) v.appendChild(el); }
+  if(typeof ResizeObserver!=='undefined'){
+    const ro = new ResizeObserver(()=>requestAnimationFrame(fitBattle));
+    ro.observe(document.getElementById('battle'));
+    document.querySelectorAll('#battle > *').forEach(el=>ro.observe(el));
+  }
+  window.addEventListener('resize', fitBattle);
+}
 // First launch: straight onto the handheld's title.
-if(typeof document!=='undefined' && document.getElementById('adv')) handheldTitle();
+if(typeof document!=='undefined' && document.getElementById('adv')){ mountScreens(); handheldTitle(); }
