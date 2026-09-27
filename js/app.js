@@ -2186,7 +2186,7 @@ function startMenu(){
     if(pick==='BAG') return bagOpen();
     if(pick==='OPTION') return optionOpen();
     if(pick==='SYSTEM') return systemMenu();
-    if(pick==='POKéNAV') return toggleMap();
+    if(pick==='POKéNAV') return openMap(true);
     if(pick===name){
       return cardOpen();
     }
@@ -2548,7 +2548,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.22-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.23-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3051,6 +3051,7 @@ if(typeof document.addEventListener==='function'){
       return;
     }
     if(k==='shift'){ owRun = true; return; }
+    if(mapOpen && adv){ if(['x','escape','backspace','enter'].includes(k)){ e.preventDefault(); closeMap(); } return; }
     if(onTitle){ const t = {enter:'start', ' ':'a', z:'a'}[k]; if(t && !e.repeat){ e.preventDefault(); titleKey(t); } return; }
     if(!owActive()) return;
     if(KEYDIR[k]){ e.preventDefault(); if(!e.repeat) pressDir(KEYDIR[k]); }
@@ -3086,7 +3087,7 @@ if(typeof document.addEventListener==='function'){
   const fbBtn = document.getElementById('btnFeedback');
   if(fbBtn) fbBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); sfx('open'); feedbackOpen(); });
   const selBtn = document.getElementById('btnSelect');
-  if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); toggleMap(); });
+  if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(mapOpen) return offWorldButton('select'); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); openMap(false); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
   if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a') || offWorldButton('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
@@ -3098,6 +3099,7 @@ if(typeof document.addEventListener==='function'){
 // The handheld's buttons also drive the title screen and the opening intro, where there is no overworld.
 const visible = id=>{ const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
 function offWorldButton(k){
+  if(mapOpen && adv){ if(k==='b' || k==='start' || k==='select') closeMap(); return true; }
   if(onTitle){ titleKey(k); return true; }
   for(const id of ['setup', 'draft']) if(visible(id)){
     const el = document.getElementById(id);
@@ -3373,7 +3375,13 @@ function healParty(){
 }
 
 let mapOpen = false;
-function toggleMap(){ mapOpen = !mapOpen; renderMap(); }
+let mapFromStart = false;
+function openMap(fromStart){ mapFromStart = !!fromStart; mapOpen = true; owBusy = true; held.length = 0; renderMap(); }
+function closeMap(){
+  mapOpen = false; owBusy = false; renderMap();
+  if(mapFromStart){ mapFromStart = false; startMenu(); }
+}
+function toggleMap(){ mapOpen ? closeMap() : openMap(false); }
 // Region map: areas on their grid cells, with a connector wherever two areas link. Places you
 // haven't been to yet show as "???".
 function renderMap(){
