@@ -930,3 +930,4 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .ab{background:radial-gradient(circle at 38% 30%,var(--b1),var(--b2) 72%); color:var(--bt);}
 .start-btn{background:radial-gradient(circle at 40% 35%,var(--b1),var(--b2) 75%); box-shadow:0 2px 0 var(--s4), inset 0 1px 0 #ffffff33;}
 .start-btn::after{color:var(--slbl);}
+@media (pointer:coarse){ #adv .dpad{align-self:flex-start; margin-top:26px;} }   /* D-pad high on the base, just under the shoulder strip */
