@@ -1608,6 +1608,7 @@ function renderOverworld(){
   if(map.theme==='ghost') view.style.setProperty('--sight', (70 + 45*map.npcs.filter(n=>n.id && adv.cleared[n.id]).length) + 'px');
   let html = '<div id="owTiles"></div>';
   html += curNpcs().map(n=>npcHtml(n, map.npcs.indexOf(n))).join('');
+  html += nbNpcs().map(({n, x, y})=>`<div class="ow-actor npc nb-npc" style="transform:translate(${x*T+4}px,${y*T-6}px); z-index:${20+2*y}">${charSvg(n.kind, n.facing, 0)}</div>`).join('');
   html += `<div class="ow-actor" id="owPlayer"><div class="ow-body"></div><div class="ow-reflect"></div></div>`;
   world.innerHTML = html;
   renderTiles(adv.pos.x, adv.pos.y);
@@ -1751,6 +1752,17 @@ function pressDir(d){
 }
 function releaseDir(d){ const i = held.indexOf(d); if(i>=0) held.splice(i,1); }
 function npcAt(x, y){ return curNpcs().find(n=>n.x===x && n.y===y); }
+// People in the connected areas (outdoors), placed in this map's coordinates. They're drawn and block
+// your way across the border, so nobody pops in or out when you cross; areas that aren't connected to
+// where you are aren't loaded at all. They wake up (wander, talk, spot you) once their area is current.
+function nbNpcs(){
+  if(curMap().interior) return [];
+  return neighbours(adv.loc).flatMap(nb=>{
+    const nloc = LOCATIONS[nb.exit.to];
+    return nb.map.npcs.filter(n=>!(n.vanish && adv.cleared[nloc.name])).map(n=>({n, x:n.x+nb.ox, y:n.y+nb.oy}));
+  });
+}
+function nbNpcAt(x, y){ return nbNpcs().some(p=>p.x===x && p.y===y); }
 // `chained` = continuing straight on from the previous step (no turn pause).
 function owTryStep(startAt, chained){
   if(owMoving || !owActive()) return;
@@ -1778,7 +1790,7 @@ function owTryStep(startAt, chained){
   }
   // Walking down onto a ledge hops you over it to the tile beyond: 32 frames for the two tiles.
   const lx = nx + DIRS[d][0], ly = ny + DIRS[d][1];
-  if(LEDGE_DIR[ch]===d && WALKABLE.has(worldTile(lx, ly)) && !npcAt(lx, ly)){
+  if(LEDGE_DIR[ch]===d && WALKABLE.has(worldTile(lx, ly)) && !npcAt(lx, ly) && !nbNpcAt(lx, ly)){
     adv.pos = {x:lx, y:ly};
     const el = document.getElementById('owPlayer');
     if(el) el.style.zIndex = 20 + 2*adv.pos.y;
@@ -1786,7 +1798,7 @@ function owTryStep(startAt, chained){
     return owStart({...here, dur:JUMP_MS, jump:true, ch:worldTile(lx, ly)});
   }
   // Blocked (by scenery or a person): walk in place against it for as long as you hold on.
-  if(npc || !WALKABLE.has(ch)){ sfx('bump'); return owStart({...here, dur:WALK_MS, inPlace:true}); }
+  if(npc || nbNpcAt(nx, ny) || !WALKABLE.has(ch)){ sfx('bump'); return owStart({...here, dur:WALK_MS, inPlace:true}); }
   adv.pos = {x:nx, y:ny};
   const el = document.getElementById('owPlayer');
   // Layer by the destination row: grass fronts on that row (and the one you leave) cover your legs.
@@ -2537,7 +2549,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.19-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.20-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
