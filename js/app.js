@@ -913,7 +913,10 @@ for(const [i,j] of [[0,14],[1,15],[5,16],[6,17]]) linkAreas(i, j, false);
 // player, exits on any side leading to neighbouring areas, and frame-synced hold-to-walk movement.
 // All art here is original: CSS tiles/buildings and hand-made 12×16 pixel-art trainers.
 // Emerald timing at 60 fps: a walk step is 16 frames, a run step or a turn-in-place is 8.
-const T = 32, VIEW_W = 15, VIEW_H = 10, WALK_MS = 16000/60, RUN_MS = 8000/60, TURN_MS = 8000/60, JUMP_MS = 32000/60;
+const T = 32;
+// The view in tiles: the GBA's 15x10 on desktop; phones get 17 across and as many rows as fit above the controls (owFit).
+let VIEW_W = 15, VIEW_H = 10;
+const WALK_MS = 16000/60, RUN_MS = 8000/60, TURN_MS = 8000/60, JUMP_MS = 32000/60;
 function seedRand(str){
   let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0;
   return function(){ h=(h*1103515245+12345)>>>0; return (h>>>8)/0x1000000; };
@@ -1625,7 +1628,7 @@ function renderOverworld(){
 // from this map and whichever connected maps it overlaps (so big maps stay cheap). It's redrawn
 // when you've moved 3 tiles from its centre; tiles sit at fixed world positions, so a redraw
 // never shows. Tall-grass fronts and buildings (this map's and the neighbours') go in the same layer.
-const WIN_X = 12, WIN_Y = 10;
+const WIN_X = 12, WIN_Y = 13;
 let owTileCenter = {x:0, y:0};
 function mapAt(x, y){
   const map = curMap();
@@ -1664,8 +1667,17 @@ function owFit(){
   const avail = scr && scr.parentNode ? scr.parentNode.clientWidth - px(scr.parentNode, "paddingLeft", "paddingRight") - px(scr, "borderLeftWidth", "borderRightWidth") : 0;
   if(!avail) return;
   owDpr = (typeof window!=='undefined' && window.devicePixelRatio) || 1;
+  const phone = typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches;
+  VIEW_W = phone ? 17 : 15;
   const tileDev = Math.min(Math.floor(avail*owDpr/VIEW_W), Math.floor(1.5*T*owDpr));
   owK = tileDev/(T*owDpr);
+  if(phone){   // rows: whatever fits above the controls base (340px) inside the page, lid and bezel
+    const wrap = document.querySelector('.wrap');
+    const room = innerHeight - (wrap ? px(wrap, "paddingTop", "paddingBottom") : 16) - px(scr.parentNode, "paddingTop", "paddingBottom") - px(scr, "borderTopWidth", "borderBottomWidth") - 6 - 340;
+    VIEW_H = Math.max(10, Math.min(22, Math.floor(room / (T*owK))));
+  } else VIEW_H = 10;
+  view.style.width = VIEW_W*T + 'px'; view.style.height = VIEW_H*T + 'px';
+  view.style.setProperty('--pgk', VIEW_W*T/480);   // full-screen pages (480 wide) scale up to the screen width
   view.style.transform = `scale(${owK})`;
   scr.style.width = VIEW_W*T*owK + 'px';
   scr.style.height = VIEW_H*T*owK + 'px';
@@ -2525,7 +2537,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.16-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.17-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3025,6 +3037,7 @@ if(typeof document.addEventListener==='function'){
       return;
     }
     if(k==='shift'){ owRun = true; return; }
+    if(onTitle){ const t = {enter:'start', ' ':'a', z:'a'}[k]; if(t && !e.repeat){ e.preventDefault(); titleKey(t); } return; }
     if(!owActive()) return;
     if(KEYDIR[k]){ e.preventDefault(); if(!e.repeat) pressDir(KEYDIR[k]); }
     else if((k==='enter'||k===' '||k==='z') && !e.repeat){
@@ -3042,7 +3055,7 @@ if(typeof document.addEventListener==='function'){
   // On-screen D-pad (hold to walk), A (read / talk / advance text) and B (hold to run).
   if(typeof document.querySelectorAll==='function') document.querySelectorAll('.gb-controls [data-dir]').forEach(btn=>{
     const d = btn.dataset.dir;
-    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); btn.setPointerCapture && btn.setPointerCapture(e.pointerId); if(uiKey(d) || owTextOpen()) return; pressDir(d); });
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); btn.setPointerCapture && btn.setPointerCapture(e.pointerId); if(uiKey(d) || offWorldButton(d) || owTextOpen()) return; pressDir(d); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev, ()=>releaseDir(d)));
   });
   // iPhone: cancelling pointer events doesn't stop a held touch selecting text, showing the loupe or the
@@ -3054,18 +3067,29 @@ if(typeof document.addEventListener==='function'){
     pad.addEventListener('contextmenu', e=>e.preventDefault());
   }
   const sBtn = document.getElementById('btnStart');
-  if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(!owTextOpen()) startMenu(); });
+  if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(offWorldButton('start')) return; else if(!owTextOpen()) startMenu(); });
   // SELECT: a shortcut to the POKéNAV map (Emerald uses it for a registered key item; there are none here).
   const selBtn = document.getElementById('btnSelect');
   if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); toggleMap(); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
-  if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
+  if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a') || offWorldButton('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
-    bBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('b')) return; owRun = true; if(owTextOpen()) owAdvance(); });
+    bBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('b') || offWorldButton('b')) return; owRun = true; if(owTextOpen()) owAdvance(); });
     ['pointerup','pointercancel','pointerleave'].forEach(ev=>bBtn.addEventListener(ev, ()=>{ owRun = false; }));
   }
 }
 
+// The handheld's buttons also drive the title screen and the opening intro, where there is no overworld.
+function offWorldButton(k){
+  if(onTitle){ titleKey(k); return true; }
+  const intro = document.getElementById('starterSelect');
+  if(intro && !intro.classList.contains('hidden') && intro.closest('#owView')){
+    const naming = !document.getElementById('introName') || !document.getElementById('introName').classList.contains('hidden');
+    if((k==='a' || k==='start') && !naming && intro.onclick) intro.onclick();
+    return true;
+  }
+  return false;
+}
 function saveAdv(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){} }
 // Phones close backgrounded apps without warning, so save the moment the game is hidden (the game
 // already saves whenever you stop walking and after most events). And ask the browser to keep the
@@ -3158,8 +3182,12 @@ const INTRO_LINES = ["Hi there! Sorry to keep you waiting!", "Welcome to the wor
 function beginNewStory(){
   const trio = STARTER_TRIOS[Math.floor(Math.random()*STARTER_TRIOS.length)];
   starterOptions = trio.map(n=>DEX.find(d=>d.name===n)).filter(Boolean);
-  ['titleScreen','setup','draft','battle','result','storyResult','adv'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-  const panel = document.getElementById('starterSelect');
+  ['titleScreen','setup','draft','battle','result','storyResult'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  leaveTitle();
+  const panel = document.getElementById('starterSelect'), view = document.getElementById('owView');
+  document.getElementById('adv').classList.remove('hidden');
+  document.getElementById('owWorld').innerHTML = '';
+  if(panel.parentNode !== view) view.appendChild(panel);   // the intro runs inside the handheld's screen
   panel.classList.remove('hidden');
   panel.innerHTML = `<div class="intro-stage"><div class="intro-prof">${charSvg('prof','down',0)}</div>
     <img class="intro-mon" src="${spritePath(dexByName('Lotad'))}" alt="">
@@ -3493,16 +3521,61 @@ function refreshContinueBtn(){
 }
 function newAdventurePrompt(){
   showConfirm('Start a new adventure? This will overwrite your current saved game (export a save code first if you want to keep it).', ok=>{
-    if(ok) beginNewStory();
+    if(ok) beginNewStory(); else handheldTitle();
   });
 }
 refreshContinueBtn();
 
-function showTitle(){
-  document.getElementById('titleScreen').classList.remove('hidden');
-  document.getElementById('setup').classList.add('hidden');
-  refreshContinueBtn();
+function showTitle(){ handheldTitle(); }
+// From first launch you're holding the handheld: its screen shows a short boot splash, then the title
+// with PRESS START; START/A opens the menu (D-pad + A/B, or tap). The old page title stays hidden.
+let onTitle = false, titleReady = false, titleTimer = null;
+function handheldTitle(){
+  onTitle = true; titleReady = false; state = null; adv = null;
+  ['titleScreen','setup','draft','battle','result','storyResult','starterSelect'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  const box = document.getElementById('adv'), view = document.getElementById('owView');
+  box.classList.remove('hidden'); box.classList.add('on-title');
+  const saved = loadAdv(); box.dataset.shell = ((saved && saved.shell) || 'RED').toLowerCase();
+  document.getElementById('owWorld').innerHTML = '';
+  document.getElementById('owText').classList.add('hidden');
+  view.className = 'ow-view';
+  document.getElementById('advMap').classList.add('hidden');
+  let t = document.getElementById('owTitle');
+  if(!t){ t = document.createElement('div'); t.id = 'owTitle'; view.appendChild(t); }
+  t.className = 'ow-title boot';
+  t.innerHTML = '<div class="tt-boot">PARTY ROYALE</div>';
+  t.onclick = ()=>titleKey('a');
+  owFit();
+  clearTimeout(titleTimer);
+  titleTimer = setTimeout(titleShow, 1900);
 }
+function titleShow(){
+  if(!onTitle) return;
+  const t = document.getElementById('owTitle');
+  titleReady = true;
+  t.className = 'ow-title';
+  t.innerHTML = '<div class="title-ball"></div><h1 class="logo">Party<br>Royale</h1><div class="version">Vellorin Version</div><div class="press-start">PRESS START</div>';
+}
+function titleKey(k){
+  if(!titleReady){ clearTimeout(titleTimer); return titleShow(); }   // any button skips the splash
+  if(uiMenus.length || !['a','start'].includes(k)) return;
+  sfx('select');
+  const sv = loadAdv(), has = !!(sv && sv.party && (sv.party.length || sv.starterPending));   // same test as startAdventure
+  const items = (has ? ['CONTINUE'] : []).concat(['NEW GAME', 'FREE BATTLE', 'IMPORT SAVE']);
+  document.getElementById('owTitle').classList.add('menu');   // Emerald: the menu replaces the title art
+  uiMenu(document.getElementById('owView'), items, i=>{
+    document.getElementById('owTitle')?.classList.remove('menu');
+    const pick = items[i];
+    if(!pick) return;
+    if(pick==='IMPORT SAVE') return openImportSave();
+    leaveTitle();
+    if(pick==='CONTINUE') return startAdventure();
+    if(pick==='NEW GAME') return has ? newAdventurePrompt() : startAdventure();
+    document.getElementById('adv').classList.add('hidden');
+    showSetup();
+  }, 'gm-title');
+}
+function leaveTitle(){ onTitle = false; clearTimeout(titleTimer); document.getElementById('owTitle')?.remove(); document.getElementById('adv').classList.remove('on-title'); }
 function showSetup(){
   document.getElementById('titleScreen').classList.add('hidden');
   document.getElementById('setup').classList.remove('hidden');
@@ -4034,9 +4107,11 @@ function resetAll(){
   document.getElementById('storyResult').classList.add('hidden');
   document.getElementById('setup').classList.add('hidden');
   document.getElementById('starterSelect').classList.add('hidden');
-  document.getElementById('titleScreen').classList.remove('hidden');
-  refreshContinueBtn();
+  handheldTitle();
 }
 
 // Installable (PWA): the service worker keeps a copy of the game for offline play.
 if('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+// First launch: straight onto the handheld's title.
+if(typeof document!=='undefined' && document.getElementById('adv')) handheldTitle();
