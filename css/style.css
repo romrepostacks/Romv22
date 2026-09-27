@@ -937,3 +937,12 @@ body:has(#adv:not(.hidden)){background:#141418;}
   #adv .ab-btns .ab{transform:rotate(35deg);}          /* keep the letters upright */
   #adv .ab-btns .ab:active{transform:rotate(35deg) translateY(3px);}
 }
+/* START and SELECT side by side (SELECT left). Desktop: under the controls; phone: between D-pad and A/B. */
+.select-btn{left:calc(50% - 34px);} #btnStart{left:calc(50% + 34px);}
+@media (pointer:coarse){
+  #adv .select-btn,#adv #btnStart{top:292px; bottom:auto;}
+  #adv .select-btn{left:36%;} #adv #btnStart{left:61%;}
+}
+@media (pointer:coarse){   /* SELECT's map floats over the screen instead of pushing the handheld down */
+  #adv #advMap:not(.hidden){position:fixed; left:12px; right:12px; top:calc(12px + env(safe-area-inset-top)); z-index:100; max-height:46vh; overflow:auto; margin:0; box-shadow:0 8px 24px #000a;}
+}

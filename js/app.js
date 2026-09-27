@@ -2525,7 +2525,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.9.15-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.9.16-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3055,6 +3055,9 @@ if(typeof document.addEventListener==='function'){
   }
   const sBtn = document.getElementById('btnStart');
   if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(!owTextOpen()) startMenu(); });
+  // SELECT: a shortcut to the POKéNAV map (Emerald uses it for a registered key item; there are none here).
+  const selBtn = document.getElementById('btnSelect');
+  if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); toggleMap(); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
   if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
