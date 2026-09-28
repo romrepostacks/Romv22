@@ -3,6 +3,14 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.10.3",
+      "date": "2026-09-27",
+      "title": "Fixes",
+      "changes": [
+        "Roads now line up where towns meet routes (no more step in the path)"
+      ]
+    },
+    {
       "version": "0.10.2",
       "date": "2026-09-27",
       "title": "Balance: Party Size",

@@ -1022,12 +1022,14 @@ function buildTown(loc){
     tiles[y+OY][P(x)] = edge ? '.' : ch;
   }));
   // Roads: west/east on the centre's road rows, a 3-wide lane north/south; openings in the border.
-  const OPEN = {left:{x:0,y:OY+5,len:4}, right:{x:W-1,y:OY+5,len:4}, up:{x:LANE,y:0,len:3}, down:{x:LANE,y:H-1,len:3}};
+  // Side openings span the 2 rows above the road and the road (rows 3-4 of the opening), the same as a
+  // route's entrance, so the roads meet in a straight line at the border.
+  const OPEN = {left:{x:0,y:OY+4,len:4}, right:{x:W-1,y:OY+4,len:4}, up:{x:LANE,y:0,len:3}, down:{x:LANE,y:H-1,len:3}};
   const exits = [], ARROW = {left:'←', right:'→', up:'↑', down:'↓'};
   const signs = [{x:P(3), y:8+OY, text:loc.name.toUpperCase()}];
   for(const l of loc.links){
     // A sign beside the road just inside each exit, as on routes.
-    const [sx, sy] = {left:[3, OY+4], right:[W-4, OY+4], up:[LANE-1, 3], down:[LANE+3, H-4]}[l.dir];   // just outside the opening, never in it
+    const [sx, sy] = {left:[3, OY+3], right:[W-4, OY+3], up:[LANE-1, 3], down:[LANE+3, H-4]}[l.dir];   // just outside the opening, never in it
     tiles[sy][sx] = 'N';
     signs.push({x:sx, y:sy, route:true, text:`${loc.name.toUpperCase()}\n${ARROW[l.dir]} ${LOCATIONS[l.to].name.toUpperCase()}`});
     if(l.dir==='left')  for(let x=0; x<=OX; x++) tiles[OY+6][x] = tiles[OY+7][x] = ':';
@@ -1123,6 +1125,7 @@ function buildRoute(loc){
     carveOpening(tiles, l.dir, OPEN[l.dir], ',');
     let x = sp.x + STEP_IN[l.dir][0], y = sp.y + STEP_IN[l.dir][1];
     tiles[sp.y][sp.x] = ':';
+    if(lr) tiles[sp.y+1][sp.x] = ':'; else tiles[sp.y][sp.x+1] = ':';   // the road is 2 wide right up to the edge
     const along = lr ? Math.abs(cx-x) : Math.abs(cy-y), legs = Math.max(1, Math.round(along/14));
     const way = [];
     for(let i=1;i<legs;i++){
@@ -2580,7 +2583,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.10.2-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.10.3-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
