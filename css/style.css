@@ -1025,3 +1025,6 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .bs-ball{position:absolute; z-index:5; pointer-events:none; transform-origin:50% 90%;}
 .bs-ball svg{display:block; width:100%; height:100%;}
 .bs-ball.shut{filter:brightness(.6);}
+
+/* One of your Pokémon on screen at a time (#13). */
+.bs-field.player .bmon:not(.focus){display:none;}

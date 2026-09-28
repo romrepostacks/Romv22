@@ -3,6 +3,16 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.4",
+      "date": "2026-09-27",
+      "title": "Cleaner Battles",
+      "changes": [
+        "Your side now shows one Pokémon at a time: whoever is choosing a move, attacking or taking a hit",
+        "Your full team stays listed with HP on the right",
+        "The opposing team is still all on screen, so you can plan your attacks"
+      ]
+    },
+    {
       "version": "0.11.3",
       "date": "2026-09-27",
       "title": "Poké Ball Throw",

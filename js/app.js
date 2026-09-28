@@ -2617,7 +2617,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.3-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.4-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3904,7 +3904,7 @@ function addLog(t){
 function addFx(fx){ (state.fx ||= {})[state.log.length-1] = fx; }
 function snapAll(){
   const s = m=>({hp:m.hp, maxhp:m.maxhp, fainted:!!m.fainted, caught:!!m.caught, status:m.status||null});
-  return {A:state.sideA.map(s), B:state.sideB.map(s)};
+  return {A:state.sideA.map(s), B:state.sideB.map(s), F:state.focusA};
 }
 
 // Paced message box: reveals a batch of lines one at a time with a tap/keypress-to-continue
@@ -4041,7 +4041,7 @@ function render(snap){
   snap = snap || snapAll();
   for(const [key, player] of [['A',true],['B',false]]){
     const side = (key==='A'?state.sideA:state.sideB).slice(0, snap[key].length);
-    const sz = spriteSize(side.length, player);
+    const sz = spriteSize(player ? 1 : side.length, player);
     if(key==='A'){ const bl = document.querySelector('#battle .bs-ball'); if(bl) bl.remove(); }
     document.getElementById('field'+key).innerHTML = side.map((m,i)=>
       `<div class="bmon" id="bs-${key}${i}" style="--sz:${sz}px"><img src="${spritePath(m.dex, player?'back':'front')}" alt="${dname(m)}" onerror="this.parentNode.classList.add('missing')"><span class="ph">❔</span></div>`).join('');
@@ -4058,7 +4058,15 @@ function render(snap){
 }
 // Point the HP boxes/sprites at a snapshot. Not instant -> bars drain via CSS transition and
 // anything that just lost HP blinks.
+// Which of your Pokémon is on screen (#13).
+function setFocusA(i){
+  const f = document.getElementById('fieldA'); if(!f) return;
+  if(i==null || !f.children[i]) i = state.sideA.findIndex(m=>!m.fainted && !m.caught);
+  state.focusA = i;
+  [...f.children].forEach((e,k)=>e.classList.toggle('focus', k===i));
+}
 function applySnap(snap, instant){
+  setFocusA(snap.F);
   for(const key of ['A','B']){
     snap[key].forEach((s,i)=>{
       const box = document.getElementById(`hb-${key}${i}`), spr = document.getElementById(`bs-${key}${i}`);
@@ -4104,6 +4112,7 @@ function renderCmd(focusIdx){
   const m = cmdMon(), ai = cmd.queue[cmd.pos];
   document.querySelectorAll('#battle .active').forEach(e=>e.classList.remove('active'));
   for(const id of [`bs-A${ai}`, `hb-A${ai}`]){ const e = document.getElementById(id); if(e) e.classList.add('active'); }
+  setFocusA(ai);
   const who = dname(m).toUpperCase();
   const step = cmd.queue.length>1 ? `<div class="turn-pips">${cmd.queue.map((q,k)=>`<i class="${k<cmd.pos?'done':k===cmd.pos?'now':''}"></i>`).join('')}<b>${cmd.pos+1}/${cmd.queue.length}</b>${cmd.pos>0?'<small>B: back</small>':''}</div>` : '';
   // With several Pokémon to order, the others dim and those already ordered get a ✓.
@@ -4273,8 +4282,10 @@ function submitTurn(){
   }
   actions.sort((a,b)=>(b.item?1:0) - (a.item?1:0) || effSpeed(b.user) - effSpeed(a.user));   // items go first
 
+  const focusOn = m=>{ const i = state.sideA.indexOf(m); if(i>=0) state.focusA = i; return i>=0; };
   for(const act of actions){
     if(act.user.fainted || act.user.caught || act.target.fainted || act.target.caught) continue;
+    focusOn(act.user) || focusOn(act.target);
     if(act.item){ const said = useItem(act.item, act.user); addLog(said ? `${adv.playerName} used a ${ITEM_INFO[act.item].name}! ${said}` : `It won't have any effect.`); continue; }
     if(act.ball){
       if(!adv.items.pokeball){ addLog(`No Poké Balls left!`); continue; }
@@ -4330,6 +4341,7 @@ function submitTurn(){
 
   for(const side of [state.sideA, state.sideB]){
     for(const m of alive(side)){
+      focusOn(m);
       if(m.status==='brn' || m.status==='psn'){ const d = Math.floor(m.maxhp/12); m.hp = Math.max(0, m.hp-d); addLog(`${dname(m)} is hurt by its ${m.status==='brn'?'burn':'poison'}! (-${d})`); if(m.hp<=0){ m.fainted=true; addLog(`${dname(m)} fainted!`); } }
       if(m.item==='leftovers' && !m.fainted){ const h = Math.floor(m.maxhp*0.06); m.hp = Math.min(m.maxhp, m.hp+h); if(h>0) addLog(`${dname(m)} restored HP with Leftovers. (+${h})`); }
       if(m.item==='sitrus' && !m.berryUsed && !m.fainted && m.hp <= m.maxhp/2){ const h = Math.floor(m.maxhp*0.25); m.hp = Math.min(m.maxhp, m.hp+h); m.berryUsed = true; addLog(`${dname(m)} restored HP with its Sitrus Berry! (+${h})`); }
