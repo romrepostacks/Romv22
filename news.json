@@ -1,7 +1,20 @@
 {
   "_howto": "Edit this file to change the title screen message (motd) or add a changelog entry. Newest entry first. Each entry: version, date (YYYY-MM-DD), title, changes (short bullet points, player-facing). The game fetches this file fresh on every launch.",
-  "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
+  "motd": "Phase 4 is here: DIVE beneath the sea, explore the underwater world and find the Sunken Shrine!",
   "changelog": [
+    {
+      "version": "0.13.0",
+      "date": "2026-09-28",
+      "title": "Phase 4: Dive",
+      "changes": [
+        "Beat Leader Hale in Rimefall Town for HM08 DIVE",
+        "Look for dark, deep water while you SURF on the Stormwake Strait or the Glimmer Sea, and press A to dive",
+        "A whole underwater world: Stormwake Depths, the Coral Trench and Glimmer Deep, with kelp to search for underwater Pokémon",
+        "Swim into a shaft of light and press A to surface",
+        "The Sunken Shrine: Wren joins you, Admin Vesper makes her last stand, and the guardian Lugia awakens. Catch it if you can!",
+        "Beating Vesper ends the storms over Vellorin"
+      ]
+    },
     {
       "version": "0.12.6",
       "date": "2026-09-28",

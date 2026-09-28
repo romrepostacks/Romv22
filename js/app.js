@@ -905,7 +905,15 @@ const LOCATIONS=[
  {type:'route', name:"Route 10: Skyreach Cliffs", at:[5,-2], tier:21, desc:"Wind howls along the cliff tops. Dragons are said to nest above the clouds.", pool:['Swablu','Bagon','Trapinch','Skarmory','Noctowl','Fearow'], theme:'rocky'},
  {type:'gym', name:"Aeriepeak City", at:[4,-2], tier:22, desc:"A city of towers above the clouds. Leader Corvin rules the skies with Dragon and Flying Pokémon.", center:true, leaderName:"Corvin", leaderTeam:['Altaria','Skarmory','Flygon','Salamence'], endOfContent:true},
  // Side area: open sea east of Glimmer Coast, for SURF and fishing.
- {type:'route', name:"Glimmer Sea", at:[6,-1], tier:6, desc:"Calm, clear water dotted with sandbars. Something big swims below.", pool:['Wingull','Krabby'], water:['Tentacool','Horsea','Staryu','Wailmer','Mantine','Lapras'], theme:'sea'}
+ {type:'route', name:"Glimmer Sea", at:[6,-1], tier:6, desc:"Calm, clear water dotted with sandbars. Something big swims below.", pool:['Wingull','Krabby'], water:['Tentacool','Horsea','Staryu','Wailmer','Mantine','Lapras'], theme:'sea'},
+ // Beneath the sea (DIVE). `deep` areas are their own layer: reached by diving, linked to each other only,
+ // and left off the region map. Their `at` cells are a separate grid.
+ {type:'route', name:"Stormwake Depths", at:[100,0], tier:20, deep:true, surface:18, theme:'deep', desc:"Dim water beneath the strait. Kelp sways over the seabed.", pool:['Chinchou','Clamperl','Horsea','Qwilfish','Luvdisc','Wailmer']},
+ {type:'route', name:"Coral Trench", at:[101,0], tier:21, deep:true, theme:'deep', desc:"A long trench of coral and rock, running west under the sea.", pool:['Corsola','Luvdisc','Seadra','Chinchou','Relicanth','Frillish']},
+ {type:'route', name:"Glimmer Deep", at:[102,0], tier:21, deep:true, surface:27, theme:'deep', desc:"Clear water over pale sand. Old carved stones lie half-buried here.", pool:['Lanturn','Relicanth','Clamperl','Seadra','Frillish','Corsola']},
+ {type:'trainer', kind:'boss', name:"Sunken Shrine", at:[102,-1], tier:23, deep:true, theme:'deep', boss:true, legend:'Lugia', grunts:3,
+  desc:"The TIDEWARDENS' shrine, deep beneath the sea. TEAM TEMPEST's machines hum around a sleeping giant. \"You're too late. The song is almost complete!\"",
+  leaderName:"Admin Vesper", leaderTeam:['Sharpedo','Crobat','Mightyena','Weezing','Gyarados'], pool:['Lanturn','Relicanth','Seadra','Frillish']}
 ];
 // Story areas link in order; the way onward from a gym or rival stays shut until they're beaten.
 // Every link works both ways, so you can always walk back.
@@ -925,6 +933,7 @@ function linkAreas(i, j, gate){
 for(let i=0;i<13;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 for(const [i,j] of [[0,14],[1,15],[5,16],[6,17],[16,27]]) linkAreas(i, j, false);
 linkAreas(13, 18, false);
+linkAreas(28, 29, false); linkAreas(29, 30, false); linkAreas(30, 31, false);
 for(let i=18;i<26;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 
 // ---------- Story: Team Tempest, the Tidewardens and Wren (see STORY.md) ----------
@@ -941,6 +950,11 @@ Object.assign(LOCATIONS[21], {storyNpc:{kind:'oldwoman', lines:["The TIDEWARDENS
 Object.assign(LOCATIONS[23], {scene:'hideout', rivalAfter:["...I lost. Again.", "Vesper promised TEAM TEMPEST would make me strong. But they're hurting Pokémon to wake the guardian.", "That's not strength. I'm done with them.", "Go on. I'll find another way to stop Vesper. ...Thanks for knocking some sense into me."]});
 Object.assign(LOCATIONS[24], {storyNpc:{kind:'girl', lines:["A trainer called WREN came down from the ridge looking shaken.", "Said they'd quit some team, and that the storms are getting worse."]}});
 Object.assign(LOCATIONS[25], {grunts:2});
+Object.assign(LOCATIONS[18], {dive:28});
+Object.assign(LOCATIONS[27], {dive:30});
+Object.assign(LOCATIONS[31], {scene:'shrine',
+  tablet:["The oldest carving of all, worn almost smooth...", "\"Sing, and the guardian sleeps. Wake it in anger, and only a true heart can calm the storm.\""],
+  rivalAfter:["No... NO! The song is finished. You can't stop what's already waking!", "Enjoy your storm, child. TEAM TEMPEST is done here."]});
 Object.assign(LOCATIONS[3], {storyNpc:{kind:'boy', lines:["A trainer called WREN blew through here, set on being the strongest in Vellorin.", "Something tells me you'll run into them again."]}});
 Object.assign(LOCATIONS[5], {storyNpc:{kind:'fisher', lines:["Folks in blue uniforms were down at the sea wall, asking about the TIDEWARDENS.", "TEAM TEMPEST, they called themselves. Gave me the creeps."]}});
 Object.assign(LOCATIONS[7], {storyNpc:{kind:'hiker', lines:["See those old stone tablets around Vellorin? The TIDEWARDENS carved them, long before any town stood here.", "Nobody's read them all. Maybe you could!"]}});
@@ -1118,6 +1132,7 @@ const ROUTE_THEMES = {
   lake:  {grass:4, trees:16, rocks:0.1,  ponds:[[7,4],[3,2]]},
   rocky: {grass:4, trees:10, rocks:0.55, ponds:[]},
   sea:   {grass:2, trees:4,  rocks:0.1,  ponds:[]},
+  deep:  {grass:5, trees:14, rocks:0.3,  ponds:[]},
   cave:  {grass:0, trees:14, rocks:0.5,  ponds:[]}};
 // Routes are long corridors like Emerald's: about 125×42 running east–west, 42×125 north–south,
 // or ~80×68 where they turn or branch (seeded ±10% per route). A two-tree-thick border with an
@@ -1304,23 +1319,29 @@ function buildRoute(loc){
     const trail = paths[gated.dir], spot = trail[Math.floor(trail.length*0.45)];
     npcs.push({kind:'rival', x:spot.x, y:spot.y, facing:OPPOSITE[gated.dir], trainer:true, vanish:true});
   }
+  if(loc.boss){
+    const trail = paths[loc.links[0].dir], spot = trail[Math.floor(trail.length*0.7)];
+    npcs.push({kind:'admin', x:spot.x, y:spot.y, facing:OPPOSITE[loc.links[0].dir], trainer:true, vanish:true});
+    npcs.push({kind:'mon:'+loc.legend, x:cx, y:cy, facing:'down', legend:loc.legend});
+  }
   // Locals with tips, spread along the route.
   const who = {forest:'bugcatcher', lake:'fisher', rocky:'hiker', sea:'fisher'}[loc.theme] || 'youngster';
   const locals = ['youngster', 'lass', who, 'gentleman', 'girl'];
-  for(let k=0; loc.theme!=='cave' && k<Math.max(1, Math.round(A/1100)); k++){
+  for(let k=0; loc.theme!=='cave' && loc.theme!=='deep' && k<Math.max(1, Math.round(A/1100)); k++){
     const sp = freeSpot(); if(!sp) break;
     const kind = locals[k % locals.length];
     npcs.push({kind, x:sp.x, y:sp.y, facing:'down', lines:ROUTE_TALK[kind] || TOWN_TALK[k % TOWN_TALK.length], home:{...sp}, wander:k%2===1});
   }
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
-  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER']}[loc.theme||'plain'];
+  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER'], deep:['SWIMMER','SWIMMER','FISHERMAN']}[loc.theme||'plain'];
   const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass'};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
   const TR_INTRO = ["Our eyes met! That means we battle!", "Hey! You look tough. Let's see!", "I just caught these guys. Try them out!", "You're not getting past without a battle!", "My Pokémon and I trained all day for this!"];
   const TR_AFTER = ["I'll train harder, I promise.", "You're really strong! Good luck out there.", "Losing is part of training, right?", "Next time, I'll win for sure!"];
   const pool = areaPool(loc), trails = Object.values(paths);
-  for(let k=0, made=0; k<200 && made<Math.max(2, Math.round(A/1300)); k++){
+  const maxTr = loc.theme==='deep' ? (loc.grunts||0) : Math.max(2, Math.round(A/1300));   // under the sea: only Tempest
+  for(let k=0, made=0; k<200 && made<maxTr; k++){
     const trail = trails[Math.floor(rnd()*trails.length)];
     if(trail.length<12) continue;
     const p = trail[6 + Math.floor(rnd()*(trail.length-10))], d = ['up','down','left','right'][Math.floor(rnd()*4)];
@@ -1346,6 +1367,7 @@ function buildRoute(loc){
   for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x]) && reach.has(pk.y*W+pk.x)) drop(pk.x, pk.y);   // only clearings you can walk to
   for(let k=Object.keys(itemTypes).length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
   if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
+  let diveSpots = null;
   // Sea routes: open water with a landing at each entrance and small islands where people and items are.
   if(loc.theme==='sea'){
     const land = new Set(), isle = (x0,y0,r)=>{ for(let y=y0-r; y<=y0+r; y++) for(let x=x0-r; x<=x0+r; x++) land.add(y*W+x); };
@@ -1357,14 +1379,39 @@ function buildRoute(loc){
     for(const s of signs) isle(s.x, s.y, 1);
     for(const k of Object.keys(itemTypes)){ const [x,y] = k.split(',').map(Number); isle(x, y, 1); }
     for(let y=0; y<H; y++) for(let x=0; x<W; x++) if(inside(x,y) && !land.has(y*W+x)) tiles[y][x] = '~';
+    if(loc.dive!=null){
+      diveSpots = new Set();
+      for(let t=0, made=0; t<600 && made<3; t++){
+        const x = 5+Math.floor(rnd()*(W-10)), y = 5+Math.floor(rnd()*(H-10));
+        let ok = ![...diveSpots].some(k=>Math.abs(+k.split(',')[0]-x) < 18);
+        for(let yy=y-3; yy<=y+3 && ok; yy++) for(let xx=x-3; xx<=x+3; xx++) if(tiles[yy][xx]!=='~' || land.has(yy*W+xx)){ ok = false; break; }
+        if(!ok) continue;
+        for(let yy=y-1; yy<=y+1; yy++) for(let xx=x-1; xx<=x+1; xx++) diveSpots.add(xx+','+yy);
+        made++;
+      }
+    }
     for(const k of land){ const x = k % W, y = Math.floor(k/W); if(inside(x,y) && 'TL<>'.includes(tiles[y][x])) tiles[y][x] = '.'; }   // no trees or ledges on the islets
   }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
   if(loc.theme==='cave') for(const row of tiles) row.forEach((ch,x)=>{ if(':"*L<>'.includes(ch)) row[x] = '.'; else if(ch==='b') row[x] = 'r'; });
+  if(loc.theme==='deep') for(const row of tiles) row.forEach((ch,x)=>{ if(':*L<>'.includes(ch)) row[x] = '.'; else if(ch==='b') row[x] = 'r'; });   // kelp ('"') stays
   const first = spots[exits[0].dir];
   const built = finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
   built.itemTypes = itemTypes;
   built.cave = loc.theme==='cave';
+  built.deep = loc.theme==='deep';
+  built.diveSpots = diveSpots;
+  // Under a dive area: light shafts where you can surface, below the dive spots up top.
+  if(loc.surface!=null){
+    const up = getMap(LOCATIONS[loc.surface]), seen = reachSet(), floor = [...seen].filter(k=>WALKABLE.has(tiles[Math.floor(k/W)][k%W]) && tiles[Math.floor(k/W)][k%W]!=='"');
+    built.shafts = new Set();
+    for(const k of up.diveSpots || []){
+      const [x,y] = k.split(',').map(Number), px = Math.round(x*W/up.w), py = Math.round(y*H/up.h);
+      let best = null, bd = 1e9;
+      for(const f of floor){ const d = Math.abs(f%W-px) + Math.abs(Math.floor(f/W)-py); if(d < bd){ bd = d; best = f; } }
+      if(best!=null) built.shafts.add((best%W)+','+Math.floor(best/W));
+    }
+  }
   return built;
 }
 function finishMap(tiles, buildings, npcs, exits, spawn, signs){
@@ -1465,7 +1512,7 @@ function worldTile(x, y){
 // The map you're on right now: the area, or the room you're inside.
 function curMap(){ const loc = LOCATIONS[adv.loc]; return adv.inside!=null ? getInterior(loc, adv.inside) : getMap(loc); }
 // People on the current map. Beaten rivals leave; everyone else stays put (Gym Leaders included).
-function curNpcs(){ const loc = LOCATIONS[adv.loc]; return curMap().npcs.filter(n=>!(n.vanish && adv.cleared[loc.name] && adv.walkOff!==loc.name)); }
+function curNpcs(){ const loc = LOCATIONS[adv.loc]; return curMap().npcs.filter(n=>!(n.vanish && adv.cleared[loc.name] && adv.walkOff!==loc.name) && !(n.legend && adv.story && adv.story[n.legend]==='caught')); }
 function activeTrainer(n){ return n.trainer && !adv.cleared[n.id || LOCATIONS[adv.loc].name]; }
 function spawnPlayer(){ adv.inside = null; adv.surfing = false; const map = getMap(LOCATIONS[adv.loc]); adv.pos = {...map.spawn}; adv.facing = 'down'; }
 
@@ -1712,7 +1759,9 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   let extra = '', style = '';
   if(cls==='grass') extra = ` v${v%4}`;
   if(cls==='tree' && (x+y)%2) extra = ' alt';
-  if(map.cave){ extra += ' cave'; if(cls==='tree' && (y+1>=map.h || map.tiles[y+1][x]!=='T')) extra += ' face'; }
+  if(map.cave || map.deep){ extra += map.deep ? ' deep' : ' cave'; if(cls==='tree' && (y+1>=map.h || map.tiles[y+1][x]!=='T')) extra += ' face'; }
+  if(map.diveSpots && map.diveSpots.has(x+','+y)) extra += ' divespot';
+  if(map.shafts && map.shafts.has(x+','+y)) extra += ' shaft';
   // Two-tile furniture (tables 'tt', Mart shelves 'ss'): left and right halves alternate along a run.
   if(cls==='table' || cls==='shelf'){ let n = 0; while(x-n-1>=0 && map.tiles[y][x-n-1]===ch) n++; extra = n%2 ? ' right' : ' left'; }
   if(cls==='bed' && (y===0 || map.tiles[y-1][x]!=='e')) extra = ' top';   // pillow end
@@ -1724,11 +1773,12 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   return `<div class="t t-${cls}${extra}" data-x="${wx}" data-y="${wy}" style="left:${wx*T}px;top:${wy*T}px;${style}"></div>`;
 }
 function npcHtml(n, i){
+  if(n.legend) return `<div class="ow-actor npc ow-legend" id="npc-${i}" style="transform:translate(${n.x*T+4}px,${n.y*T-6}px); z-index:${20+2*n.y}"><img src="${spritePath(dexByName(n.legend))}" alt=""></div>`;
   return `<div class="ow-actor npc" id="npc-${i}" style="transform:translate(${n.x*T+4}px,${n.y*T-6}px); z-index:${20+2*n.y}">${charSvg(n.kind, n.facing, 0)}<div class="ow-bang hidden">!</div></div>`;
 }
 // Overworld weather, Emerald-style: volcanic ash near Cindergate (like Route 113), fog around
 // Wispgate (like Route 120), rain on the coast.
-const WEATHER = {"Cindergate Town":'ash', "Route 2: Marrow Pass":'ash', "Wispgate City":'fog', "Route 5: Cragmoor Trail":'fog', "Route 3: Hollow Bluffs":'rain', "Glimmer Coast":'rain',
+const WEATHER = {"Stormwake Depths":'deep', "Coral Trench":'deep', "Glimmer Deep":'deep', "Sunken Shrine":'deep', "Cindergate Town":'ash', "Route 2: Marrow Pass":'ash', "Wispgate City":'fog', "Route 5: Cragmoor Trail":'fog', "Route 3: Hollow Bluffs":'rain', "Glimmer Coast":'rain',
   "Route 7: Stormwake Strait":'rain', "Route 9: Frostpine Ridge":'snow', "Rimefall Town":'snow', "Tempest Hideout":'cave', "Route 10: Skyreach Cliffs":'fog'};
 let owShownLoc = null;
 function renderOverworld(){
@@ -1789,7 +1839,7 @@ function renderTiles(cx, cy, inc){
     if(!a) continue;
     const ch = a.m.tiles[a.ly][a.lx];
     html += tileHtml(a.m, ch, a.lx, a.ly, x, y);
-    if(ch==='"') fronts += `<div class="tg-front" data-x="${x}" data-y="${y}" style="left:${x*T}px;top:${y*T+16}px;z-index:${21+2*y}"></div>`;
+    if(ch==='"') fronts += `<div class="tg-front${a.m.deep ? ' deep' : ''}" data-x="${x}" data-y="${y}" style="left:${x*T}px;top:${y*T+16}px;z-index:${21+2*y}"></div>`;
   }
   if(old){   // new tiles go under the buildings; grass fronts carry their own z-index
     const firstBld = layer.querySelector('.bld');
@@ -1835,11 +1885,12 @@ if(typeof window!=='undefined' && window.addEventListener) window.addEventListen
 let owFrameShown = null;
 function drawPlayer(frame, run){
   const el = document.getElementById('owPlayer');
-  if(adv.surfing) frame = 0, run = false;   // sitting still on your ride
-  const key = (adv.facing||'down') + frame + (run?'r':'') + (adv.surfing?'s':'');
+  const diving = !!(LOCATIONS[adv.loc].deep && adv.inside==null);
+  if(adv.surfing || diving) frame = 0, run = false;   // sitting still on your ride
+  const key = (adv.facing||'down') + frame + (run?'r':'') + (adv.surfing?'s':'') + (diving?'d':'');
   if(!el || owFrameShown===key && el.__drawn) return;
-  el.classList.toggle('surfing', !!adv.surfing);
-  const ride = el.querySelector('.ow-surf'); if(ride && adv.surfing) ride.innerHTML = surfSvg(adv.facing||'down');
+  el.classList.toggle('surfing', !!adv.surfing || diving); el.classList.toggle('diving', diving);
+  const ride = el.querySelector('.ow-surf'); if(ride && (adv.surfing || diving)) ride.innerHTML = surfSvg(adv.facing||'down');
   el.querySelector('.ow-body').innerHTML = el.querySelector('.ow-reflect').innerHTML = charSvg('player', adv.facing||'down', frame, run);
   owFrameShown = key; el.__drawn = true;
 }
@@ -1915,7 +1966,7 @@ function nbNpcs(){
   if(curMap().interior) return [];
   return neighbours(adv.loc).flatMap(nb=>{
     const nloc = LOCATIONS[nb.exit.to];
-    return nb.map.npcs.filter(n=>!(n.vanish && adv.cleared[nloc.name])).map(n=>({n, x:n.x+nb.ox, y:n.y+nb.oy}));
+    return nb.map.npcs.filter(n=>!(n.vanish && adv.cleared[nloc.name]) && !n.legend).map(n=>({n, x:n.x+nb.ox, y:n.y+nb.oy}));
   });
 }
 function nbNpcAt(x, y){ return nbNpcs().some(p=>p.x===x && p.y===y); }
@@ -2171,7 +2222,9 @@ const THING_TEXT = {
   seat:["A soft, round cushion seat."], glasstable:["A glass table. There's a POKéMON magazine on it."]};
 function owInteract(){
   if(!owActive() || owMoving) return;
-  const loc = LOCATIONS[adv.loc], map = curMap();
+  const loc = LOCATIONS[adv.loc], map = curMap(), here = adv.pos.x+','+adv.pos.y;
+  if(!map.interior && adv.surfing && map.diveSpots && map.diveSpots.has(here)) return diveAction();
+  if(!map.interior && map.shafts && map.shafts.has(here)) return surfaceAction();
   const [dx,dy] = DIRS[adv.facing||'down'];
   let tx = adv.pos.x+dx, ty = adv.pos.y+dy;
   if(tileAt(map,tx,ty)==='c'){ tx += dx; ty += dy; }   // talk across a counter
@@ -2197,6 +2250,51 @@ function owInteract(){
   if(said) owSay(said);
 }
 // SURF comes with Sable's badge (Tidalkeep); the OLD ROD from any fisherman who isn't battling.
+function canDive(){ return !!(adv.items.hm08 || adv.cleared['Rimefall Town']); }
+// Map a spot between a sea area and the area beneath it (they're different sizes), then the nearest listed tile.
+function layerSpot(from, to, set, pos){
+  const px = Math.round(pos.x*to.w/from.w), py = Math.round(pos.y*to.h/from.h);
+  let best = null, bd = 1e9;
+  for(const k of set || []){ const [x,y] = k.split(',').map(Number), d = Math.abs(x-px) + Math.abs(y-py); if(d < bd){ bd = d; best = {x, y}; } }
+  return best || {...to.spawn};
+}
+function diveAction(){
+  if(!canDive()) return owSay(['The sea is deep here.', 'A POKéMON may be able to go underwater.']);
+  const view = document.getElementById('owView');
+  owBusy = true;
+  owPrompt('The sea is deep here. Would you like to use DIVE?');
+  uiMenu(view, ['YES', 'NO'], k=>{
+    owPromptClose();
+    if(k!==0) return;
+    const mon = adv.party.find(m=>!m.fainted && m.types.includes('Water')) || adv.party.find(m=>!m.fainted) || adv.party[0];
+    owSay([`${dname(mon).toUpperCase()} used DIVE!`], ()=>owFade(()=>{
+      const up = LOCATIONS[adv.loc], down = LOCATIONS[up.dive], dm = getMap(down);
+      adv.pos = layerSpot(getMap(up), dm, dm.shafts, adv.pos); adv.loc = up.dive; adv.surfing = false; adv.facing = 'down';
+    }));
+  }, 'gm-yesno');
+}
+function surfaceAction(){
+  const view = document.getElementById('owView');
+  owBusy = true;
+  owPrompt('Light is filtering down from above. Would you like to use DIVE?');
+  uiMenu(view, ['YES', 'NO'], k=>{
+    owPromptClose();
+    if(k!==0) return;
+    owFade(()=>{
+      const down = LOCATIONS[adv.loc], up = LOCATIONS[down.surface], um = getMap(up);
+      adv.pos = layerSpot(getMap(down), um, um.diveSpots, adv.pos); adv.loc = down.surface; adv.surfing = true; adv.facing = 'down';
+    });
+  }, 'gm-yesno');
+}
+// The guardian of the Sunken Shrine: Vesper stands in the way until she's beaten.
+function legendTalk(n){
+  const loc = LOCATIONS[adv.loc];
+  if(!adv.cleared[loc.name]) return owSay([`${loc.leaderName.toUpperCase()}: "Get away from the guardian! You'll have to go through me!"`], ()=>startTrainerBattle());
+  owSay([`The great ${n.legend.toUpperCase()} is stirring...`, 'Gyaaaoooh!'], ()=>{
+    (adv.story ||= {}).legendFight = n.legend; saveAdv();
+    startWildBattle({names:[n.legend], level:50, legendary:true});
+  });
+}
 function canSurf(){ return !!(adv.items.hm03 || adv.cleared['Tidalkeep City']); }
 function waterAction(tx, ty){
   const opts = [];
@@ -2240,6 +2338,7 @@ function goFish(){
 }
 function talkTo(n){
   const loc = LOCATIONS[adv.loc];
+  if(n.legend) return legendTalk(n);
   faceNpcToPlayer(n);
   if(n.kind==='fisher' && !n.trainer && !adv.items.oldrod){
     adv.items.oldrod = 1; saveAdv();
@@ -2697,6 +2796,7 @@ const ITEM_INFO = {pokeball:{name:'POKé BALL', pocket:1, desc:'A tool for catch
   awakening:{name:'AWAKENING', pocket:0, desc:'Awakens a sleeping POKéMON.', price:250, cure:'slp'},
   burnheal:{name:'BURN HEAL', pocket:0, desc:'Heals a POKéMON of a burn.', price:250, cure:'brn'},
   hm03:{name:'HM03 SURF', pocket:2, desc:'Lets a POKéMON carry you across water. Face the water and press A.'},
+  hm08:{name:'HM08 DIVE', pocket:2, desc:'Lets a POKéMON take you underwater. Use it on dark, deep water while you SURF.'},
   oldrod:{name:'OLD ROD', pocket:4, desc:'An old fishing rod. Face the water and press A to fish.'}};
 const CURED = {psn:'poisoning', par:'paralysis', slp:'sleep', brn:'its burn'};
 // POTION heals 20 HP (not a fainted Pokémon). Returns the message, or null if it would do nothing.
@@ -2782,7 +2882,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.12.6-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.13.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3561,6 +3661,12 @@ function sceneNpc(npc, n, min=n){
 }
 function sceneEnd(...npcs){ const map = curMap(); map.npcs = map.npcs.filter(n=>!npcs.includes(n)); owBusy = false; renderAdventure(); }
 const SCENES = {
+  // The Sunken Shrine: Wren catches up, patches up your team and holds the way behind you.
+  shrine(){ owSay(["WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"", "WREN: \"Here, let me patch up your team first.\""], ()=>{
+      for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; }
+      saveAdv(); sfx('heal');
+      owSay(['Your POKéMON were fully healed!', "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]);
+    }); },
   hideout(){ owSay(["Voices echo from deeper in the cave...", `${ADMIN}: "The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!"`,
     `${ADMIN}: "WREN. Our little shadow has followed us here. Prove you're one of us."`]); },
   // Marrow Pass: a grunt barrels down the pass, warns you off and runs on.
@@ -3695,10 +3801,11 @@ function renderMap(){
   const el = document.getElementById('advMap');
   el.classList.toggle('hidden', !mapOpen);
   if(!mapOpen) return;
-  const xs = LOCATIONS.map(l=>l.at[0]), ys = LOCATIONS.map(l=>l.at[1]);
+  const xs = LOCATIONS.filter(l=>!l.deep).map(l=>l.at[0]), ys = LOCATIONS.filter(l=>!l.deep).map(l=>l.at[1]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), cols = Math.max(...xs)-x0+1, rows = Math.max(...ys)-y0+1;
   let cells = '';
   LOCATIONS.forEach((loc,i)=>{
+    if(loc.deep) return;
     const gx = (loc.at[0]-x0)*2+1, gy = (loc.at[1]-y0)*2+1;
     const seen = adv.visited[loc.name] || i===adv.loc;
     const icon = loc.type==='gym'?'🥊':loc.type==='trainer'?'🧑':loc.type==='route'?'🌿':'🏘️';
@@ -3724,6 +3831,7 @@ function renderAdventure(){
   const here = adv.pos ? tileAt(curMap(), adv.pos.x, adv.pos.y) : null;
   if(adv.surfing && (here!=='~' || adv.inside!=null)) adv.surfing = false;
   if(adv.cleared['Tidalkeep City'] && !adv.items.hm03 && !(adv.story && adv.story.surfGift)) adv.items.hm03 = 1;   // saves from before SURF
+  if(adv.cleared['Rimefall Town'] && !adv.items.hm08 && !(adv.story && adv.story.diveGift)) adv.items.hm08 = 1;   // ...and before DIVE
   if(!here || !(WALKABLE.has(here) || adv.surfing && here==='~') || 'DEM'.includes(here)) spawnPlayer();
   renderOverworld();
   document.getElementById('advTitle').textContent = `${loc.type==='gym'?'🥊':loc.type==='trainer'?'🧑':loc.type==='route'?'🌿':'🏘️'} ${loc.name}`;
@@ -3768,7 +3876,8 @@ function startWildBattle(fixed, where){
   let id=9000;
   const wild = picks.map(n=>makeMon(dexByName(n), id++, 'none', fixed ? fixed.level : wildLevel()));
   wild.forEach(markSeen);
-  state = {sideA: adv.party, sideB: wild, log:[], mode:'story'};
+  state = {sideA: adv.party, sideB: wild, log:[], mode:'story', legendary:!!(fixed && fixed.legendary)};
+  if(state.legendary) for(const m of wild){ m.maxhp = Math.round(m.maxhp * Math.max(1, alive(adv.party).length/2)); m.hp = m.maxhp; }
   battleIntro(()=>{
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
@@ -3857,6 +3966,21 @@ function trainerWalkBack(done){
 }
 function afterStory(){
   if(walkBackNpc && !activeTrainer(walkBackNpc)) return trainerWalkBack(afterStory);
+  if(adv.story && adv.story.diveGift){
+    delete adv.story.diveGift; adv.items.hm08 = 1; saveAdv();
+    return owSay(['HALE: "The ice keeps old secrets, and so does the sea. Take this."'], ()=>obtainItem('HM08 DIVE', 1, 'TMs & HMs', ()=>owSay([
+      'HALE: "Look for dark, deep water while you SURF, and press A there to DIVE."', 'HALE: "They say the TIDEWARDENS\' shrine lies somewhere beneath the GLIMMER SEA."'], ()=>afterStory())));
+  }
+  if(adv.story && adv.story.legendFight){
+    const name = adv.story.legendFight, got = [...adv.party, ...adv.box].some(m=>m && m.name===name), first = !adv.story.stormEnded;
+    delete adv.story.legendFight;
+    if(got) adv.story[name] = 'caught';
+    adv.story.stormEnded = true; saveAdv();
+    const lines = got ? [`${name.toUpperCase()}, guardian of the sea and sky, joined your team!`] : [`${name.toUpperCase()} sank back into the depths of the shrine...`, 'Maybe it will rise again if you return.'];
+    if(first) lines.push('Far above, the storm clouds over VELLORIN begin to break apart.', 'WREN: "You did it... The storms are clearing!"', 'WREN: "VESPER\'s gone, and TEAM TEMPEST with her. See you at the top!"');
+    renderAdventure();
+    return owSay(lines, ()=>afterStory());
+  }
   if(adv.story && adv.story.surfGift){
     delete adv.story.surfGift; adv.items.hm03 = 1; saveAdv();
     return owSay(['SABLE: "The sea chose well today. Take this as well."'], ()=>obtainItem('HM03 SURF', 1, 'TMs & HMs', ()=>owSay([
@@ -4827,7 +4951,7 @@ function submitTurn(){
       adv.items.pokeball--;
       const hpFrac = act.target.hp/act.target.maxhp;
       const statusBonus = act.target.status ? 1.5 : 1;
-      const chance = Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus;
+      const chance = Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus * (state.legendary ? 0.35 : 1);
       let shakes = 0; while(shakes<3 && Math.random() < Math.pow(chance, 1/3)) shakes++;
       addLog(`${adv.playerName} used POKé BALL!`);
       addFx({ball:'B'+state.sideB.indexOf(act.target), shakes});
@@ -4910,6 +5034,7 @@ function checkEnd(){
         if(state.trainerLoc){
           adv.cleared[state.trainerLoc.name] = true;
           if(state.trainerLoc.name==='Tidalkeep City' && !adv.items.hm03) (adv.story ||= {}).surfGift = true;
+          if(state.trainerLoc.name==='Rimefall Town' && !adv.items.hm08) (adv.story ||= {}).diveGift = true;
           if(state.trainerLoc===LOCATIONS[adv.loc] && getMap(state.trainerLoc).npcs.some(n=>n.vanish)) adv.walkOff = state.trainerLoc.name;   // rival: leaves on foot
           const top = Math.max(...state.sideB.map(m=>m.level)), rate = state.trainerLoc.type==='gym' ? 100 : state.trainerLoc.type==='route' ? 20 : 60;
           adv.money = (adv.money ?? 3000) + top*rate;

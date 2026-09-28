@@ -22,16 +22,15 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    a lower wild encounter rate.
 2. **Surf — DONE (0.12.0).** HM03 SURF from Sable (badge 2); ride water with an original sea-creature sprite; water encounters (#10: land/water pools split); OLD ROD from fishermen and fishing (#17); real lakes on Mirror Lake, Hollow Bluffs and Glimmer Coast; sea routes: Route 7 Stormwake Strait (from Portmere) and the Glimmer Sea side area.
 3. **Four new towns + gyms — DONE (0.12.0).** Voltara City (Juno, Electric), Route 8 Thornwood Path, Mossgrove Town (Bryn, Grass), Route 9 Frostpine Ridge (snow), Tempest Hideout (Vesper scene; Wren battle and turn), Rimefall Town (Hale, Ice), Route 10 Skyreach Cliffs, Aeriepeak City (Corvin, Dragon/Flying) = 8 badges. Aeriepeak is the end of content until Phase 4 (Dive).
-4. **Dive.** DIVE from the 6th/7th gym; dark-water dive spots on sea routes; underwater maps (seaweed works like
-   tall grass, their own Pokémon, pixel-art seabed); the **Sunken Shrine** and the Lugia climax with Wren's help.
+4. **Dive — DONE (0.13.0).** HM08 DIVE from Hale (7th badge). Dark dive spots on Route 7 and the Glimmer Sea; an underwater layer (Stormwake Depths, Coral Trench, Glimmer Deep: seabed, rock, kelp encounters, light shafts to surface; not on the region map); the Sunken Shrine (Wren heals you, Admin Vesper battle, Lugia legendary battle; if caught it is gone for good, if not it can be retried). Beating the shrine ends the storms.
 5. **Ending.** Victory Road, the Pokémon League (four elite trainers + Champion Wren), credits.
-6. **Platform-specific UI (planned — not started).** The interface adapts to the device instead of one layout for all:
-   - Phone portrait: the handheld as now; phone landscape: a wide layout (screen in the middle, D-pad left, A/B right).
-   - Tablet: a larger screen and controls, split layouts where there is room.
-   - Desktop: keyboard-first (key hints on screen, no need for on-screen buttons), mouse support in menus.
-   - Game controllers via the Gamepad API (D-pad/stick, A/B, START/SELECT) on any platform.
-   - Detected from input type and screen size (pointer, orientation, touch points), with a manual override in OPTION.
-7. **Nuzlocke mode (planned — not started).** Chosen when starting a new story (NORMAL / NUZLOCKE), plus a
+   - **Music:** original chiptune soundtrack in the GBA handheld style, synthesized live with the Web Audio API
+     (two pulse channels, a wave/triangle bass and noise drums, like the handheld's sound chip), no audio files.
+     All melodies are new compositions, not copies of existing game themes. Tracks: ambient themes (towns, routes,
+     sea/surfing, caves, underwater), battle themes (wild, trainer, Gym Leader/rival, Elite/Champion, legendary),
+     short jingles (victory, level up, heal, badge, evolution) and a credits theme. Crossfades between areas,
+     follows the SOUND option, with a separate MUSIC volume in OPTION.
+6. **Nuzlocke mode (planned — not started).** Chosen when starting a new story (NORMAL / NUZLOCKE), plus a
    SKIP STORY TEXT option for players who already know the route:
    - Classic rules, enforced by the game: a Pokémon that faints is dead (moved to a graveyard; it can't be used
      or revived); only the first wild encounter in each area can be caught (a failed catch or a knockout uses it
@@ -40,6 +39,27 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    - A Nuzlocke HUD: encounters used per area on the map, deaths and a run summary on the trainer card.
    - Skip story text: scenes and calls fast-forward or complete themselves, and key story items (e.g. SURF, DIVE)
      are still granted at the same story points so the run can be finished.
+7. **Endgame: Adventure Mode (planned, not started).** Unlocked by the first clear of the main story (Phase 5).
+   - **Continuing:** after the credits the same save carries on as ADVENTURE MODE (shown on the title and the save
+     info). The whole region stays open, with the Challenge Tower as the new goal.
+   - **The Challenge Tower:** repeatable Elite Four-style runs (four elite trainers and a tower master in a row, no
+     healing except items you carry). Each clear raises the tower's rank, so the next run is harder (higher levels,
+     bigger and smarter teams, held items). Each clear earns a battle against one legendary from the tower's pool,
+     where it can be caught; losing or fleeing puts it back. A caught legendary leaves the pool for good (so does a
+     Lugia caught in the story), until every legendary in the game's Pokémon list is caught. The tower shows your
+     rank, best streak and legendaries left.
+   - **NEW ADVENTURE MODE:** after the first clear, the title menu offers NEW ADVENTURE MODE: it skips the main story
+     entirely. You draft a team of 6 Pokémon at level 50 (the draft screen from Free Battle); the other 4 party slots
+     stay empty until you catch more. The run starts in the post-game with the region open and the tower available.
+     Only this mode starts at level 50 with a draft; a normal NEW GAME is unchanged.
+   - **Not in Nuzlocke:** the tower and Adventure Mode are never available in a Nuzlocke run, and NEW ADVENTURE MODE
+     can't be combined with Nuzlocke.
+8. **Platform-specific UI (planned — not started).** The interface adapts to the device instead of one layout for all:
+   - Phone portrait: the handheld as now; phone landscape: a wide layout (screen in the middle, D-pad left, A/B right).
+   - Tablet: a larger screen and controls, split layouts where there is room.
+   - Desktop: keyboard-first (key hints on screen, no need for on-screen buttons), mouse support in menus.
+   - Game controllers via the Gamepad API (D-pad/stick, A/B, START/SELECT) on any platform.
+   - Detected from input type and screen size (pointer, orientation, touch points), with a manual override in OPTION.
 
 ## Tablets (in order of the legend)
 1. Whisperwood — "When sky and sea raged as one, we sang the silver guardian to sleep."
