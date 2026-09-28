@@ -15,7 +15,12 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    Tempest grunts on Marrow Pass / Hollow Bluffs / Emberflow Delta, tablets on the four side areas, POKéNAV calls
    after badges 1, 2 and 4, story townsfolk in the gym towns, Wren's post-battle lines, **Portmere Harbour**
    (Vesper's dock scene + grunt battle). The ferry is shut: end of content for now.
-2. **Surf.** Sable (badge 2) gives SURF; ride water tiles; surf sprite; water encounters; sea routes out of
+1.5. **Route design pass (from tester feedback #11, #14, #15) — DONE (0.11.0).** Routes become guided corridors
+   instead of open fields: forest walls with the path through them, side paths and pockets to explore; tall grass
+   you have to cross at points on the main path; trainers watching the path; ledges as real one-way shortcuts;
+   rocks that shape the path; item variety (Potions, Antidotes, Super Potions, Poké Balls) at the end of side paths;
+   a lower wild encounter rate.
+2. **Surf** (after 1.5; folds in #10 land/water encounter split and #17 bigger water + fishing). Sable (badge 2) gives SURF; ride water tiles; surf sprite; water encounters; sea routes out of
    Glimmer Coast / Portmere.
 3. **Four new towns + gyms** (Electric, Grass, Ice, Dragon/Flying → 8 badges) and routes between them;
    Tempest's hideout (with Wren's turn).

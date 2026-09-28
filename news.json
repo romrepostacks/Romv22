@@ -3,6 +3,18 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.0",
+      "date": "2026-09-27",
+      "title": "Phase 1.5: Guided Routes",
+      "changes": [
+        "Routes are now paths through the forest instead of wide open fields, so it's clear where to go",
+        "Side paths wind through tall grass to hidden clearings with an item waiting at the end",
+        "Tall grass stretches across the main path, and trainers watch it: no more skipping them",
+        "Items now include Potions, Super Potions, Antidotes and status heals, not just Poké Balls",
+        "Fewer wild encounters in tall grass"
+      ]
+    },
+    {
       "version": "0.10.3",
       "date": "2026-09-27",
       "title": "Fixes",

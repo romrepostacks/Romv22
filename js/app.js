@@ -1147,6 +1147,31 @@ function buildRoute(loc){
     paths[l.dir] = trail;
     exits.push({...OPEN[l.dir], ...l});
   }
+  // Guided routes (Phase 1.5, testers #11/#14): a corridor of open ground along the path through forest,
+  // instead of an open field. A few side paths wind off through tall grass to small clearings (an item
+  // waits at the end), and each long path has a stretch of tall grass right across it you must cross.
+  const keep = new Set(), pockets = [];
+  const CW = loc.type==='trainer' ? 4 : 3;   // how far the open ground reaches either side of the path
+  const markNear = (x0,y0,r)=>{ for(let yy=y0-r; yy<=y0+r; yy++) for(let xx=x0-r; xx<=x0+r; xx++) if(inside(xx,yy) && Math.abs(xx-x0)+Math.abs(yy-y0)<=r+1) keep.add(yy*W+xx); };
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(tiles[y][x]===':' || tiles[y][x]===',') markNear(x, y, CW);
+  const trailList = Object.values(paths).filter(t=>t.length>20);
+  const sideCount = Math.max(2, Math.round(A/1500));
+  for(let k=0, tries=0; k<sideCount && tries<sideCount*20 && trailList.length; tries++){
+    const trail = trailList[Math.floor(rnd()*trailList.length)], p = trail[8 + Math.floor(rnd()*(trail.length-16))];
+    const d = ['up','down','left','right'][Math.floor(rnd()*4)], [dx,dy] = DIRS[d], len = 8 + Math.floor(rnd()*8);
+    const ex = p.x + dx*(len+CW), ey = p.y + dy*(len+CW);
+    if(!inside(ex-2, ey-2) || !inside(ex+2, ey+2)) continue;
+    for(let s=1; s<=len+CW; s++){ const sx = p.x+dx*s, sy = p.y+dy*s; markNear(sx, sy, 1); if(s>CW && tiles[sy][sx]==='.' && rnd()<0.7) tiles[sy][sx] = '"'; }
+    markNear(ex, ey, 2); pockets.push({x:ex, y:ey}); k++;
+  }
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(inside(x,y) && tiles[y][x]==='.' && !keep.has(y*W+x)) tiles[y][x] = 'T';
+  for(const trail of trailList){   // a stretch of tall grass right across the corridor
+    if(trail.length < 30) continue;
+    const g = Math.floor(trail.length*(0.35 + rnd()*0.25));
+    for(let i=g; i<Math.min(trail.length, g+6); i++){ const t = trail[i];
+      for(let yy=t.y-CW-1; yy<=t.y+CW+1; yy++) for(let xx=t.x-CW-1; xx<=t.x+CW+1; xx++)
+        if(inside(xx,yy) && keep.has(yy*W+xx) && (tiles[yy][xx]==='.' || tiles[yy][xx]===':')) tiles[yy][xx] = '"'; }
+  }
   const open = (x,y)=> tiles[y] && tiles[y][x]==='.';
   const rect = (w,h)=>[2+Math.floor(rnd()*(W-4-w)), 2+Math.floor(rnd()*(H-4-h))];
   // Ponds (need clear ground plus a one-tile margin).
@@ -1160,7 +1185,7 @@ function buildRoute(loc){
     }
   }
   // Tree clusters: little woods that give a big route some shape.
-  for(let k=0; k<Math.round(A/260*(th.trees/22)); k++){
+  for(let k=0; k<Math.round(A/900*(th.trees/22)); k++){
     const ox = 3+Math.floor(rnd()*(W-6)), oy = 3+Math.floor(rnd()*(H-6)), r = 1.5 + rnd()*3;
     for(let yy=Math.floor(oy-r); yy<=oy+r; yy++) for(let xx=Math.floor(ox-r); xx<=ox+r; xx++)
       if(open(xx,yy) && (xx-ox)*(xx-ox)+(yy-oy)*(yy-oy) <= r*r && rnd()<0.85) tiles[yy][xx] = 'T';
@@ -1273,15 +1298,18 @@ function buildRoute(loc){
     made++;
   }
   // Item balls lying in the grass (A picks them up, once).
-  const items = [];
-  for(let k=0; k<Math.max(1, Math.round(A/1300)); k++){
-    const sp = freeSpot(); if(!sp) break;
-    tiles[sp.y][sp.x] = 'I'; items.push(sp);
-  }
+  // Items (tester #15): a mix of useful things, waiting at the end of the side paths first.
+  const ITEM_DROPS = ['potion','potion','pokeball','antidote','superpotion','parlyzheal','pokeball','awakening','burnheal','potion'];
+  const itemTypes = {};
+  const drop = (x,y)=>{ tiles[y][x] = 'I'; itemTypes[`${x},${y}`] = ITEM_DROPS[Math.floor(rnd()*ITEM_DROPS.length)]; };
+  for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x])) drop(pk.x, pk.y);
+  for(let k=pockets.length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
   if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
   const first = spots[exits[0].dir];
-  return finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
+  const built = finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
+  built.itemTypes = itemTypes;
+  return built;
 }
 function finishMap(tiles, buildings, npcs, exits, spawn, signs){
   for(const b of buildings){
@@ -1295,8 +1323,8 @@ function getMap(loc){
   if(!loc.__map) loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc);
   // Item balls you've already picked up stay gone (adv.picked holds "Area@x,y").
   if(typeof adv!=='undefined' && adv && adv.picked) for(const k in adv.picked){
-    if(!k.startsWith(loc.name+'@')) continue;
-    const [x,y] = k.slice(loc.name.length+1).split(',').map(Number), row = loc.__map.tiles[y];
+    if(!k.startsWith(loc.name+'@2:')) continue;   // "@2:" = the Phase 1.5 route layouts
+    const [x,y] = k.slice(loc.name.length+3).split(',').map(Number), row = loc.__map.tiles[y];
     if(row && row[x]==='I') row[x] = '.';
   }
   return loc.__map;
@@ -1916,7 +1944,7 @@ function owArrive(ch, endedAt){
   if(ch==='D'){ const bi = map.buildings.findIndex(b=>b.door.x===adv.pos.x && b.door.y===adv.pos.y); if(bi>=0) return enterBuilding(bi); }
   if(ch==='M') return leaveBuilding();
   if(ch==='"'){
-    if(Math.random()<0.12){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
+    if(Math.random()<0.08){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
   }
   // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between).
   for(const n of curNpcs()){
@@ -2039,11 +2067,12 @@ function owInteract(){
   // An item ball: take it (Emerald: "Obtained ..." then "put away ... in the ... POCKET.").
   if(ch==='I'){
     const x = adv.pos.x+dx, y = adv.pos.y+dy;
-    (adv.picked ||= {})[`${loc.name}@${x},${y}`] = true;
+    (adv.picked ||= {})[`${loc.name}@2:${x},${y}`] = true;
     map.tiles[y][x] = '.';
-    adv.items.pokeball = (adv.items.pokeball||0) + 1;
+    const id = (map.itemTypes && map.itemTypes[`${x},${y}`]) || 'pokeball', it = ITEM_INFO[id];
+    adv.items[id] = (adv.items[id]||0) + 1;
     saveAdv(); renderTiles(adv.pos.x, adv.pos.y);
-    return obtainItem('POKé BALL', 1, 'POKé BALLS', ()=>renderAdventure());
+    return obtainItem(it.name, 1, it.pocket===1 ? 'POKé BALLS' : 'ITEMS', ()=>renderAdventure());
   }
   if(ch==='u') return owSay([`${loc.name.toUpperCase()} POKéMON GYM`, `Leader: ${loc.leaderName}`, adv.cleared[loc.name] ? `Winning trainers: ${adv.playerName}` : 'Winning trainers: ...']);
   const said = THING_TEXT[(TILE_CLS[ch]||'').split(' ')[0]];
@@ -2583,7 +2612,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.10.3-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
