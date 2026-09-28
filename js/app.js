@@ -2931,7 +2931,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.1-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.2-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -5036,7 +5036,14 @@ function submitTurn(){
 
   const focusOn = m=>{ const i = state.sideA.indexOf(m); if(i>=0) state.focusA = i; return i>=0; };
   for(const act of actions){
-    if(act.user.fainted || act.user.caught || act.target.fainted || act.target.caught) continue;
+    if(act.user.fainted || act.user.caught) continue;
+    // Its target already fainted (tester #19): an attack moves on to another foe, as in the games' double battles.
+    if(act.target.fainted || act.target.caught){
+      if(act.item || act.ball) continue;
+      const next = alive(state.sideA.includes(act.user) ? state.sideB : state.sideA)[0];
+      if(!next) continue;
+      act.target = next;
+    }
     focusOn(act.user) || focusOn(act.target);
     if(act.item){ const said = useItem(act.item, act.user); addLog(said ? `${adv.playerName} used a ${ITEM_INFO[act.item].name}! ${said}` : `It won't have any effect.`); continue; }
     if(act.ball){

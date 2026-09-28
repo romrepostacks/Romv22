@@ -3,6 +3,15 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.2",
+      "date": "2026-09-28",
+      "title": "Fixes",
+      "changes": [
+        "If a foe faints before your Pokémon attacks, the attack now goes to the next foe instead of being wasted",
+        "Numbers are easier to read: a 5 no longer looks like an S"
+      ]
+    },
+    {
       "version": "0.14.1",
       "date": "2026-09-28",
       "title": "League Balance and New Medicine",

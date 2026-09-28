@@ -11,7 +11,7 @@
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px); height:100%;}
 *{box-sizing:border-box;}
-body{margin:0; min-height:100%; color:var(--ink); font-family:"Pixelify Sans",monospace; font-size:18px; line-height:1.3;
+body{margin:0; min-height:100%; color:var(--ink); font-family:"Silkscreen","Pixelify Sans",monospace; font-size:18px; line-height:1.3;
   background:#5ab4c4 repeating-linear-gradient(135deg,#62bccc 0 14px,#56aebe 14px 28px);}
 .wrap{max-width:760px; margin:0 auto; padding:20px 16px 48px;}
 .hidden{display:none !important;}
@@ -32,7 +32,7 @@ label{font-size:.85rem; color:#686870; display:block; margin-bottom:4px;}
 @media(max-width:560px){.grid{grid-template-columns:1fr;}}
 
 /* ---------- Menu items (every button) ---------- */
-button{position:relative; cursor:pointer; font:600 1rem "Pixelify Sans",monospace; color:var(--ink); text-shadow:1px 1px 0 var(--ink-shadow);
+button{position:relative; cursor:pointer; font:600 1rem "Silkscreen","Pixelify Sans",monospace; color:var(--ink); text-shadow:1px 1px 0 var(--ink-shadow);
   background:#fff; border:2px solid #586070; border-radius:6px; padding:7px 14px 7px 24px; box-shadow:0 2px 0 #0002; text-align:left;}
 button::before{content:"▶"; position:absolute; left:7px; top:50%; transform:translateY(-50%); font-size:.7em; visibility:hidden; color:var(--ink);}
 button:hover::before,button:focus-visible::before{visibility:visible;}
@@ -44,7 +44,7 @@ button:disabled::before{visibility:hidden !important;}
 button.primary{background:var(--accent); border-color:#903028; color:#fff; text-shadow:1px 1px 0 #802820;}
 button.primary::before{color:#fff;}
 button.small{font-size:.85rem; padding:4px 10px 4px 20px;}
-select,input,textarea{font:1rem "Pixelify Sans",monospace; color:var(--ink); background:#fff; border:2px solid #586070; border-radius:6px; padding:6px 10px;}
+select,input,textarea{font:1rem "Silkscreen","Pixelify Sans",monospace; color:var(--ink); background:#fff; border:2px solid #586070; border-radius:6px; padding:6px 10px;}
 textarea{width:100%; font-family:monospace; font-size:.75rem;}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-offset:1px;}
 
@@ -78,7 +78,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
 .mon-sprite .ph{display:none; font-size:24px; opacity:.35;}
 .mon-row{display:flex; gap:10px; align-items:center;}
 .mon-row>.mon-body{flex:1; min-width:0;}
-.tbadge{display:inline-block; font:600 .7rem "Pixelify Sans",monospace; text-transform:uppercase; color:#fff; padding:1px 8px; border-radius:4px; border:1px solid #0004; text-shadow:1px 1px 0 #0006; letter-spacing:.04em;}
+.tbadge{display:inline-block; font:600 .7rem "Silkscreen","Pixelify Sans",monospace; text-transform:uppercase; color:#fff; padding:1px 8px; border-radius:4px; border:1px solid #0004; text-shadow:1px 1px 0 #0006; letter-spacing:.04em;}
 .lvbadge{display:inline-block; font-size:.8rem; color:#686870; margin-left:6px;}
 .status-tag{display:inline-block; font:.55rem "Press Start 2P",monospace; color:#fff; text-shadow:none; padding:2px 4px; border-radius:3px; margin-left:4px; vertical-align:middle;}
 .st-par{background:#c0a020;} .st-brn{background:#d06030;} .st-psn{background:#a050a0;} .st-slp{background:#8088a0;} .st-frz{background:#58a8d0;}
@@ -227,7 +227,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
 /* Emerald's area name: a wooden plank that drops in from the top-left and slides back up. */
 .ow-popup{position:absolute; left:8px; top:0; z-index:55; padding:8px 16px 6px; border:3px solid #603818; border-top:none; border-radius:0 0 10px 10px;
   background:repeating-linear-gradient(180deg,#e8b070 0 5px,#d89c5c 5px 6px); box-shadow:inset 0 0 0 2px #f8d098, inset 0 -4px 0 #b87838, 0 2px 0 #0004;
-  font:600 15px "Pixelify Sans",monospace; color:#402010; transform:translateY(-110%); transition:transform .3s linear;}
+  font:600 15px "Silkscreen","Pixelify Sans",monospace; color:#402010; transform:translateY(-110%); transition:transform .3s linear;}
 .ow-popup.show{transform:none;}
 .ow-text{position:absolute; left:6px; right:6px; bottom:6px; z-index:60; min-height:74px; background:var(--win); border:4px solid var(--frame); border-radius:8px;
   box-shadow:inset 0 0 0 3px var(--frame-in); padding:10px 16px 14px; font-size:17px; line-height:1.4; text-shadow:1px 1px 0 var(--ink-shadow); cursor:pointer;}
@@ -844,10 +844,10 @@ button{touch-action:manipulation;}
 .dpad button:active{background:linear-gradient(#a0121a,#901018);}
 .dpad-hub{background:radial-gradient(circle,#a8141c 0 9px,#b8181f 10px);}
 .ab{background:radial-gradient(circle at 38% 30%,#c4222a,#9a0e16 70%); color:#ffd8da; border:none;
-  box-shadow:0 4px 0 #6a080e, 0 6px 8px #0003, inset 0 2px 0 #ff9a9e55; font:600 18px "Pixelify Sans",sans-serif; text-shadow:0 1px 0 #6a080e;}
+  box-shadow:0 4px 0 #6a080e, 0 6px 8px #0003, inset 0 2px 0 #ff9a9e55; font:600 18px "Silkscreen","Pixelify Sans",sans-serif; text-shadow:0 1px 0 #6a080e;}
 .ab:active{transform:translateY(3px); box-shadow:0 1px 0 #6a080e, inset 0 2px 4px #0004;}
 .start-btn{bottom:10px; background:linear-gradient(#b8161e,#98101a); color:#ffd0d4; border:none; box-shadow:0 2px 0 #6a080e, inset 0 1px 0 #ff9a9e55;
-  font:600 11px "Pixelify Sans",sans-serif; letter-spacing:1px; padding:4px 14px;}
+  font:600 11px "Silkscreen","Pixelify Sans",sans-serif; letter-spacing:1px; padding:4px 14px;}
 .start-btn:active{transform:translate(-50%,2px); box-shadow:inset 0 2px 3px #0004;}
 @media (pointer:coarse){
   #adv .gb-controls{flex:1; height:auto; min-height:240px; margin:10px 0 0;}   /* the panel fills the bottom of the phone */
@@ -875,7 +875,7 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .start-btn{left:24%; bottom:30px; width:24px; height:24px; padding:0; border-radius:50%; font-size:0; transform:none;
   background:radial-gradient(circle at 40% 35%,#3a3a44,#18181e 75%); box-shadow:0 2px 0 #6a080e, inset 0 1px 0 #ffffff33;}
 .start-btn:active{transform:translateY(2px); box-shadow:inset 0 2px 3px #0008;}
-.start-btn::after{position:absolute; top:28px; left:50%; transform:translateX(-50%); font:600 10px "Pixelify Sans",sans-serif; letter-spacing:1px; color:#ffd0d4; white-space:nowrap;}
+.start-btn::after{position:absolute; top:28px; left:50%; transform:translateX(-50%); font:600 10px "Silkscreen","Pixelify Sans",sans-serif; letter-spacing:1px; color:#ffd0d4; white-space:nowrap;}
 @media (pointer:coarse){
   .sp-lid{padding:12px 12px 18px; border-radius:18px 18px 8px 8px;}
   #adv .gb-controls{margin-top:6px;}
@@ -1004,7 +1004,7 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .t-tablet::before{content:""; position:absolute; left:0; top:-16px; width:32px; height:48px; z-index:2; background:var(--art-tablet) 0 0/32px 48px no-repeat; image-rendering:pixelated;}
 
 /* Message of the day (title) and the What's New page (over the handheld's screen, like setup). */
-.tt-motd{max-width:84%; margin-top:16px; font:18px/1.4 "Pixelify Sans",sans-serif; color:#fff; text-shadow:1px 1px 0 #1a3a70;}
+.tt-motd{max-width:84%; margin-top:16px; font:18px/1.4 "Silkscreen","Pixelify Sans",sans-serif; color:#fff; text-shadow:1px 1px 0 #1a3a70;}
 .sp-lid > #newsPage{position:absolute; z-index:6; margin:0; border-radius:4px; overflow:auto; box-sizing:border-box; overscroll-behavior:contain; padding-bottom:0;}
 .news-motd{background:#fff6d0; border:2px solid #e0c060; border-radius:6px; padding:8px 10px; margin-bottom:10px; font-size:.9em;}
 .news-entry{margin-bottom:12px;}
