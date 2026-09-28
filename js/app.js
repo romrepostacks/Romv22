@@ -668,15 +668,17 @@ function tryEvolve(mon){
   addLog(`✨ ${oldDisplay} evolved into ${newDex.name}!`);
   learnMovesAt(mon, mon.level);
 }
-// New level-up moves: fill empty slots, otherwise forget the oldest move (the games ask; this doesn't).
+// New level-up moves: fill an empty slot straight away; with four moves already, it waits in
+// pendingMoves and the player chooses after the battle (movePromptNext), as in the games.
+let pendingMoves = [];
 function learnMovesAt(mon, level){
   for(const [lv, mi] of (mon.dex.learn||[])){
     if(lv!==level) continue;
     const mv = MOVEDATA[mi];
     mon.moves = mon.moves.filter(m=>m.n!=='Struggle');
     if(mon.moves.some(m=>m.n===mv.n)) continue;
-    if(mon.moves.length>=4){ const old = mon.moves.shift(); addLog(`${dname(mon)} forgot ${old.n} and learned ${mv.n}!`); }
-    else addLog(`${dname(mon)} learned ${mv.n}!`);
+    if(mon.moves.length>=4){ pendingMoves.push({mon, mv}); addLog(`${dname(mon)} wants to learn ${mv.n}!`); continue; }
+    addLog(`${dname(mon)} learned ${mv.n}!`);
     mon.moves.push(mv);
   }
 }
@@ -2613,7 +2615,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.1-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.2-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3633,6 +3635,33 @@ function startTrainerBattle(npc){
 function continueStory(){
   document.getElementById('storyResult').classList.add('hidden');
   renderAdventure();
+  if(pendingMoves.length) return movePromptNext(afterStory);
+  afterStory();
+}
+// "X wants to learn Y. However, X already knows four moves. Should a move be forgotten...?"
+function movePromptNext(done){
+  const p = pendingMoves.shift();
+  if(!p){ owBusy = false; return done(); }
+  const {mon, mv} = p, who = dname(mon).toUpperCase(), mvn = mv.n.toUpperCase(), view = document.getElementById('owView');
+  if(mon.moves.some(m=>m.n===mv.n) || !adv.party.includes(mon)) return movePromptNext(done);
+  const skip = ()=>owSay([`${who} did not learn ${mvn}.`], ()=>movePromptNext(done));
+  owSay([`${who} wants to learn the move ${mvn}.`, `However, ${who} already knows four moves.`], ()=>{
+    owBusy = true;
+    owPrompt(`Should a move be forgotten to make space for ${mvn}?`);
+    uiMenu(view, ['YES', 'NO'], k=>{
+      owPromptClose();
+      if(k!==0) return skip();
+      owPrompt('Which move should be forgotten?');
+      uiMenu(view, [...mon.moves.map(m=>m.n.toUpperCase()), "DON'T LEARN"], i=>{
+        owPromptClose();
+        if(i<0 || i>=mon.moves.length) return skip();
+        const old = mon.moves[i]; mon.moves[i] = mv; saveAdv();
+        owSay(['1, 2, and... ... Poof!', `${who} forgot ${old.n.toUpperCase()}.`, `And... ${who} learned ${mvn}!`], ()=>movePromptNext(done));
+      }, 'gm-br');
+    }, 'gm-yesno');
+  });
+}
+function afterStory(){
   const rival = adv.walkOff && curMap().npcs.find(n=>n.vanish);
   if(rival){
     const loc = LOCATIONS[adv.loc];
