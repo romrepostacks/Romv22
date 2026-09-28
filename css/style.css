@@ -1031,3 +1031,35 @@ body:has(#adv:not(.hidden)){background:#141418;}
 
 /* Attack animation particles (#7). */
 .fx-p{position:absolute; z-index:6; pointer-events:none; image-rendering:pixelated;}
+
+/* SURF (Phase 2): the player sits on an original sea creature that bobs on the waves. */
+#owPlayer .ow-surf{display:none; position:absolute; left:-4px; top:14px; width:32px; height:20px; z-index:1; pointer-events:none;}
+#owPlayer.surfing .ow-surf{display:block; animation:surfBob 1s steps(2) infinite;}
+#owPlayer.surfing .ow-body{clip-path:inset(0 0 42% 0); margin-top:-6px; animation:surfBob 1s steps(2) infinite;}
+#owPlayer.surfing .ow-reflect{display:none;}
+#owPlayer.surfing{--shadow:none;}
+@keyframes surfBob{0%{translate:0 0} 50%{translate:0 2px}}
+/* Phase 3 weather: snow on the ridge and in Rimefall, darkness in the Tempest hideout. */
+.ow-view.wx-snow #owTiles{filter:saturate(.3) brightness(1.22);}
+.ow-view.wx-snow::before,.ow-view.wx-cave::before{content:""; position:absolute; inset:0; z-index:44; pointer-events:none;}
+.ow-view.wx-snow::before{background:radial-gradient(circle,#fff 0 1.5px,transparent 2px) 0 0/37px 41px, radial-gradient(circle,#fff 0 1px,transparent 1.5px) 11px 17px/23px 29px; animation:snowFall 3s linear infinite; opacity:.85;}
+@keyframes snowFall{to{background-position:-20px 82px, -6px 75px;}}
+.ow-view.wx-cave #owTiles{filter:brightness(.55) saturate(.5) sepia(.3);}
+.ow-view.wx-cave::before{background:radial-gradient(circle at 50% 50%, transparent 30%, #000a 85%);}
+/* Four new Gyms: Electric, Grass, Ice, Dragon. */
+.gym-electric{--floor:#f0d860; --floor2:#c8a830; --wall:#f8e890; --wall2:#b09020;}
+.gym-electric .t-floor{background-image:linear-gradient(90deg,#303038 0 2px,transparent 2px),linear-gradient(#303038 0 2px,transparent 2px); background-size:32px 32px;}
+.gym-electric .t-rug{background:#3868d0 !important;}
+.gym-electric .t-gymwall::before{background:linear-gradient(#f8e048,#c89818); box-shadow:inset 0 -5px 0 #806010, inset 0 3px 0 #fff8b0;}
+.gym-grass{--floor:#78b858; --floor2:#58983c; --wall:#a8d880; --wall2:#488830;}
+.gym-grass .t-floor{background-image:radial-gradient(circle,#98d070 0 2px,transparent 2.5px),radial-gradient(circle,#4c8c34 0 1.5px,transparent 2px); background-size:16px 16px,22px 22px; background-position:0 0,8px 11px;}
+.gym-grass .t-rug{background:#f0e0a0 !important;}
+.gym-grass .t-gymwall::before{border-radius:45%; background:radial-gradient(circle at 35% 30%,#88c860,#3c7c2c 65%,#285a1c); box-shadow:inset 0 -4px 0 #1c4012;}
+.gym-ice{--floor:#d8f0f8; --floor2:#a8d8f0; --wall:#e8f8ff; --wall2:#88c0e0;}
+.gym-ice .t-floor{background-image:linear-gradient(135deg,transparent 45%,#ffffff 46% 49%,transparent 50%); background-size:24px 24px;}
+.gym-ice .t-rug{background:#4890c8 !important;}
+.gym-ice .t-gymwall::before{background:linear-gradient(#f0fbff,#98d0f0); box-shadow:inset 0 -5px 0 #5898c8, inset 0 3px 0 #fff;}
+.gym-dragon{--floor:#685088; --floor2:#4c3868; --wall:#8870a8; --wall2:#4c3868;}
+.gym-dragon .t-floor{background-image:linear-gradient(#4c3868 0 2px,transparent 2px),linear-gradient(90deg,#4c3868 0 2px,transparent 2px); background-size:32px 16px,16px 32px;}
+.gym-dragon .t-rug{background:#e0a030 !important;}
+.gym-dragon .t-gymwall::before{background:linear-gradient(#a04838,#602820); box-shadow:inset 0 -5px 0 #401810, inset 0 3px 0 #e07860;}

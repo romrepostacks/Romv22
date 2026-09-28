@@ -1,7 +1,23 @@
 {
   "_howto": "Edit this file to change the title screen message (motd) or add a changelog entry. Newest entry first. Each entry: version, date (YYYY-MM-DD), title, changes (short bullet points, player-facing). The game fetches this file fresh on every launch.",
-  "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
+  "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
   "changelog": [
+    {
+      "version": "0.12.0",
+      "date": "2026-09-27",
+      "title": "Phases 2 and 3: Surf and the Eastern Gyms",
+      "changes": [
+        "SURF: beat Leader Sable in Tidalkeep for HM03 SURF, then face any water and press A to ride across it",
+        "Fishing: a fisherman gives you the OLD ROD. Face water and press A to cast",
+        "Water Pokémon now live in the water: surf or fish for them. Grass is for land Pokémon",
+        "Mirror Lake, Hollow Bluffs and Glimmer Coast now have real lakes, plus the open Glimmer Sea to explore",
+        "Portmere is no longer the end: SURF across the Stormwake Strait to reach four new towns and Gyms",
+        "New Gyms: Juno (Electric) in Voltara City, Bryn (Grass) in Mossgrove Town, Hale (Ice) in Rimefall Town and Corvin (Dragon and Flying) in Aeriepeak City. That makes 8 badges",
+        "Track Team Tempest to their hideout in the frozen ridge, where Wren makes a choice",
+        "Snow on Frostpine Ridge and in Rimefall, and a dark cave for the hideout",
+        "Fixed: items at the end of a side path could sometimes be unreachable"
+      ]
+    },
     {
       "version": "0.11.6",
       "date": "2026-09-27",

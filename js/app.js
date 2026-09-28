@@ -881,19 +881,31 @@ const LOCATIONS=[
  {type:'gym', name:"Cindergate Town", at:[2,-1], desc:"Smoke curls from the gym's chimney. Leader Rell awaits with a scorched-earth team.", center:true, leaderName:"Rell", leaderTeam:['Slugma','Growlithe','Torkoal']},
  {type:'route', name:"Route 2: Marrow Pass", at:[3,-1], desc:"A narrow pass between cliffs. The wind carries distant cries.", pool:['Geodude','Spearow','Zubat','Sandshrew','Machop','Rockruff'], theme:'rocky'},
  {type:'gym', name:"Tidalkeep City", at:[4,-1], desc:"Waves crash against the gym's sea wall. Leader Sable commands the tide.", center:true, leaderName:"Sable", leaderTeam:['Horsea','Staryu','Wailmer']},
- {type:'route', name:"Route 3: Hollow Bluffs", at:[4,0], desc:"Weathered bluffs overlook the coast. The path forks ahead.", pool:['Wingull','Krabby','Tentacool','Psyduck','Slowpoke','Corphish']},
+ {type:'route', name:"Route 3: Hollow Bluffs", at:[4,0], desc:"Weathered bluffs overlook the coast. The path forks ahead.", pool:['Wingull','Krabby','Corphish','Slowpoke','Spearow'], water:['Tentacool','Psyduck','Wingull','Wailmer'], theme:'lake'},
  {type:'gym', name:"Stonebrook Town", at:[4,1], desc:"A rugged gym built into the bluffs. Leader Orin trains ground-pounders and toxic tacticians.", center:true, leaderName:"Orin", leaderTeam:['Diglett','Nidorina','Sandslash']},
  {type:'route', name:"Route 4: The Roost", at:[3,1], desc:"Cliffside nests dot the rockface above. Wings flash in the haze.", pool:['Spearow','Taillow','Starly','Hoothoot','Pidgeotto','Swablu']},
  {type:'trainer', kind:'rival', name:"Windward Ledge", at:[2,1], desc:"Wren again, team clearly stronger this time. \"You've grown. Let's finish this properly.\"", leaderName:"Wren", leaderTeam:['Pidgeotto','Espeon','Growlithe','Pikachu']},
  {type:'route', name:"Route 5: Cragmoor Trail", at:[2,2], desc:"Loose scree and echoing caves. Wild Pokémon lurk in the dark.", pool:['Machop','Geodude','Gastly','Onix','Cubone'], theme:'rocky'},
  {type:'gym', name:"Wispgate City", at:[3,2], desc:"Lantern-lit streets wind up to a gym wreathed in fog. Leader Sable's successor, Iska, trains ghosts and psychics.", center:true, leaderName:"Iska", leaderTeam:['Haunter','Kadabra','Gengar']},
- {type:'route', name:"Route 6: Emberflow Delta", at:[4,2], desc:"Steam vents hiss where river meets old lava rock.", pool:['Charmander','Growlithe','Numel','Krabby','Magikarp','Slugma']},
- {type:'town', name:"Portmere Harbour", at:[5,2], desc:"A busy port under a stubborn storm. Blue-uniformed figures guard the docks, and no ferry has sailed in days.", center:true, endOfContent:true},
+ {type:'route', name:"Route 6: Emberflow Delta", at:[4,2], desc:"Steam vents hiss where river meets old lava rock.", pool:['Charmander','Growlithe','Numel','Slugma','Houndour'], water:['Krabby','Psyduck','Magikarp','Corphish']},
+ {type:'town', name:"Portmere Harbour", at:[5,2], desc:"A busy port under a stubborn storm. Blue-uniformed figures guard the docks, and no ferry has sailed in days.", center:true},
  // Side areas (optional; `tier` sets their level cap to match where they branch off)
  {type:'route', name:"Whisperwood", at:[0,-1], tier:1, desc:"Old trees crowd out the sky. Bug and Grass Pokémon thrive in the shade.", pool:['Caterpie','Weedle','Oddish','Bellsprout','Wurmple','Seedot','Grubbin'], theme:'forest'},
- {type:'route', name:"Mirror Lake", at:[1,1], tier:2, desc:"A still lake reflects the sky. Water Pokémon splash near the shore.", pool:['Psyduck','Poliwag','Lotad','Marill','Surskit','Wooper'], theme:'lake'},
- {type:'route', name:"Glimmer Coast", at:[5,-1], tier:6, desc:"Sea spray and sparkling sand. Shells glint in the tide pools.", pool:['Wingull','Shellder','Staryu','Krabby','Horsea','Corsola'], theme:'lake'},
- {type:'route', name:"Old Quarry", at:[3,0], tier:7, desc:"Abandoned cuts in the rock. Boulders everywhere — some of them move.", pool:['Geodude','Onix','Aron','Nosepass','Roggenrola','Larvitar'], theme:'rocky'}
+ {type:'route', name:"Mirror Lake", at:[1,1], tier:2, desc:"A still lake reflects the sky. Water Pokémon splash near the shore.", pool:['Surskit','Wooper','Lotad','Poliwag','Oddish'], water:['Psyduck','Marill','Goldeen','Magikarp'], theme:'lake'},
+ {type:'route', name:"Glimmer Coast", at:[5,-1], tier:6, desc:"Sea spray and sparkling sand. Shells glint in the tide pools.", pool:['Wingull','Krabby','Corphish','Slowpoke'], water:['Shellder','Staryu','Horsea','Corsola','Tentacool'], theme:'lake'},
+ {type:'route', name:"Old Quarry", at:[3,0], tier:7, desc:"Abandoned cuts in the rock. Boulders everywhere — some of them move.", pool:['Geodude','Onix','Aron','Nosepass','Roggenrola','Larvitar'], theme:'rocky'},
+ // Phase 3: across the strait from Portmere (SURF) to four more Gyms and Team Tempest's hideout.
+ {type:'route', name:"Route 7: Stormwake Strait", at:[6,2], tier:14, desc:"Open sea between islets. Only a trainer who can SURF gets across.", pool:['Wingull','Pelipper','Taillow'], water:['Tentacool','Wingull','Wailmer','Horsea','Mantine','Carvanha'], theme:'sea'},
+ {type:'gym', name:"Voltara City", at:[7,2], tier:15, desc:"Power lines hum over a city that never sleeps. Leader Juno's gym crackles with Electric Pokémon.", center:true, leaderName:"Juno", leaderTeam:['Magneton','Electabuzz','Manectric','Ampharos']},
+ {type:'route', name:"Route 8: Thornwood Path", at:[7,1], tier:16, desc:"Brambles and giant ferns close in over a winding trail.", pool:['Gloom','Shroomish','Skiploom','Tangela','Nuzleaf','Weepinbell'], theme:'forest'},
+ {type:'gym', name:"Mossgrove Town", at:[7,0], tier:17, desc:"A town grown into the forest itself. Leader Bryn's gym is a greenhouse full of Grass Pokémon.", center:true, leaderName:"Bryn", leaderTeam:['Breloom','Victreebel','Tangrowth','Roserade']},
+ {type:'route', name:"Route 9: Frostpine Ridge", at:[7,-1], tier:18, desc:"Snow drifts between pines on the climb north. The air bites.", pool:['Snorunt','Swinub','Sneasel','Snover','Delibird','Spheal'], theme:'forest'},
+ {type:'trainer', kind:'rival', name:"Tempest Hideout", at:[7,-2], tier:19, desc:"A cave mouth hidden in the ridge, lit by TEAM TEMPEST lanterns. Wren waits at the back. \"You shouldn't have followed me here.\"", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow'], theme:'rocky', grunts:4},
+ {type:'gym', name:"Rimefall Town", at:[6,-2], tier:20, desc:"Frost clings to every roof. Leader Hale's gym is a rink of solid ice.", center:true, leaderName:"Hale", leaderTeam:['Glalie','Piloswine','Dewgong','Walrein']},
+ {type:'route', name:"Route 10: Skyreach Cliffs", at:[5,-2], tier:21, desc:"Wind howls along the cliff tops. Dragons are said to nest above the clouds.", pool:['Swablu','Bagon','Trapinch','Skarmory','Noctowl','Fearow'], theme:'rocky'},
+ {type:'gym', name:"Aeriepeak City", at:[4,-2], tier:22, desc:"A city of towers above the clouds. Leader Corvin rules the skies with Dragon and Flying Pokémon.", center:true, leaderName:"Corvin", leaderTeam:['Altaria','Skarmory','Flygon','Salamence'], endOfContent:true},
+ // Side area: open sea east of Glimmer Coast, for SURF and fishing.
+ {type:'route', name:"Glimmer Sea", at:[6,-1], tier:6, desc:"Calm, clear water dotted with sandbars. Something big swims below.", pool:['Wingull','Krabby'], water:['Tentacool','Horsea','Staryu','Wailmer','Mantine','Lapras'], theme:'sea'}
 ];
 // Story areas link in order; the way onward from a gym or rival stays shut until they're beaten.
 // Every link works both ways, so you can always walk back.
@@ -911,7 +923,9 @@ function linkAreas(i, j, gate){
   (b.links ||= []).push({dir:OPPOSITE[dir], to:i, gate:false});
 }
 for(let i=0;i<13;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
-for(const [i,j] of [[0,14],[1,15],[5,16],[6,17]]) linkAreas(i, j, false);
+for(const [i,j] of [[0,14],[1,15],[5,16],[6,17],[16,27]]) linkAreas(i, j, false);
+linkAreas(13, 18, false);
+for(let i=18;i<26;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 
 // ---------- Story: Team Tempest, the Tidewardens and Wren (see STORY.md) ----------
 // grunts: Tempest grunts among a route's trainers; tablet: a Tidewarden stone to read; storyNpc: a
@@ -921,7 +935,12 @@ Object.assign(LOCATIONS[9], {rivalAfter:["...You're really something, you know t
 Object.assign(LOCATIONS[4], {grunts:2, scene:'tempestRun'});
 Object.assign(LOCATIONS[6], {grunts:2});
 Object.assign(LOCATIONS[12], {grunts:2});
-Object.assign(LOCATIONS[13], {scene:'portmere', storyNpc:{kind:'fisher', lines:["The ferry's shut while this storm hangs over the harbour.", "TEAM TEMPEST took over the docks. Nobody sails until they're gone."]}});
+Object.assign(LOCATIONS[13], {scene:'portmere', storyNpc:{kind:'fisher', lines:["The ferry's shut while this storm hangs over the harbour.", "Those TEMPEST types sailed off east, over the strait toward VOLTARA CITY.", "A trainer who can SURF could follow them..."]}});
+Object.assign(LOCATIONS[19], {storyNpc:{kind:'gentleman', lines:["TEAM TEMPEST came through town buying up every lantern and rope in the shops.", "Headed north, into the mountains past MOSSGROVE."]}});
+Object.assign(LOCATIONS[21], {storyNpc:{kind:'oldwoman', lines:["The TIDEWARDENS sang to the guardian in a shrine under the sea.", "To find it, one would have to DIVE... but nobody alive knows how anymore."]}});
+Object.assign(LOCATIONS[23], {scene:'hideout', rivalAfter:["...I lost. Again.", "Vesper promised TEAM TEMPEST would make me strong. But they're hurting Pokémon to wake the guardian.", "That's not strength. I'm done with them.", "Go on. I'll find another way to stop Vesper. ...Thanks for knocking some sense into me."]});
+Object.assign(LOCATIONS[24], {storyNpc:{kind:'girl', lines:["A trainer called WREN came down from the ridge looking shaken.", "Said they'd quit some team, and that the storms are getting worse."]}});
+Object.assign(LOCATIONS[25], {grunts:2});
 Object.assign(LOCATIONS[3], {storyNpc:{kind:'boy', lines:["A trainer called WREN blew through here, set on being the strongest in Vellorin.", "Something tells me you'll run into them again."]}});
 Object.assign(LOCATIONS[5], {storyNpc:{kind:'fisher', lines:["Folks in blue uniforms were down at the sea wall, asking about the TIDEWARDENS.", "TEAM TEMPEST, they called themselves. Gave me the creeps."]}});
 Object.assign(LOCATIONS[7], {storyNpc:{kind:'hiker', lines:["See those old stone tablets around Vellorin? The TIDEWARDENS carved them, long before any town stood here.", "Nobody's read them all. Maybe you could!"]}});
@@ -1003,7 +1022,7 @@ const TOWN_TALK = [
 const ROUTE_TALK = {
   youngster:["I like shorts! They're comfy and easy to wear!", "...Also, hold Shift to run. Or press B."],
   bugcatcher:["Bug Pokémon evolve fast! Caterpie becomes Metapod at level 7!"],
-  fisher:["The water Pokémon here come up into the lakeside grass.", "No rod needed!"],
+  fisher:["Water Pokémon hide under the surface. SURF over them, or cast a line!"],
   hiker:["Rock and Ground Pokémon hate Water and Grass moves. Remember that!"]};   // from an exit tile into the map
 
 // Towns are 36×26: the compact centre (TOWN_ROWS: Pokémon Center, Mart/Gym, houses, pond) sits in
@@ -1073,7 +1092,7 @@ function buildTown(loc){
   // Each town's outskirts lean toward its Gym's type: rocky (fire/ground), woods (ghost), a strip of
   // sea shore along the south (water); home and the rest get trees and flowers.
   const flavor = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
-  const PALETTE = {fire:'rrrTb', ground:'rrTTb*', ghost:'TTTTb', water:'**bT'}[flavor] || 'TTTT**b';
+  const PALETTE = {fire:'rrrTb', ground:'rrTTb*', ghost:'TTTTb', water:'**bT', electric:'rTb*', grass:'TTbb**', ice:'rrTT', dragon:'rrrTb'}[flavor] || 'TTTT**b';
   const tries = flavor==='ghost' ? 120 : 70;
   if(flavor==='water') for(let y=H-5; y<H-2; y++) for(let x=2; x<W-2; x++){
     if(x>=LANE-1 && x<=LANE+3) continue;   // leave the south lane
@@ -1097,7 +1116,8 @@ const ROUTE_THEMES = {
   plain: {grass:6, trees:22, rocks:0.12, ponds:[[3,2]]},
   forest:{grass:7, trees:55, rocks:0.05, ponds:[]},
   lake:  {grass:4, trees:16, rocks:0.1,  ponds:[[7,4],[3,2]]},
-  rocky: {grass:4, trees:10, rocks:0.55, ponds:[]}};
+  rocky: {grass:4, trees:10, rocks:0.55, ponds:[]},
+  sea:   {grass:2, trees:4,  rocks:0.1,  ponds:[]}};
 // Routes are long corridors like Emerald's: about 125×42 running east–west, 42×125 north–south,
 // or ~80×68 where they turn or branch (seeded ±10% per route). A two-tree-thick border with an
 // opening per exit, a two-wide path that meanders in L-shaped legs from each opening to the middle,
@@ -1152,7 +1172,7 @@ function buildRoute(loc){
   // Guided routes (Phase 1.5, testers #11/#14): a corridor of open ground along the path through forest,
   // instead of an open field. A few side paths wind off through tall grass to small clearings (an item
   // waits at the end), and each long path has a stretch of tall grass right across it you must cross.
-  const keep = new Set(), pockets = [];
+  const keep = new Set(), pockets = [], sidePath = new Set();
   const CW = loc.type==='trainer' ? 4 : 3;   // how far the open ground reaches either side of the path
   const markNear = (x0,y0,r)=>{ for(let yy=y0-r; yy<=y0+r; yy++) for(let xx=x0-r; xx<=x0+r; xx++) if(inside(xx,yy) && Math.abs(xx-x0)+Math.abs(yy-y0)<=r+1) keep.add(yy*W+xx); };
   for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(tiles[y][x]===':' || tiles[y][x]===',') markNear(x, y, CW);
@@ -1163,7 +1183,7 @@ function buildRoute(loc){
     const d = ['up','down','left','right'][Math.floor(rnd()*4)], [dx,dy] = DIRS[d], len = 8 + Math.floor(rnd()*8);
     const ex = p.x + dx*(len+CW), ey = p.y + dy*(len+CW);
     if(!inside(ex-2, ey-2) || !inside(ex+2, ey+2)) continue;
-    for(let s=1; s<=len+CW; s++){ const sx = p.x+dx*s, sy = p.y+dy*s; markNear(sx, sy, 1); if(s>CW && tiles[sy][sx]==='.' && rnd()<0.7) tiles[sy][sx] = '"'; }
+    for(let s=1; s<=len+CW; s++){ const sx = p.x+dx*s, sy = p.y+dy*s; markNear(sx, sy, 1); for(let b=-1;b<=1;b++) for(let a=-1;a<=1;a++) sidePath.add((sy+b)*W+sx+a); if(s>CW && tiles[sy][sx]==='.' && rnd()<0.7) tiles[sy][sx] = '"'; }
     markNear(ex, ey, 2); pockets.push({x:ex, y:ey}); k++;
   }
   for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(inside(x,y) && tiles[y][x]==='.' && !keep.has(y*W+x)) tiles[y][x] = 'T';
@@ -1173,6 +1193,24 @@ function buildRoute(loc){
     for(let i=g; i<Math.min(trail.length, g+6); i++){ const t = trail[i];
       for(let yy=t.y-CW-1; yy<=t.y+CW+1; yy++) for(let xx=t.x-CW-1; xx<=t.x+CW+1; xx++)
         if(inside(xx,yy) && keep.has(yy*W+xx) && (tiles[yy][xx]==='.' || tiles[yy][xx]===':')) tiles[yy][xx] = '"'; }
+  }
+  // Lake routes get a real lake beside the path (#17), kept clear of the path and the side clearings.
+  if(loc.theme==='lake') for(let k=0; k<2; k++){
+    let best = null;
+    for(let t=0; t<40; t++){
+      const ex = 8+rnd()*(W-16), ey = 6+rnd()*(H-12), rx = 7+rnd()*6, ry = 4+rnd()*3, cells = [];
+      for(let y=Math.floor(ey-ry); y<=ey+ry; y++) for(let x=Math.floor(ex-rx); x<=ex+rx; x++){
+        if(!inside(x,y) || ((x-ex)/rx)**2 + ((y-ey)/ry)**2 > 1) continue;
+        let ok = !pockets.some(p=>Math.abs(p.x-x)<=3 && Math.abs(p.y-y)<=3);
+        if(sidePath.has(y*W+x)) ok = false;   // side paths stay dry
+        for(let yy=y-2; yy<=y+2 && ok; yy++) for(let xx=x-2; xx<=x+2; xx++){ const ch = tiles[yy] && tiles[yy][xx]; if(ch===':' || ch===',') { ok = false; break; } }   // a shore of ground beside the path
+        if(ok) cells.push([x,y]);
+      }
+      // It has to reach the open ground somewhere, so you can fish or SURF from the shore.
+      const shore = cells.filter(([x,y])=>Object.values(DIRS).some(([a,b])=>keep.has((y+b)*W+x+a) && '."'.includes(tiles[y+b][x+a]))).length;
+      if(shore >= 6 && (!best || cells.length > best.length)) best = cells;
+    }
+    if(best && best.length > 30) for(const [x,y] of best) tiles[y][x] = '~';
   }
   const open = (x,y)=> tiles[y] && tiles[y][x]==='.';
   const rect = (w,h)=>[2+Math.floor(rnd()*(W-4-w)), 2+Math.floor(rnd()*(H-4-h))];
@@ -1266,7 +1304,7 @@ function buildRoute(loc){
     npcs.push({kind:'rival', x:spot.x, y:spot.y, facing:OPPOSITE[gated.dir], trainer:true, vanish:true});
   }
   // Locals with tips, spread along the route.
-  const who = {forest:'bugcatcher', lake:'fisher', rocky:'hiker'}[loc.theme] || 'youngster';
+  const who = {forest:'bugcatcher', lake:'fisher', rocky:'hiker', sea:'fisher'}[loc.theme] || 'youngster';
   const locals = ['youngster', 'lass', who, 'gentleman', 'girl'];
   for(let k=0; k<Math.max(1, Math.round(A/1100)); k++){
     const sp = freeSpot(); if(!sp) break;
@@ -1274,8 +1312,8 @@ function buildRoute(loc){
     npcs.push({kind, x:sp.x, y:sp.y, facing:'down', lines:ROUTE_TALK[kind] || TOWN_TALK[k % TOWN_TALK.length], home:{...sp}, wander:k%2===1});
   }
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
-  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS']}[loc.theme||'plain'];
-  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt'};
+  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER']}[loc.theme||'plain'];
+  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass'};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
   const TR_INTRO = ["Our eyes met! That means we battle!", "Hey! You look tough. Let's see!", "I just caught these guys. Try them out!", "You're not getting past without a battle!", "My Pokémon and I trained all day for this!"];
@@ -1291,9 +1329,9 @@ function buildRoute(loc){
     for(let s=1; s<dist; s++) if(!WALKABLE.has(tiles[y-dy*s][x-dx*s])) clear = false;
     if(!clear) continue;
     const grunt = made < (loc.grunts||0), pick = TR_CLASSES[Math.floor(rnd()*TR_CLASSES.length)], cls = grunt ? 'TEMPEST GRUNT' : pick;
-    const tp = grunt ? TEMPEST_POOL : pool;
+    const tp = grunt ? TEMPEST_POOL : cls==='SWIMMER' || cls==='FISHERMAN' ? waterPool(loc) : pool;
     const size = 2 + Math.floor(rnd()*4), team = Array.from({length:size}, ()=>tp[Math.floor(rnd()*tp.length)]);
-    const named = `${cls} ${(names=>names[Math.floor(rnd()*names.length)])(TR_NAMES[cls==='LASS' ? 'girl' : 'boy'])}`;
+    const named = `${cls} ${(names=>names[Math.floor(rnd()*names.length)])(TR_NAMES[cls==='LASS' || cls==='SWIMMER' ? 'girl' : 'boy'])}`;
     const ii = Math.floor(rnd()*TR_INTRO.length), ai = Math.floor(rnd()*TR_AFTER.length);
     npcs.push({kind:TR_KIND[cls], x, y, facing:OPPOSITE[d], trainer:true, id:`${loc.name}#${made}`, title:grunt ? 'TEMPEST GRUNT' : named,
       team, intro:grunt ? GRUNT_INTRO[ii % GRUNT_INTRO.length] : TR_INTRO[ii], after:grunt ? GRUNT_AFTER[ai % GRUNT_AFTER.length] : TR_AFTER[ai], home:{x,y}});
@@ -1304,9 +1342,22 @@ function buildRoute(loc){
   const ITEM_DROPS = ['potion','potion','pokeball','antidote','superpotion','parlyzheal','pokeball','awakening','burnheal','potion'];
   const itemTypes = {};
   const drop = (x,y)=>{ tiles[y][x] = 'I'; itemTypes[`${x},${y}`] = ITEM_DROPS[Math.floor(rnd()*ITEM_DROPS.length)]; };
-  for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x])) drop(pk.x, pk.y);
-  for(let k=pockets.length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
+  for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x]) && reach.has(pk.y*W+pk.x)) drop(pk.x, pk.y);   // only clearings you can walk to
+  for(let k=Object.keys(itemTypes).length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
   if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
+  // Sea routes: open water with a landing at each entrance and small islands where people and items are.
+  if(loc.theme==='sea'){
+    const land = new Set(), isle = (x0,y0,r)=>{ for(let y=y0-r; y<=y0+r; y++) for(let x=x0-r; x<=x0+r; x++) land.add(y*W+x); };
+    for(const l of loc.links){ const o = OPEN[l.dir], lr = l.dir==='left' || l.dir==='right';
+      for(let d=0; d<7; d++) for(let i=-1; i<=o.len; i++){
+        const x = lr ? (l.dir==='left' ? d : W-1-d) : o.x+i, y = lr ? o.y+i : (l.dir==='up' ? d : H-1-d);
+        land.add(y*W+x); } }
+    for(const n of npcs) isle(n.x, n.y, 1);
+    for(const s of signs) isle(s.x, s.y, 1);
+    for(const k of Object.keys(itemTypes)){ const [x,y] = k.split(',').map(Number); isle(x, y, 1); }
+    for(let y=0; y<H; y++) for(let x=0; x<W; x++) if(inside(x,y) && !land.has(y*W+x)) tiles[y][x] = '~';
+    for(const k of land){ const x = k % W, y = Math.floor(k/W); if(inside(x,y) && tiles[y][x]==='T') tiles[y][x] = '.'; }
+  }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
   const first = spots[exits[0].dir];
   const built = finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
@@ -1347,8 +1398,13 @@ const GYM_JUNIORS = {
   fire:  {cls:'KINDLER',    kind:'boy',    team:['Vulpix','Ponyta','Slugma','Growlithe','Numel']},
   water: {cls:'SWIMMER',    kind:'lass',   team:['Horsea','Goldeen','Staryu','Psyduck','Poliwag','Marill']},
   ground:{cls:'CAMPER',     kind:'hiker',  team:['Diglett','Sandshrew','Geodude','Phanpy','Cubone']},
-  ghost: {cls:'HEX MANIAC', kind:'oldwoman', team:['Gastly','Shuppet','Duskull','Misdreavus','Abra','Natu']}};
-const GYM_STYLE = {Rell:{kind:'leaderFire', type:'Fire'}, Sable:{kind:'leaderWater', type:'Water'}, Orin:{kind:'leaderGround', type:'Ground and Poison'}, Iska:{kind:'leaderGhost', type:'Ghost and Psychic'}};
+  ghost: {cls:'HEX MANIAC', kind:'oldwoman', team:['Gastly','Shuppet','Duskull','Misdreavus','Abra','Natu']},
+  electric:{cls:'GUITARIST', kind:'boy',    team:['Voltorb','Magnemite','Electrike','Pikachu','Shinx','Mareep']},
+  grass: {cls:'AROMA LADY', kind:'lass',    team:['Oddish','Roselia','Shroomish','Sunkern','Cherubi','Budew']},
+  ice:   {cls:'SKIER',      kind:'girl',    team:['Snorunt','Swinub','Spheal','Seel','Smoochum','Snover']},
+  dragon:{cls:'DRAGON TAMER', kind:'gentleman', team:['Swablu','Bagon','Dratini','Gible','Taillow','Trapinch']}};
+const GYM_STYLE = {Rell:{kind:'leaderFire', type:'Fire'}, Sable:{kind:'leaderWater', type:'Water'}, Orin:{kind:'leaderGround', type:'Ground and Poison'}, Iska:{kind:'leaderGhost', type:'Ghost and Psychic'},
+  Juno:{kind:'leaderElectric', type:'Electric'}, Bryn:{kind:'leaderGrass', type:'Grass'}, Hale:{kind:'leaderIce', type:'Ice'}, Corvin:{kind:'leaderDragon', type:'Dragon and Flying'}};
 function getInterior(loc, bi){
   loc.__rooms ||= {};
   if(loc.__rooms[bi]) return loc.__rooms[bi];
@@ -1408,7 +1464,7 @@ function curMap(){ const loc = LOCATIONS[adv.loc]; return adv.inside!=null ? get
 // People on the current map. Beaten rivals leave; everyone else stays put (Gym Leaders included).
 function curNpcs(){ const loc = LOCATIONS[adv.loc]; return curMap().npcs.filter(n=>!(n.vanish && adv.cleared[loc.name] && adv.walkOff!==loc.name)); }
 function activeTrainer(n){ return n.trainer && !adv.cleared[n.id || LOCATIONS[adv.loc].name]; }
-function spawnPlayer(){ adv.inside = null; const map = getMap(LOCATIONS[adv.loc]); adv.pos = {...map.spawn}; adv.facing = 'down'; }
+function spawnPlayer(){ adv.inside = null; adv.surfing = false; const map = getMap(LOCATIONS[adv.loc]); adv.pos = {...map.spawn}; adv.facing = 'down'; }
 
 // ---------- Pixel-art characters: everyone is on the player's 16×21 Gen 3 frame ----------
 // Gen 3 NPCs stand as tall as the player, so each character is a 12-row head on the player's own body
@@ -1451,7 +1507,11 @@ const CHARS = {
   leaderFire:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#e84828',B:'#303030',D:'#e84828',Y:'#303030'},
   leaderWater: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d0b0',H:'#3888e0',B:'#f8f8f8',D:'#3888e0',Y:'#f8f8f8'},
   leaderGround:{head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d89868',H:'#604028',B:'#a07838',D:'#584028',Y:'#a07838'},
-  leaderGhost: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e0e8',H:'#6848a8',B:'#383050',D:'#383050',Y:'#383050'}};
+  leaderGhost: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e0e8',H:'#6848a8',B:'#383050',D:'#383050',Y:'#383050'},
+  leaderElectric:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#f8d030',B:'#303038',D:'#303038',Y:'#f8d030'},
+  leaderGrass: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#40883a',B:'#78c050',D:'#78c050',Y:'#e8e090'},
+  leaderIce:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#d8f0f8',B:'#4890c8',D:'#305878',Y:'#d8f0f8'},
+  leaderDragon:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#402060',B:'#7038c0',D:'#282030',Y:'#e0a030'}};
 const charCache = {};
 // The player: an original trainer on Gen 3's 16×21 overworld frame, following Brendan's row-by-row
 // widths from the pokeemerald sheet: the head is widest at the eyes (14 px, hair tufts outside the face
@@ -1664,7 +1724,8 @@ function npcHtml(n, i){
 }
 // Overworld weather, Emerald-style: volcanic ash near Cindergate (like Route 113), fog around
 // Wispgate (like Route 120), rain on the coast.
-const WEATHER = {"Cindergate Town":'ash', "Route 2: Marrow Pass":'ash', "Wispgate City":'fog', "Route 5: Cragmoor Trail":'fog', "Route 3: Hollow Bluffs":'rain', "Glimmer Coast":'rain'};
+const WEATHER = {"Cindergate Town":'ash', "Route 2: Marrow Pass":'ash', "Wispgate City":'fog', "Route 5: Cragmoor Trail":'fog', "Route 3: Hollow Bluffs":'rain', "Glimmer Coast":'rain',
+  "Route 7: Stormwake Strait":'rain', "Route 9: Frostpine Ridge":'snow', "Rimefall Town":'snow', "Tempest Hideout":'cave', "Route 10: Skyreach Cliffs":'fog'};
 let owShownLoc = null;
 function renderOverworld(){
   const loc = LOCATIONS[adv.loc], map = curMap();
@@ -1674,7 +1735,7 @@ function renderOverworld(){
   let html = '<div id="owTiles"></div>';
   html += curNpcs().map(n=>npcHtml(n, map.npcs.indexOf(n))).join('');
   html += nbNpcs().map(({n, x, y})=>`<div class="ow-actor npc nb-npc" style="transform:translate(${x*T+4}px,${y*T-6}px); z-index:${20+2*y}">${charSvg(n.kind, n.facing, 0)}</div>`).join('');
-  html += `<div class="ow-actor" id="owPlayer"><div class="ow-body"></div><div class="ow-reflect"></div></div>`;
+  html += `<div class="ow-actor" id="owPlayer"><div class="ow-surf"></div><div class="ow-body"></div><div class="ow-reflect"></div></div>`;
   world.innerHTML = html;
   renderTiles(adv.pos.x, adv.pos.y);
   owAnim = null; owMoving = false;
@@ -1753,13 +1814,24 @@ if(typeof window!=='undefined' && window.addEventListener) window.addEventListen
 let owFrameShown = null;
 function drawPlayer(frame, run){
   const el = document.getElementById('owPlayer');
-  const key = (adv.facing||'down') + frame + (run?'r':'');
+  if(adv.surfing) frame = 0, run = false;   // sitting still on your ride
+  const key = (adv.facing||'down') + frame + (run?'r':'') + (adv.surfing?'s':'');
   if(!el || owFrameShown===key && el.__drawn) return;
+  el.classList.toggle('surfing', !!adv.surfing);
+  const ride = el.querySelector('.ow-surf'); if(ride && adv.surfing) ride.innerHTML = surfSvg(adv.facing||'down');
   el.querySelector('.ow-body').innerHTML = el.querySelector('.ow-reflect').innerHTML = charSvg('player', adv.facing||'down', frame, run);
   owFrameShown = key; el.__drawn = true;
 }
 // Put player + camera at fractional tile coords. The camera keeps the player centred; both use
 // the same whole-pixel offset so tiles stay crisp and the player never jitters against them.
+const SURF_ROWS = {down:['....KKKKKKKK....','..KKBBBBBBBBKK..','.KBBBBBBBBBBBBK.','KBWKBBBBBBBBKWBK','KBKKBBBBBBBBKKBK','KbBBBBBBBBBBBBbK','KbbBBBBBBBBBBbbK','.KbbbbbbbbbbbbK.','w.KKKKKKKKKKKK.w','.ww..w.ww.w..ww.'],
+  up:['....KKKKKKKK....','..KKBBBBBBBBKK..','.KBBBBBBBBBBBBK.','KBBBBBBLLBBBBBBK','KBBBBBLLLLBBBBBK','KbBBBBBLLBBBBBbK','KbbBBBBBBBBBBbbK','.KbbbbbbbbbbbbK.','w.KKKKKKKKKKKK.w','.ww..w.ww.w..ww.'],
+  left:['...KKKKKKKK.....','.KKBBBBBBBBKK...','KBWKBBBBBBBBBKK.','KBKKBBBBBBBBBBBK','KBBBBBBBBBBBBBLK','KbBBBBBBBBBBBBBK','.KbBBBBBBBBBBbK.','..KbbbbbbbbbbK..','w..KKKKKKKKKK..w','.ww..w.ww.w..ww.']};
+function surfSvg(f){
+  const rows = SURF_ROWS[f==='right' ? 'left' : f] || SURF_ROWS.down, C = {K:'#202838', B:'#4888e0', b:'#3060b0', W:'#f8f8f8', L:'#a8d0f8', w:'#e8f8ff'};
+  let r = ''; rows.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(C[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${C[ch]}"/>`; }));
+  return `<svg viewBox="0 0 16 10" width="32" height="20" shape-rendering="crispEdges"${f==='right' ? ' style="transform:scaleX(-1)"' : ''}>${r}</svg>`;
+}
 function setActorPos(px, py){
   const el = document.getElementById('owPlayer'), world = document.getElementById('owWorld');
   if(!el || !world) return;
@@ -1852,6 +1924,21 @@ function owTryStep(startAt, chained){
   if(cross && cross.exit.gate && !adv.cleared[loc.name]){
     drawPlayer(0);
     return owSay([`You should challenge ${loc.type==='gym'?'Gym Leader':'your rival'} ${loc.leaderName} before moving on.`]);
+  }
+  // Surfing: glide over water; step toward land and you hop off onto it.
+  if(adv.surfing && !map.interior){
+    const blocked = npc || nbNpcAt(nx, ny);
+    if(!blocked && ch==='~'){
+      adv.pos = {x:nx, y:ny};
+      const el = document.getElementById('owPlayer'); if(el) el.style.zIndex = 20 + 2*ny;
+      return owStart({...here, dur:RUN_MS, ch});
+    }
+    if(!blocked && WALKABLE.has(ch)){
+      adv.surfing = false; adv.pos = {x:nx, y:ny};
+      const el = document.getElementById('owPlayer'); if(el) el.style.zIndex = 20 + 2*ny;
+      sfx('jump'); owFrameShown = null;
+      return owStart({...here, dur:JUMP_MS, jump:true, ch});
+    }
   }
   // Walking down onto a ledge hops you over it to the tile beyond: 32 frames for the two tiles.
   const lx = nx + DIRS[d][0], ly = ny + DIRS[d][1];
@@ -1948,13 +2035,15 @@ function owArrive(ch, endedAt){
   if(ch==='"'){
     if(Math.random()<0.08){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
   }
+  if(ch==='~' && adv.surfing && !adv.surfFresh && Math.random()<0.05){ held.length = 0; saveAdv(); startWildBattle(null, 'water'); return; }
+  adv.surfFresh = false;
   // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between).
   for(const n of curNpcs()){
     if(!activeTrainer(n)) continue;
     const [fx,fy] = DIRS[n.facing];
     for(let s=1; s<=5; s++){
       const tx = n.x+fx*s, ty = n.y+fy*s;
-      if(!WALKABLE.has(tileAt(map,tx,ty))) break;
+      if(!WALKABLE.has(tileAt(map,tx,ty)) && tileAt(map,tx,ty)!=='~') break;   // trainers see across water
       if(tx===adv.pos.x && ty===adv.pos.y){ saveAdv(); return triggerTrainer(n); }
     }
   }
@@ -2006,6 +2095,7 @@ function leaveBuilding(){
 // one tile below it, facing down, with the party healed. Home is the default.
 function sendToCenter(){
   const li = adv.lastHeal!=null && LOCATIONS[adv.lastHeal].center ? adv.lastHeal : 0;
+  adv.surfing = false;
   const b = getMap(LOCATIONS[li]).buildings.find(b=>b.kind==='center');
   adv.loc = li; adv.inside = null;
   adv.pos = {x:b.door.x, y:b.door.y+1}; adv.facing = 'down';
@@ -2076,13 +2166,61 @@ function owInteract(){
     saveAdv(); renderTiles(adv.pos.x, adv.pos.y);
     return obtainItem(it.name, 1, it.pocket===1 ? 'POKé BALLS' : 'ITEMS', ()=>renderAdventure());
   }
+  if(ch==='~' && !map.interior) return waterAction(adv.pos.x+dx, adv.pos.y+dy);
   if(ch==='u') return owSay([`${loc.name.toUpperCase()} POKéMON GYM`, `Leader: ${loc.leaderName}`, adv.cleared[loc.name] ? `Winning trainers: ${adv.playerName}` : 'Winning trainers: ...']);
   const said = THING_TEXT[(TILE_CLS[ch]||'').split(' ')[0]];
   if(said) owSay(said);
 }
+// SURF comes with Sable's badge (Tidalkeep); the OLD ROD from any fisherman who isn't battling.
+function canSurf(){ return !!(adv.items.hm03 || adv.cleared['Tidalkeep City']); }
+function waterAction(tx, ty){
+  const opts = [];
+  if(canSurf() && !adv.surfing) opts.push('SURF');
+  if(adv.items.oldrod) opts.push('FISH');
+  if(!opts.length) return owSay(['The water is dyed a deep blue...']);
+  const view = document.getElementById('owView');
+  const go = pick=>{ owBusy = false; if(pick==='SURF') startSurf(tx, ty); else if(pick==='FISH') goFish(); };
+  const ask = ()=>{
+    owBusy = true;
+    if(opts.length===1){
+      owPrompt(opts[0]==='SURF' ? 'The water is dyed a deep blue... Would you like to SURF?' : 'Would you like to fish with the OLD ROD?');
+      uiMenu(view, ['YES', 'NO'], k=>{ owPromptClose(); go(k===0 ? opts[0] : null); }, 'gm-yesno');
+    } else {
+      owPrompt('The water is dyed a deep blue... What would you like to do?');
+      uiMenu(view, [...opts, 'CANCEL'], k=>{ owPromptClose(); go(opts[k]); }, 'gm-br');
+    }
+  };
+  ask();
+}
+function startSurf(tx, ty){
+  const mon = adv.party.find(m=>!m.fainted && m.types.includes('Water')) || adv.party.find(m=>!m.fainted) || adv.party[0];
+  owSay([`${dname(mon).toUpperCase()} used SURF!`], ()=>{
+    const from = {...adv.pos};
+    adv.surfing = true; adv.surfFresh = true; adv.pos = {x:tx, y:ty}; owFrameShown = null;
+    const el = document.getElementById('owPlayer'); if(el) el.style.zIndex = 20 + 2*ty;
+    sfx('jump');
+    owStart({fx:from.x, fy:from.y, start:owNow(), dur:JUMP_MS, jump:true, ch:'~'});
+  });
+}
+// Emerald's fishing: cast, a wait, then "Oh! A bite!" (a single wild Pokémon) or "Not even a nibble...".
+function goFish(){
+  const loc = LOCATIONS[adv.loc];
+  sfx('ball');
+  owSay([`${adv.playerName} used the OLD ROD!`, '. . . . . .'], ()=>{
+    if(Math.random() < 0.3) return owSay(['Not even a nibble...']);
+    sfx('spot');
+    const pool = fishPool(loc), name = pool[Math.floor(Math.random()*pool.length)];
+    owSay(['Oh! A bite!'], ()=>{ saveAdv(); startWildBattle({names:[name], level:Math.max(3, wildLevel()-2)}); });
+  });
+}
 function talkTo(n){
   const loc = LOCATIONS[adv.loc];
   faceNpcToPlayer(n);
+  if(n.kind==='fisher' && !n.trainer && !adv.items.oldrod){
+    adv.items.oldrod = 1; saveAdv();
+    return owSay(['Hey there! Ever tried fishing?', "Nothing beats the thrill of a bite. Here, you have this OLD ROD!"],
+      ()=>obtainItem('OLD ROD', 1, 'KEY ITEMS', ()=>owSay(['Face any water and press A to cast your line. Good luck!'], ()=>renderAdventure())));
+  }
   if(activeTrainer(n)) return triggerTrainer(n);
   if(n.id) return owSay([`${n.title}: "${n.after}"`]);
   if(n.gymLeader) return owSay([`${loc.leaderName}: "You've already beaten me. The road ahead is waiting for you!"`]);
@@ -2532,7 +2670,9 @@ const ITEM_INFO = {pokeball:{name:'POKé BALL', pocket:1, desc:'A tool for catch
   antidote:{name:'ANTIDOTE', pocket:0, desc:'Heals a poisoned POKéMON.', price:100, cure:'psn'},
   parlyzheal:{name:'PARLYZ HEAL', pocket:0, desc:'Heals a paralyzed POKéMON.', price:200, cure:'par'},
   awakening:{name:'AWAKENING', pocket:0, desc:'Awakens a sleeping POKéMON.', price:250, cure:'slp'},
-  burnheal:{name:'BURN HEAL', pocket:0, desc:'Heals a POKéMON of a burn.', price:250, cure:'brn'}};
+  burnheal:{name:'BURN HEAL', pocket:0, desc:'Heals a POKéMON of a burn.', price:250, cure:'brn'},
+  hm03:{name:'HM03 SURF', pocket:2, desc:'Lets a POKéMON carry you across water. Face the water and press A.'},
+  oldrod:{name:'OLD ROD', pocket:4, desc:'An old fishing rod. Face the water and press A to fish.'}};
 const CURED = {psn:'poisoning', par:'paralysis', slp:'sleep', brn:'its burn'};
 // POTION heals 20 HP (not a fainted Pokémon). Returns the message, or null if it would do nothing.
 // Use a medicine on m. Returns the message, or null if it would do nothing (nothing is used up).
@@ -2617,7 +2757,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.6-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.12.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3396,6 +3536,8 @@ function sceneNpc(npc, n, min=n){
 }
 function sceneEnd(...npcs){ const map = curMap(); map.npcs = map.npcs.filter(n=>!npcs.includes(n)); owBusy = false; renderAdventure(); }
 const SCENES = {
+  hideout(){ owSay(["Voices echo from deeper in the cave...", `${ADMIN}: "The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!"`,
+    `${ADMIN}: "WREN. Our little shadow has followed us here. Prove you're one of us."`]); },
   // Marrow Pass: a grunt barrels down the pass, warns you off and runs on.
   tempestRun(){
     held.length = 0;
@@ -3555,7 +3697,9 @@ function renderAdventure(){
   // Saves from the old 10×6 maps (or a position on a door/exit) get put back at the entrance.
   if(adv.inside!=null && !getMap(loc).buildings[adv.inside]) adv.inside = null;
   const here = adv.pos ? tileAt(curMap(), adv.pos.x, adv.pos.y) : null;
-  if(!here || !WALKABLE.has(here) || 'DEM'.includes(here)) spawnPlayer();
+  if(adv.surfing && (here!=='~' || adv.inside!=null)) adv.surfing = false;
+  if(adv.cleared['Tidalkeep City'] && !adv.items.hm03 && !(adv.story && adv.story.surfGift)) adv.items.hm03 = 1;   // saves from before SURF
+  if(!here || !(WALKABLE.has(here) || adv.surfing && here==='~') || 'DEM'.includes(here)) spawnPlayer();
   renderOverworld();
   document.getElementById('advTitle').textContent = `${loc.type==='gym'?'🥊':loc.type==='trainer'?'🧑':loc.type==='route'?'🌿':'🏘️'} ${loc.name}`;
   document.getElementById('advDesc').innerHTML = `${loc.desc} <span class="pill">🧑 ${adv.playerName}</span> <span class="pill">🔴 x${adv.items.pokeball||0}</span>${adv.box.some(Boolean)?` <span class="pill">📦 Box: ${adv.box.filter(Boolean).length}</span>`:''}`;
@@ -3590,12 +3734,12 @@ function renderAdventure(){
 
 
 // fixed = {names, level} for a scripted encounter (the opening); otherwise a wild pack from the area.
-function startWildBattle(fixed){
+function startWildBattle(fixed, where){
   const loc = LOCATIONS[adv.loc];
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
   // A wild pack: 1 up to half your (living) party, at most 4.
   const n = 1 + Math.floor(Math.random()*Math.min(4, Math.ceil(alive(adv.party).length/2)));
-  const picks = fixed ? fixed.names : shuffle(areaPool(loc)).slice(0,n);
+  const picks = fixed ? fixed.names : shuffle(where==='water' ? waterPool(loc) : areaPool(loc)).slice(0,n);
   let id=9000;
   const wild = picks.map(n=>makeMon(dexByName(n), id++, 'none', fixed ? fixed.level : wildLevel()));
   wild.forEach(markSeen);
@@ -3664,6 +3808,11 @@ function movePromptNext(done){
   });
 }
 function afterStory(){
+  if(adv.story && adv.story.surfGift){
+    delete adv.story.surfGift; adv.items.hm03 = 1; saveAdv();
+    return owSay(['SABLE: "The sea chose well today. Take this as well."'], ()=>obtainItem('HM03 SURF', 1, 'TMs & HMs', ()=>owSay([
+      'SABLE: "With SURF, a POKéMON can carry you across the water."', 'SABLE: "Face the water and press A. The sea is wider than you think!"'], ()=>afterStory())));
+  }
   const rival = adv.walkOff && curMap().npcs.find(n=>n.vanish);
   if(rival){
     const loc = LOCATIONS[adv.loc];
@@ -3709,6 +3858,10 @@ function dexRegisterNext(){
   dexDraw();
 }
 
+// Wild Pokémon in the water (surfing) and on the line (fishing).
+function waterPool(loc){ return loc.water || ['Magikarp','Psyduck','Poliwag','Goldeen']; }
+function fishPool(loc){ const sea = loc.theme==='sea' || /Coast|Harbour|Tidalkeep|Bluffs/.test(loc.name);
+  return loc.fish || (sea ? ['Magikarp','Magikarp','Tentacool','Horsea','Remoraid'] : ['Magikarp','Magikarp','Goldeen','Poliwag']); }
 function areaPool(loc){
   if(loc.pool) return loc.pool;
   for(const l of loc.links||[]) if(LOCATIONS[l.to].pool) return LOCATIONS[l.to].pool;
@@ -4707,6 +4860,7 @@ function checkEnd(){
         const head = state.trainerLoc ? `You defeated ${state.trainerLoc.type==='gym'?'Gym Leader ':''}${state.trainerLoc.leaderName}! (+${xpAmount} XP)` : `The wild Pokémon retreated. (+${xpAmount} XP)`;
         if(state.trainerLoc){
           adv.cleared[state.trainerLoc.name] = true;
+          if(state.trainerLoc.name==='Tidalkeep City' && !adv.items.hm03) (adv.story ||= {}).surfGift = true;
           if(state.trainerLoc===LOCATIONS[adv.loc] && getMap(state.trainerLoc).npcs.some(n=>n.vanish)) adv.walkOff = state.trainerLoc.name;   // rival: leaves on foot
           const top = Math.max(...state.sideB.map(m=>m.level)), rate = state.trainerLoc.type==='gym' ? 100 : state.trainerLoc.type==='route' ? 20 : 60;
           adv.money = (adv.money ?? 3000) + top*rate;
