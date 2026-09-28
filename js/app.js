@@ -1768,17 +1768,34 @@ function mapAt(x, y){
   const n = nbAt(x, y);
   return n ? {m:n.map, lx:x-n.ox, ly:y-n.oy} : null;
 }
-function renderTiles(cx, cy){
+// Walking (inc): keep the tiles already drawn and only add the strip coming into view and drop the one
+// leaving it; rebuilding all ~750 tiles every few steps made running stutter on phones (tester #18).
+function renderTiles(cx, cy, inc){
   const layer = document.getElementById('owTiles');
   if(!layer) return;
   owTileCenter = {x:cx, y:cy};
+  const win = {x0:cx-WIN_X, x1:cx+WIN_X, y0:cy-WIN_Y, y1:cy+WIN_Y}, old = inc && layer.__win;
+  const inOld = (x,y)=>old && x>=old.x0 && x<=old.x1 && y>=old.y0 && y<=old.y1;
+  if(old) for(const el of [...layer.children]){
+    if(el.dataset.x==null) continue;   // buildings stay
+    const x = +el.dataset.x, y = +el.dataset.y;
+    if(x<win.x0 || x>win.x1 || y<win.y0 || y>win.y1) el.remove();
+  }
+  layer.__win = win;
   let html = '', fronts = '';
-  for(let y=cy-WIN_Y; y<=cy+WIN_Y; y++) for(let x=cx-WIN_X; x<=cx+WIN_X; x++){
+  for(let y=win.y0; y<=win.y1; y++) for(let x=win.x0; x<=win.x1; x++){
+    if(inOld(x,y)) continue;
     const a = mapAt(x, y);
     if(!a) continue;
     const ch = a.m.tiles[a.ly][a.lx];
     html += tileHtml(a.m, ch, a.lx, a.ly, x, y);
     if(ch==='"') fronts += `<div class="tg-front" data-x="${x}" data-y="${y}" style="left:${x*T}px;top:${y*T+16}px;z-index:${21+2*y}"></div>`;
+  }
+  if(old){   // new tiles go under the buildings; grass fronts carry their own z-index
+    const firstBld = layer.querySelector('.bld');
+    if(firstBld) firstBld.insertAdjacentHTML('beforebegin', html); else layer.insertAdjacentHTML('beforeend', html);
+    layer.insertAdjacentHTML('beforeend', fronts);
+    return;
   }
   const map = curMap();
   let blds = map.buildings.map((b,i)=>buildingHtml(b, 0, 0, i)).join('');
@@ -1786,7 +1803,7 @@ function renderTiles(cx, cy){
   layer.innerHTML = html + fronts + blds;
 }
 function keepTilesAround(){
-  if(Math.abs(adv.pos.x-owTileCenter.x)>=3 || Math.abs(adv.pos.y-owTileCenter.y)>=3) renderTiles(adv.pos.x, adv.pos.y);
+  if(Math.abs(adv.pos.x-owTileCenter.x)>=3 || Math.abs(adv.pos.y-owTileCenter.y)>=3) renderTiles(adv.pos.x, adv.pos.y, true);
 }
 // Scale the 480×320 view to fit, choosing a scale where one tile is a whole number of device
 // pixels — otherwise the browser leaves hairline seams between tiles.
@@ -2765,7 +2782,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.12.5-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.12.6-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];

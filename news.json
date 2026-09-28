@@ -3,6 +3,14 @@
   "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
   "changelog": [
     {
+      "version": "0.12.6",
+      "date": "2026-09-28",
+      "title": "Smoother Running",
+      "changes": [
+        "Fixed: running could stutter every few steps, especially on phones. The world now redraws only the edge coming into view instead of the whole screen"
+      ]
+    },
+    {
       "version": "0.12.5",
       "date": "2026-09-28",
       "title": "Balance: Rivals and Gym Leaders",
