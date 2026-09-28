@@ -2489,7 +2489,9 @@ function summaryKey(k){
 // list of [Hz, seconds, wave, volume]; 0 Hz is a rest. OPTION > SOUND turns them off.
 const SFX = {
   select:[[1318,.045]], open:[[880,.035],[1318,.05]], bump:[[98,.09,'triangle',.2]],
-  jump:[[523,.05],[784,.07]], ball:[[1046,.04,'triangle',.12]], save:[[784,.1],[988,.1],[1175,.1],[1568,.25]],
+  jump:[[523,.05],[784,.07]], ball:[[1046,.04,'triangle',.12]],
+  throw:[[880,.05,'triangle',.1],[660,.05,'triangle',.1],[440,.08,'triangle',.1]], shake:[[196,.06,'triangle',.25]],
+  pop:[[1318,.04],[880,.06]], caught:[[1046,.06],[0,.03],[1046,.06],[1568,.2,'triangle',.1]], save:[[784,.1],[988,.1],[1175,.1],[1568,.25]],
   pcOn:[[660,.05],[990,.05],[1320,.07]], pcOff:[[1320,.05],[990,.05],[660,.07]], pcLogin:[[990,.04],[1320,.06]],
   spot:[[1568,.05],[2093,.1]], obtain:[[784,.12],[784,.06],[784,.06],[1046,.3],[0,.05],[988,.12],[1175,.35,'triangle',.08]], door:[[392,.05,'triangle',.12],[294,.08,'triangle',.12]],
   heal:[[523,.16],[659,.16],[784,.16],[1046,.32],[0,.08],[880,.16],[988,.16],[1046,.16],[1318,.6,'triangle',.1]]};
@@ -2615,7 +2617,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.2-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.3-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3899,6 +3901,7 @@ function addLog(t){
   (state.snaps = state.snaps || [])[state.log.length-1] = snapAll();
   const el=document.getElementById('log'); el.innerHTML = state.log.map(l=>`<div>${l}</div>`).join(''); el.scrollTop = el.scrollHeight;
 }
+function addFx(fx){ (state.fx ||= {})[state.log.length-1] = fx; }
 function snapAll(){
   const s = m=>({hp:m.hp, maxhp:m.maxhp, fainted:!!m.fainted, caught:!!m.caught, status:m.status||null});
   return {A:state.sideA.map(s), B:state.sideB.map(s)};
@@ -3911,13 +3914,15 @@ let msgQueue = [];
 let msgQueueDone = null;
 function showMsgBox(lines, onDone, startIdx){
   if(!lines || !lines.length){ if(onDone) onDone(); return; }
-  msgQueue = lines.map((t,k)=>({t, snap: startIdx!=null && state && state.snaps ? state.snaps[startIdx+k] : null}));
+  msgQueue = lines.map((t,k)=>({t, snap: startIdx!=null && state && state.snaps ? state.snaps[startIdx+k] : null,
+    fx: startIdx!=null && state && state.fx ? state.fx[startIdx+k] : null}));
   msgQueueDone = onDone || null;
   advanceMsgBox();
 }
+let msgBusy = false;   // an animation (ball throw) is playing; the text waits for it
 function advanceMsgBox(){
   const box = document.getElementById('msgBox');
-  if(!box) return;
+  if(!box || msgBusy) return;
   const cmd = document.getElementById('battleCmd');
   if(msgQueue.length===0){
     box.classList.add('hidden');
@@ -3929,12 +3934,46 @@ function advanceMsgBox(){
   const next = msgQueue.shift();
   document.getElementById('msgBoxText').innerHTML = next.t;
   if(next.snap) applySnap(next.snap);
+  if(next.fx) ballFx(next.fx);
   box.classList.remove('hidden');
   if(cmd) cmd.classList.add('hidden');
 }
+// The throw, as in Emerald: the ball arcs in from your side, the Pokémon is drawn in, the ball drops
+// and shakes (0-3 times), then clicks shut (caught) or bursts open (broke free).
+const BALL_SVG = (()=>{ const P = ['....KKKK....','..KKRRRRKK..','.KRRRRWWRRK.','.KRRRRRWRRK.','KRRRRRRRRRRK','KKKKKWWKKKKK','KWWWKWWKWWWK','KWWWWKKWWWWK','.KWWWWWWWWK.','.KWWWWWWWWK.','..KKWWWWKK..','....KKKK....'], C = {K:'#202020', R:'#e83828', W:'#f8f8f8'};
+  let r = ''; P.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(C[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${C[ch]}"/>`; }));
+  return `<svg viewBox="0 0 12 12" shape-rendering="crispEdges">${r}</svg>`; })();
+function ballFx(fx){
+  const scene = document.querySelector('#battle .battle-scene'), ball = scene && scene.querySelector('.bs-ball');
+  if(fx.click){ if(ball){ sfx('caught'); ball.classList.add('shut'); } return; }
+  if(fx.pop){ if(ball) ball.remove(); const spr = document.getElementById('bs-'+fx.pop); sfx('pop');
+    if(spr){ spr.getAnimations().forEach(a=>a.cancel()); spr.animate([{transform:'scale(0)', filter:'brightness(3)'}, {transform:'scale(1)', filter:'none'}], {duration:250}); } return; }
+  const spr = document.getElementById('bs-'+fx.ball);
+  if(!scene || !spr || !spr.animate){ return; }
+  if(ball) ball.remove();
+  const sr = scene.getBoundingClientRect(), tr = spr.getBoundingClientRect(), b = document.createElement('div');
+  const size = Math.max(12, Math.round(sr.width/18)), tx = tr.left - sr.left + tr.width/2 - size/2, ty = tr.top - sr.top + tr.height*0.45 - size/2, ground = tr.bottom - sr.top - size*1.2;
+  b.className = 'bs-ball'; b.innerHTML = BALL_SVG; b.style.cssText = `width:${size}px; height:${size}px; left:${tx}px; top:${ty}px`;
+  scene.appendChild(b);
+  msgBusy = true; sfx('throw');
+  const sx = sr.width*0.12 - tx, sy = sr.height*0.9 - ty, peak = Math.min(sy, 0) - sr.height*0.25, wait = ms=>new Promise(r=>setTimeout(r, ms));
+  (async()=>{
+    await b.animate([{transform:`translate(${sx}px,${sy}px) rotate(0)`}, {transform:`translate(${sx*0.45}px,${peak}px) rotate(-360deg)`}, {transform:'translate(0,0) rotate(-720deg)'}], {duration:550, easing:'linear'}).finished;
+    sfx('ball');
+    await spr.animate([{transform:'scale(1)', filter:'none'}, {transform:'scale(.9)', filter:'sepia(1) saturate(6) hue-rotate(-30deg) brightness(1.6)', offset:.4}, {transform:'scale(0)', filter:'sepia(1) saturate(6) hue-rotate(-30deg) brightness(1.6)'}], {duration:400, fill:'forwards'}).finished;
+    const dy = ground - ty;
+    await b.animate([{transform:'translate(0,0)'}, {transform:`translate(0,${dy}px)`, offset:.6}, {transform:`translate(0,${dy-size*0.6}px)`, offset:.8}, {transform:`translate(0,${dy}px)`}], {duration:450, easing:'ease-in', fill:'forwards'}).finished;
+    b.style.top = ground+'px'; b.getAnimations().forEach(a=>a.cancel());
+    for(let i=0; i<fx.shakes; i++){
+      await wait(350); sfx('shake');
+      await b.animate([{transform:'rotate(0)'}, {transform:'rotate(-25deg)'}, {transform:'rotate(0)'}, {transform:'rotate(25deg)'}, {transform:'rotate(0)'}], {duration:450, easing:'ease-in-out'}).finished;
+    }
+    await wait(fx.shakes===3 ? 250 : 450);
+  })().catch(()=>{}).finally(()=>{ msgBusy = false; if(b.isConnected) advanceMsgBox(); });
+}
 function alive(side){ return side.filter(m=>!m.fainted && !m.caught); }
 // Once its battle is over, a caught Pokémon is just a party (or Box) member.
-function clearCaught(){ if(adv) for(const m of [...adv.party, ...adv.box]) if(m) delete m.caught; }
+function clearCaught(){ document.querySelectorAll(".bs-ball").forEach(b=>b.remove()); if(adv) for(const m of [...adv.party, ...adv.box]) if(m) delete m.caught; }
 
 function renamePartyMon(i){
   const m = adv.party[i];
@@ -4003,6 +4042,7 @@ function render(snap){
   for(const [key, player] of [['A',true],['B',false]]){
     const side = (key==='A'?state.sideA:state.sideB).slice(0, snap[key].length);
     const sz = spriteSize(side.length, player);
+    if(key==='A'){ const bl = document.querySelector('#battle .bs-ball'); if(bl) bl.remove(); }
     document.getElementById('field'+key).innerHTML = side.map((m,i)=>
       `<div class="bmon" id="bs-${key}${i}" style="--sz:${sz}px"><img src="${spritePath(m.dex, player?'back':'front')}" alt="${dname(m)}" onerror="this.parentNode.classList.add('missing')"><span class="ph">❔</span></div>`).join('');
     const hud = document.getElementById('hud'+key);
@@ -4242,10 +4282,13 @@ function submitTurn(){
       const hpFrac = act.target.hp/act.target.maxhp;
       const statusBonus = act.target.status ? 1.5 : 1;
       const chance = Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus;
-      addLog(`${dname(act.user)} threw a Poké Ball at ${dname(act.target)}!`);
-      if(Math.random() < chance){
+      let shakes = 0; while(shakes<3 && Math.random() < Math.pow(chance, 1/3)) shakes++;
+      addLog(`${adv.playerName} used POKé BALL!`);
+      addFx({ball:'B'+state.sideB.indexOf(act.target), shakes});
+      if(shakes===3){
         act.target.caught = true;
         addLog(`Gotcha! ${dname(act.target)} was caught!`);
+        addFx({click:true});
         nickQueue.push(act.target);
         if(markOwned(act.target)){ addLog(`${act.target.name.toUpperCase()}'s data was added to the POKéDEX.`); (adv.dexNew ||= []).push(act.target.name); }
         if(adv.party.length < partyCap()) adv.party.push(act.target);
@@ -4253,6 +4296,7 @@ function submitTurn(){
         saveAdv();
       } else {
         addLog(`Oh no! The wild ${dname(act.target)} broke free!`);
+        addFx({pop:'B'+state.sideB.indexOf(act.target)});
       }
       continue;
     }

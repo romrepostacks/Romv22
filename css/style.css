@@ -1019,3 +1019,9 @@ body:has(#adv:not(.hidden)){background:#141418;}
 /* EXP bar under your Pokémon's HP (battle HUD). */
 .hb-xp{height:4px; margin:2px 3px 0 22px; background:#404850; border-radius:2px; overflow:hidden;}
 .hb-xp i{display:block; height:100%; background:linear-gradient(#78d0f8,#3898d8);}
+
+/* Poké Ball throw (#8). */
+.battle-scene{position:relative;}
+.bs-ball{position:absolute; z-index:5; pointer-events:none; transform-origin:50% 90%;}
+.bs-ball svg{display:block; width:100%; height:100%;}
+.bs-ball.shut{filter:brightness(.6);}

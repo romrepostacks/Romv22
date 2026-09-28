@@ -3,6 +3,16 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.3",
+      "date": "2026-09-27",
+      "title": "Poké Ball Throw",
+      "changes": [
+        "Throwing a Poké Ball is now animated: it arcs in, draws the Pokémon inside, and shakes up to three times",
+        "A click means it's caught; if it bursts open, the Pokémon broke free",
+        "Catch odds are unchanged"
+      ]
+    },
+    {
       "version": "0.11.2",
       "date": "2026-09-27",
       "title": "Learning New Moves",
