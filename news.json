@@ -3,6 +3,16 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.5",
+      "date": "2026-09-27",
+      "title": "Attack Animations",
+      "changes": [
+        "Every attack now has a pixel-art effect for its type: flames, bubbles, leaves, lightning, ice, rocks and more",
+        "Physical moves lunge at the target; special moves fire a stream across the field",
+        "HP bars drain when the hit lands, not before"
+      ]
+    },
+    {
       "version": "0.11.4",
       "date": "2026-09-27",
       "title": "Cleaner Battles",

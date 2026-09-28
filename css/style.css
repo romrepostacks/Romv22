@@ -1028,3 +1028,6 @@ body:has(#adv:not(.hidden)){background:#141418;}
 
 /* One of your Pokémon on screen at a time (#13). */
 .bs-field.player .bmon:not(.focus){display:none;}
+
+/* Attack animation particles (#7). */
+.fx-p{position:absolute; z-index:6; pointer-events:none; image-rendering:pixelated;}

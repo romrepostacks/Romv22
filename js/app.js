@@ -2491,7 +2491,7 @@ const SFX = {
   select:[[1318,.045]], open:[[880,.035],[1318,.05]], bump:[[98,.09,'triangle',.2]],
   jump:[[523,.05],[784,.07]], ball:[[1046,.04,'triangle',.12]],
   throw:[[880,.05,'triangle',.1],[660,.05,'triangle',.1],[440,.08,'triangle',.1]], shake:[[196,.06,'triangle',.25]],
-  pop:[[1318,.04],[880,.06]], caught:[[1046,.06],[0,.03],[1046,.06],[1568,.2,'triangle',.1]], save:[[784,.1],[988,.1],[1175,.1],[1568,.25]],
+  pop:[[1318,.04],[880,.06]], hit:[[220,.05,'square',.08],[110,.08,'triangle',.2]], caught:[[1046,.06],[0,.03],[1046,.06],[1568,.2,'triangle',.1]], save:[[784,.1],[988,.1],[1175,.1],[1568,.25]],
   pcOn:[[660,.05],[990,.05],[1320,.07]], pcOff:[[1320,.05],[990,.05],[660,.07]], pcLogin:[[990,.04],[1320,.06]],
   spot:[[1568,.05],[2093,.1]], obtain:[[784,.12],[784,.06],[784,.06],[1046,.3],[0,.05],[988,.12],[1175,.35,'triangle',.08]], door:[[392,.05,'triangle',.12],[294,.08,'triangle',.12]],
   heal:[[523,.16],[659,.16],[784,.16],[1046,.32],[0,.08],[880,.16],[988,.16],[1046,.16],[1318,.6,'triangle',.1]]};
@@ -2617,7 +2617,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.4-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.5-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3933,8 +3933,8 @@ function advanceMsgBox(){
   }
   const next = msgQueue.shift();
   document.getElementById('msgBoxText').innerHTML = next.t;
-  if(next.snap) applySnap(next.snap);
-  if(next.fx) ballFx(next.fx);
+  if(next.fx && next.fx.atk){ if(next.snap) setFocusA(next.snap.F); atkFx(next.fx, ()=>{ if(next.snap) applySnap(next.snap); }); }
+  else { if(next.snap) applySnap(next.snap); if(next.fx) ballFx(next.fx); }
   box.classList.remove('hidden');
   if(cmd) cmd.classList.add('hidden');
 }
@@ -3951,7 +3951,8 @@ function ballFx(fx){
   const spr = document.getElementById('bs-'+fx.ball);
   if(!scene || !spr || !spr.animate){ return; }
   if(ball) ball.remove();
-  const sr = scene.getBoundingClientRect(), tr = spr.getBoundingClientRect(), b = document.createElement('div');
+  const k = scene.getBoundingClientRect().width/scene.offsetWidth || 1, s0 = scene.getBoundingClientRect(), t0 = spr.getBoundingClientRect(), b = document.createElement('div');
+  const sr = {left:s0.left, top:s0.top, width:scene.offsetWidth, height:scene.offsetHeight}, tr = {left:s0.left+(t0.left-s0.left)/k, top:s0.top+(t0.top-s0.top)/k, width:t0.width/k, height:t0.height/k, bottom:s0.top+(t0.bottom-s0.top)/k};
   const size = Math.max(12, Math.round(sr.width/18)), tx = tr.left - sr.left + tr.width/2 - size/2, ty = tr.top - sr.top + tr.height*0.45 - size/2, ground = tr.bottom - sr.top - size*1.2;
   b.className = 'bs-ball'; b.innerHTML = BALL_SVG; b.style.cssText = `width:${size}px; height:${size}px; left:${tx}px; top:${ty}px`;
   scene.appendChild(b);
@@ -3970,6 +3971,59 @@ function ballFx(fx){
     }
     await wait(fx.shakes===3 ? 250 : 450);
   })().catch(()=>{}).finally(()=>{ msgBusy = false; if(b.isConnected) advanceMsgBox(); });
+}
+function sideKey(m){ const i = state.sideA.indexOf(m); return i>=0 ? 'A'+i : 'B'+state.sideB.indexOf(m); }
+// Attack animations by type: [colour, colour, particle shape, motion]. Physical moves lunge first;
+// special moves send a stream from the attacker; then the type's burst plays on the target.
+const ATK_FX = {Normal:['#f8f8f8','#f8d848','star','burst'], Fire:['#f86820','#f8d030','flame','rise'], Water:['#58a8f8','#d0f0ff','bubble','burst'],
+  Grass:['#58c030','#a8e060','leaf','spin'], Electric:['#f8e030','#ffffff','bolt','zap'], Ice:['#a8e8f8','#ffffff','shard','fall'],
+  Fighting:['#f8a040','#c03028','star','burst'], Poison:['#a040a0','#d880d8','bubble','rise'], Ground:['#c8a048','#886830','sq','fall'],
+  Flying:['#e0e8f8','#ffffff','shard','spin'], Psychic:['#f85888','#f8b8d0','ring','ring'], Bug:['#a8b820','#d8e070','sq','burst'],
+  Rock:['#b8a038','#786830','sq','fall'], Ghost:['#705898','#b8a0e0','bubble','rise'], Dragon:['#7038f8','#f86050','shard','spin'],
+  Dark:['#504038','#201818','sq','burst'], Steel:['#b8b8d0','#ffffff','star','burst'], Fairy:['#f8a0e0','#ffffff','star','spin']};
+const FX_CLIP = {star:'polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)', flame:'polygon(50% 0,80% 45%,100% 100%,0 100%,20% 45%)',
+  leaf:'polygon(0 100%,20% 30%,100% 0,80% 70%)', bolt:'polygon(40% 0,100% 0,60% 40%,90% 40%,20% 100%,40% 55%,10% 55%)',
+  shard:'polygon(50% 0,100% 50%,50% 100%,0 50%)'};
+function atkFx(fx, done){
+  const scene = document.querySelector('#battle .battle-scene'), from = document.getElementById('bs-'+fx.from), to = document.getElementById('bs-'+fx.to);
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!scene || !from || !to || !to.animate || reduce || !to.offsetWidth) return done();
+  const [c1, c2, shape, motion] = ATK_FX[fx.atk] || ATK_FX.Normal, sr = scene.getBoundingClientRect();
+  const k = sr.width/scene.offsetWidth || 1;   // the handheld may scale the screen
+  const mid = el=>{ const r = (el.querySelector("img") || el).getBoundingClientRect(); return [(r.left - sr.left + r.width/2)/k, (r.top - sr.top + r.height*0.55)/k, r.width/k]; };
+  const [fx0, fy0] = mid(from), [tx, ty, tw] = mid(to), px = Math.max(8, Math.round(scene.offsetWidth/28)), rnd = (a,b)=>a + Math.random()*(b-a);
+  const wait = ms=>new Promise(r=>setTimeout(r, ms)), anims = [];
+  const spawn = (x, y, kf, dur, delay, col, sz=px)=>{
+    const p = document.createElement('div'); p.className = 'fx-p';
+    p.style.cssText = `left:${x-sz/2}px; top:${y-sz/2}px; width:${sz}px; height:${sz}px; background:${shape==='ring'||shape==='bubble' ? 'transparent' : col};`
+      + (FX_CLIP[shape] ? `clip-path:${FX_CLIP[shape]};` : '') + (shape==='ring'||shape==='bubble' ? `border:${Math.max(1, sz/5)}px solid ${col}; border-radius:50%;` : '');
+    scene.appendChild(p);
+    const a = p.animate(kf, {duration:dur, delay, easing:'ease-out', fill:'both'}); a.finished.then(()=>p.remove(), ()=>p.remove()); anims.push(a.finished.catch(()=>{}));
+  };
+  msgBusy = true;
+  (async()=>{
+    if(fx.cat==='phys'){
+      const dx = (tx-fx0)*0.18, dy = (ty-fy0)*0.18;
+      await from.animate([{transform:'translate(0,0)'}, {transform:`translate(${dx}px,${dy}px)`}, {transform:'translate(0,0)'}], {duration:260, easing:'ease-in-out'}).finished;
+    } else {
+      for(let i=0; i<6; i++) spawn(fx0, fy0, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(${tx-fx0}px,${ty-fy0}px) scale(1)`, opacity:1}], 320, i*45, i%2 ? c2 : c1);
+      await wait(320 + 5*45);
+    }
+    sfx('hit');
+    const N = motion==='ring' ? 3 : 10, R = tw*0.45;
+    for(let i=0; i<N; i++){
+      const col = i%2 ? c2 : c1, a = i/N*Math.PI*2, d = i*25;
+      const x = tx + rnd(-R*0.6, R*0.6), y = ty + rnd(-R*0.6, R*0.6);
+      if(motion==='burst') spawn(tx, ty, [{transform:'translate(0,0) scale(.5)', opacity:1}, {transform:`translate(${Math.cos(a)*R}px,${Math.sin(a)*R}px) scale(1.2) rotate(90deg)`, opacity:0}], 420, d/2, col);
+      if(motion==='rise') spawn(x, ty + R*0.6, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(0,${-R*1.2}px) scale(1.2)`, opacity:0}], 480, d, col, px*1.3);
+      if(motion==='fall') spawn(x, ty - R*1.3, [{transform:'translate(0,0)', opacity:1}, {transform:`translate(0,${R*1.3}px) rotate(180deg)`, opacity:1, offset:.8}, {transform:`translate(0,${R*1.3}px)`, opacity:0}], 450, d, col, px*1.2);
+      if(motion==='spin') spawn(tx, ty, [0,.25,.5,.75,1].map(k=>({transform:`translate(${Math.cos(a+k*4)*R*(0.3+k*0.7)}px,${Math.sin(a+k*4)*R*(0.3+k*0.7)}px) rotate(${k*360}deg)`, opacity:1-k*0.8})), 520, 0, col);
+      if(motion==='zap') spawn(x, y, [{opacity:0, transform:'scale(.6)'}, {opacity:1, transform:'scale(1.6)', offset:.3}, {opacity:0, transform:'scale(1.2)'}], 260, d*1.5, col, px*2);
+      if(motion==='ring') spawn(tx, ty, [{transform:'scale(.3)', opacity:1}, {transform:'scale(6)', opacity:0}], 520, i*150, col, px*2);
+    }
+    to.animate([{filter:'none'}, {filter:`drop-shadow(0 0 0 ${c1}) brightness(1.8)`}, {filter:'none'}], {duration:300, delay:120});
+    await Promise.all(anims);
+  })().catch(()=>{}).finally(()=>{ msgBusy = false; done(); });
 }
 function alive(side){ return side.filter(m=>!m.fainted && !m.caught); }
 // Once its battle is over, a caught Pokémon is just a party (or Box) member.
@@ -4335,6 +4389,7 @@ function submitTurn(){
     act.target.hp = Math.max(0, act.target.hp - dmg);
     let tag = r.eff===0?' (no effect)':r.eff>1?' (super effective!)':r.eff<1?' (not very effective)':'';
     addLog(`${dname(act.user)} used ${act.move.n} on ${dname(act.target)} for ${dmg}${tag}`);
+    addFx({atk:act.move.t, cat:act.move.c, from:sideKey(act.user), to:sideKey(act.target)});
     if(act.move.sec) applyStatus(act.target, act.move.sec.status, act.move.sec.chance);
     if(act.target.hp<=0 && !act.target.fainted){ act.target.fainted=true; addLog(`${dname(act.target)} fainted!`); }
   }
