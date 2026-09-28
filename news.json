@@ -3,6 +3,16 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.7",
+      "date": "2026-09-28",
+      "title": "Weather Amount",
+      "changes": [
+        "OPTION > WEATHER now has OFF, LOW, MED and HIGH. LOW is the default and the look you had before",
+        "MED and HIGH add more rain, snow, ash and bubbles",
+        "OFF still keeps puddles, snow on the ground and ash on the grass"
+      ]
+    },
+    {
       "version": "0.14.6",
       "date": "2026-09-28",
       "title": "Weather Option",
