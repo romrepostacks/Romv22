@@ -2617,7 +2617,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.5-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.6-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3973,57 +3973,336 @@ function ballFx(fx){
   })().catch(()=>{}).finally(()=>{ msgBusy = false; if(b.isConnected) advanceMsgBox(); });
 }
 function sideKey(m){ const i = state.sideA.indexOf(m); return i>=0 ? 'A'+i : 'B'+state.sideB.indexOf(m); }
-// Attack animations by type: [colour, colour, particle shape, motion]. Physical moves lunge first;
-// special moves send a stream from the attacker; then the type's burst plays on the target.
-const ATK_FX = {Normal:['#f8f8f8','#f8d848','star','burst'], Fire:['#f86820','#f8d030','flame','rise'], Water:['#58a8f8','#d0f0ff','bubble','burst'],
-  Grass:['#58c030','#a8e060','leaf','spin'], Electric:['#f8e030','#ffffff','bolt','zap'], Ice:['#a8e8f8','#ffffff','shard','fall'],
-  Fighting:['#f8a040','#c03028','star','burst'], Poison:['#a040a0','#d880d8','bubble','rise'], Ground:['#c8a048','#886830','sq','fall'],
-  Flying:['#e0e8f8','#ffffff','shard','spin'], Psychic:['#f85888','#f8b8d0','ring','ring'], Bug:['#a8b820','#d8e070','sq','burst'],
-  Rock:['#b8a038','#786830','sq','fall'], Ghost:['#705898','#b8a0e0','bubble','rise'], Dragon:['#7038f8','#f86050','shard','spin'],
-  Dark:['#504038','#201818','sq','burst'], Steel:['#b8b8d0','#ffffff','star','burst'], Fairy:['#f8a0e0','#ffffff','star','spin']};
-const FX_CLIP = {star:'polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)', flame:'polygon(50% 0,80% 45%,100% 100%,0 100%,20% 45%)',
-  leaf:'polygon(0 100%,20% 30%,100% 0,80% 70%)', bolt:'polygon(40% 0,100% 0,60% 40%,90% 40%,20% 100%,40% 55%,10% 55%)',
-  shard:'polygon(50% 0,100% 50%,50% 100%,0 50%)'};
+// ---------- Move animations (#7): one for every move, inspired by its name ----------
+// Each move has a short script of steps (MOVE_FX, else the keyword rules in MFX_RULES), written as
+// "kind:shape*count flags #colour/#colour" joined by "+", e.g. Fire Fang = "jaws+rise:flame*6".
+// Flags: ^ from above, x criss-cross, ! big, ~ spinning, @ arcing. Colours default to the move's type.
+const TYPE_COL = {Normal:['#f8f8f8','#f8d848'], Fire:['#f86820','#f8d030'], Water:['#3890f8','#b8e8ff'], Grass:['#48b828','#a8e060'],
+  Electric:['#f8d818','#fff8a0'], Ice:['#88d8f8','#ffffff'], Fighting:['#e87838','#c03028'], Poison:['#a040a0','#d880d8'],
+  Ground:['#c8a048','#886830'], Flying:['#d8e8f8','#ffffff'], Psychic:['#f85888','#f8b8d0'], Bug:['#a8b820','#d8e070'],
+  Rock:['#b8a038','#786830'], Ghost:['#705898','#b8a0e0'], Dragon:['#7038f8','#f86050'], Dark:['#504038','#a09080'],
+  Steel:['#b8b8d0','#ffffff'], Fairy:['#f8a0e0','#ffffff']};
+// Pixel sprites: K outline, W white, A/B the step's two colours.
+const PIX = {
+  hit:['..A..','.ABA.','ABWBA','.ABA.','..A..'],
+  star:['...A...','...A...','..ABA..','AABWBAA','..ABA..','...A...','...A...'],
+  flame:['...A...','..AA...','..AAA..','.AABA..','.ABBAA.','AABWBAA','ABBWWBA','ABWWWBA','.AAAAA.'],
+  drop:['..A..','..A..','.AAA.','AABAA','AAWAA','AAAAA','.AAA.'],
+  bubble:['..AAA..','.A..WA.','A....WA','A.....A','A.....A','.A...A.','..AAA..'],
+  blob:['.AAA.','AABAA','AAAAA','AAAAA','.AAA.'],
+  orb:['..AAAA..','.ABBBBA.','ABBWWBBA','ABBWBBBA','ABBBBBBA','ABBBBBBA','.ABBBBA.','..AAAA..'],
+  leaf:['....AA.','..AAAB.','.AABBA.','AABAA..','ABAA...','AA.....','A......'],
+  petal:['.A.A.','AABAA','AAAAA','.AAA.','..A..'],
+  shard:['..W..','.WAB.','.AAB.','AAABB','.AAB.','.AB..','..B..'],
+  rock:['..KKK..','.KAAAK.','KAABAAK','KAAAABK','KABAAAK','.KKKKK.'],
+  bolt:['..AAAA','.AAAA.','.AAA..','AAAAAA','...AA.','..AA..','..A...','.A....','A.....'],
+  note:['..AA.','..A.A','..A..','..A..','.AA..','AAA..','.A...'],
+  snow:['A.A.A','.AWA.','AWWWA','.AWA.','A.A.A'],
+  seed:['.A.','AAA','ABA','.A.'],
+  needle:['KK......','KAAKK...','KAAAAAKK','KAAKK...','KK......'],
+  horn:['KKK.......','KAAKKK....','KAAAAAKKK.','KAAAAAAAAK','KAAAAAKKK.','KAAKKK....','KKK.......'],
+  fist:['..KKKKK...','.KAAKAAKK.','KAAAKAAKAK','KAAAAAAKAK','KAAAAAAAAK','KBAAAAAAAK','.KBBAAAAK.','..KKKKKK..'],
+  palm:['.K.K.K....','KAKAKAK...','KAKAKAK.K.','KAKAKAKKAK','KAAAAAAKAK','KAAAAAAAK.','KBAAAAAAK.','.KBBAAAK..','..KKKKK...'],
+  boot:['...KKKK...','...KAAK...','...KAAK...','...KAAK...','...KAAKK..','..KAAAAAK.','.KAAAAAAAK','KBBBBBBBBK','KKKKKKKKKK'],
+  jawTop:['KKKKKKKKKKKKKKKK','KAAAAAAAAAAAAAAK','KBAAAAAAAAAAAABK','.KAAK.KAAK.KAAK.','..KK...KK...KK..'],
+  jawBot:['..KK...KK...KK..','.KAAK.KAAK.KAAK.','KBAAAAAAAAAAAABK','KAAAAAAAAAAAAAAK','KKKKKKKKKKKKKKKK'],
+  bone:['.AA.....AA.','AAAAAAAAAAA','AAAAAAAAAAA','.AA.....AA.'],
+  hammer:['KKKKKKKKK','KAAAAAAAK','KABBBBBAK','KAAAAAAAK','KKKKBKKKK','....B....','....B....','....B....'],
+  heart:['.AA.AA.','AWAAAAA','AAAAAAA','.AAAAA.','..AAA..','...A...'],
+  wisp:['...A..','..AA..','.AABA.','AABWBA','ABWWBA','.ABBA.','..AA..'],
+  moon:['..AAA..','.AAA...','AAA....','AAA....','AAA....','.AAA...','..AAA..'],
+  z:['AAAA','..A.','.A..','AAAA'],
+  blade:['.......A','.....AAB','...AABB.','.AABB...','AABB....','.A......'],
+  web:['A...A...A','.A..A..A.','..AAAAA..','AAA.A.AAA','..AAAAA..','.A..A..A.','A...A...A'],
+  gear:['..AAA..','.ABBBA.','ABBABBA','ABA.ABA','ABBABBA','.ABBBA.','..AAA..'],
+  egg:['..AA..','.AAAA.','AABAAA','AAAAAA','AAAABA','.AAAA.'],
+  eye:['..KKKKK..','.KWWWWWK.','KWWAAAWWK','KWWAKAWWK','.KWWWWWK.','..KKKKK..'],
+};
+const pixCache = {};
+function pixSvg(name, a, b){
+  const key = name+a+b; if(pixCache[key]) return pixCache[key];
+  const P = PIX[name] || PIX.hit, C = {K:'#202020', W:'#ffffff', A:a, B:b};
+  let r = ''; P.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(C[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${C[ch]}"/>`; }));
+  return pixCache[key] = `<svg viewBox="0 0 ${P[0].length} ${P.length}" shape-rendering="crispEdges" width="100%" height="100%">${r}</svg>`;
+}
+// Keyword rules, first match wins (MOVE_FX below covers the rest and the special cases).
+const MFX_RULES = [
+  [/Fang|Bite|Crunch|Clamp|Vise Grip/, 'jaws+EL'],
+  [/Punch|Fists|Uppercut|Hammer Arm/, 'impact:fist+EL'],
+  [/Kick/, 'impact:boot+EL'],
+  [/Slap|Pound|Palm|Arm Thrust|Smelling Salts/, 'impact:palm'],
+  [/Claw|Slash|Scratch|Swipe|Scissor|Chop|Sword|Blade|Cutter|Razor Shell|False Swipe/, 'slash*3+EL'],
+  [/Horn|Peck|Sting|Jab|Needle|Drill|Beak|Pluck/, 'impact:horn+EL'],
+  [/Beam|Laser|Cannon/, 'gather:hit*8+beam'],
+  [/Ball$|Bomb|Sphere|Puff|Orb/, 'projectile:orb!@'],
+  [/Thrower|Gun$|Pump|Spray|Breath|Incinerate|Scald|Belch/, 'stream:drop*16'],
+  [/Voice|Round|Snore|Uproar|Boomburst|Echoed|Buzz|Chatter|Whistle|Aria|Clanging|Snarl|Sing/, 'notes:note*6+rings'],
+  [/Wrap|Bind|Constrict|Shackle|Web/, 'bind'],
+  [/Whip|Lash|Tail|Lick/, 'whip+EL'],
+  [/Quake|Bulldoze|Tantrum|Horsepower|Land.s Wrath/, 'quake+rise:rock*6'],
+  [/Powder|Spore/, 'powder:blob*18'],
+  [/Drain|Absorb|Leech/, 'drain:orb*8'],
+  [/Pulse/, 'rings*3'],
+  [/Wind|Gust/, 'vortex:blade*10'],
+];
+// Extra flourish for an elemental version of a physical move (Fire Fang, Ice Punch, Poison Tail...).
+const MFX_EL = {Fire:'rise:flame*7', Ice:'burst:snow*8', Electric:'bolt*2', Poison:'rise:bubble*6', Psychic:'ringin*2', Water:'burst:drop*8',
+  Grass:'burst:leaf*6', Ghost:'rise:wisp*5', Dark:'burst:hit*6 #504038/#a09080', Dragon:'burst:shard*8', Steel:'burst:star*6', Fairy:'burst:heart*6',
+  Bug:'burst:hit*6', Rock:'burst:rock*6', Ground:'burst:rock*6', Flying:'burst:blade*6', Fighting:'', Normal:''};
+const MOVE_FX = {
+  // Normal
+  'Tackle':'rush', 'Take Down':'rush!', 'Double-Edge':'rush!+flash', 'Body Slam':'rush^!', 'Slam':'whip!', 'Quick Attack':'rush:hit*6~', 'Extreme Speed':'rush:hit*10!',
+  'Skull Bash':'gather:hit*6+rush!', 'Headbutt':'rush', 'Head Charge':'rush!+burst:hit*8', 'Giga Impact':'gather:hit*10+rush!+flash', 'Rapid Spin':'rush~',
+  'Fury Attack':'impact:horn*3', 'Rage':'thrash+burst:hit*6 #f84040/#f8a0a0', 'Wrap':'bind', 'Bind':'bind', 'Constrict':'bind', 'Glare':'impact:eye!+flash #f8d018/#fff',
+  'Feint':'rush', 'Fake Out':'impact:palm*2', 'Swift':'projectile:star*5~', 'Fury Swipes':'slash*3', 'Crush Claw':'slash*3!', 'Chip Away':'rush+burst:hit*6',
+  'Horn Attack':'impact:horn', 'Thrash':'thrash', 'Sing':'notes:note*8', 'Double Slap':'impact:palm*2', 'Round':'notes:note*6', 'Hyper Voice':'rings*4!',
+  'Hyper Fang':'jaws!', 'Tri Attack':'projectile:orb*3 #f86820/#f8d030+bolt+burst:snow*6', 'Pay Day':'projectile:orb*5~ #f8c828/#fff0a0', 'Covet':'rush+burst:heart*5 #f8a0e0/#fff',
+  'Retaliate':'rush!', 'Strength':'rush!+quake', 'Self-Destruct':'self', 'Stomp':'impact:boot^', 'Spike Cannon':'projectile:needle*5', 'Barrage':'projectile:orb*3@',
+  'Egg Bomb':'projectile:egg!@ #f8f0d8/#f8d848+burst:hit*10', 'Mega Kick':'impact:boot!', 'Comet Punch':'impact:fist*3', 'Mega Punch':'impact:fist!', 'Dizzy Punch':'impact:fist+ringin*2 #f8d848/#fff',
+  'Razor Wind':'gather:blade*6+projectile:blade*4', 'Lovely Kiss':'projectile:heart*3@ #f85888/#fff', 'Hyper Beam':'gather:hit*10+beam!+flash',
+  'Last Resort':'rush!+burst:star*8', 'Snore':'notes:z*5', 'Echoed Voice':'rings*3+rings*3', 'Hidden Power':'gather:orb*8+burst:orb*8', 'Weather Ball':'projectile:orb!@ #f8f8f8/#88c8f8',
+  'Facade':'rush+burst:star*6', 'Secret Power':'rush+burst:hit*8', 'Rock Climb':'rush^', 'Tail Slap':'whip*2', 'Techno Blast':'gather:gear*6+beam!', 'Multi-Attack':'rush!+burst:star*10',
+  'Revelation Dance':'vortex:star*10+burst:hit*6', 'Judgment':'rain:orb*8!+flash', 'Boomburst':'rings*5!+flash', 'Uproar':'notes:note*8+rings*3', 'Cut':'slash*1', 'Slash':'slash*1!',
+  'Scratch':'slash*3', 'Double Hit':'rush+rush', 'Vise Grip':'jaws #c8c8d0/#888898', 'Smelling Salts':'impact:palm+burst:hit*6', 'Pound':'impact:palm', 'False Swipe':'slash*1',
+  // Fire
+  'Ember':'projectile:flame*3', 'Flamethrower':'stream:flame*24', 'Flame Burst':'projectile:orb! #f86820/#f8d030+burst:flame*10', 'Fire Spin':'vortex:flame*14',
+  'Inferno':'vortex:flame*16!+rise:flame*8', 'Flare Blitz':'rush:flame*10!+burst:flame*10', 'Heat Wave':'stream:flame*14+rings*2', 'Fire Blast':'projectile:flame!+burst:flame*14!',
+  'Will-O-Wisp':'projectile:wisp*3@ #5890f8/#b8d8ff', 'Flame Wheel':'rush:flame*10~', 'Flame Charge':'rush:flame*8', 'Lava Plume':'rise:flame*12+rain:rock*4 #f86820/#883010',
+  'Burn Up':'rise:flame*14!+flash', 'Eruption':'rise:flame*12!+rain:rock*6 #f86820/#883010', 'Incinerate':'stream:flame*18', 'Sacred Fire':'vortex:flame*12 #f8d030/#f86820+rise:flame*8',
+  'Mystical Fire':'projectile:flame*4~ #f85888/#f8d030', 'Searing Shot':'projectile:orb! #f86820/#f8d030+burst:flame*12', 'Overheat':'gather:flame*8+stream:flame*20!',
+  'Magma Storm':'vortex:flame*18!', 'Shell Trap':'self+burst:flame*10', 'Fire Lash':'whip #f86820/#f8d030+rise:flame*5', 'Fiery Dance':'vortex:flame*10+rise:flame*6',
+  'Fusion Flare':'gather:flame*8+projectile:orb! #f8f8f8/#f86820+burst:flame*12!', 'Blue Flare':'stream:flame*20! #3868f8/#a8d8ff+rise:flame*8 #3868f8/#a8d8ff',
+  'Fire Fang':'jaws+rise:flame*7', 'Blaze Kick':'impact:boot+rise:flame*7', 'Fire Punch':'impact:fist+rise:flame*7',
+  // Water
+  'Water Gun':'stream:drop*14', 'Bubble':'projectile:bubble*6@', 'Bubble Beam':'stream:bubble*18', 'Water Pulse':'projectile:orb! #3890f8/#b8e8ff+rings*3',
+  'Aqua Tail':'whip+burst:drop*8', 'Hydro Pump':'stream:drop*28!', 'Brine':'rain:drop*10+burst:drop*6', 'Aqua Jet':'rush:drop*8', 'Dive':'vanish:down+rise:drop*8',
+  'Clamp':'jaws #b0a0d0/#f8f8f8', 'Razor Shell':'slash*2x', 'Whirlpool':'vortex:drop*16', 'Crabhammer':'impact:hammer! #f86040/#f8c0a0+burst:drop*6',
+  'Waterfall':'rush^+rain:drop*12', 'Muddy Water':'stream:blob*18 #886830/#c8a048', 'Octazooka':'projectile:blob*3 #302838/#605868+powder:blob*10 #302838/#605868',
+  'Water Spout':'rise:drop*10+rain:drop*14!', 'Origin Pulse':'rings*5!+rain:drop*10', 'Scald':'stream:drop*18+rise:bubble*6 #f8f8f8/#f8f8f8',
+  'Steam Eruption':'rise:bubble*14! #f8f8f8/#d8e8f8+burst:drop*8', 'Water Shuriken':'projectile:star*3~ #3890f8/#b8e8ff', 'Sparkling Aria':'notes:note*6+projectile:bubble*8@',
+  'Liquidation':'rush+burst:drop*12',
+  // Grass
+  'Vine Whip':'whip*2', 'Razor Leaf':'projectile:leaf*5~', 'Seed Bomb':'projectile:seed*3!@+burst:hit*8', 'Solar Beam':'gather:hit*12 #f8f070/#fff+beam! #f8f070/#fff',
+  'Petal Dance':'vortex:petal*16 #f890c0/#fff', 'Petal Blizzard':'vortex:petal*22! #f890c0/#fff', 'Sleep Powder':'powder:blob*18 #58c058/#b8f0a8', 'Stun Spore':'powder:blob*18 #f8d018/#fff8a0',
+  'Absorb':'drain:orb*5', 'Mega Drain':'drain:orb*8', 'Giga Drain':'drain:orb*12!', 'Spore':'powder:blob*22 #b89060/#e8d0a8', 'Leaf Tornado':'vortex:leaf*14',
+  'Leaf Storm':'vortex:leaf*20!', 'Leaf Blade':'slash*1!+burst:leaf*6', 'Mud Bomb':'projectile:blob!@ #886830/#c8a048+burst:blob*8 #886830/#c8a048',
+  'Sand Tomb':'vortex:blob*18 #d8c078/#f0e0a8', 'Dig':'vanish:down+rise:rock*6', 'Earthquake':'quake!+rise:rock*8', 'Earth Power':'quake+rise:flame*8 #c8a048/#f8d030',
+  'Drill Run':'rush~+impact:horn', 'Mud-Slap':'projectile:blob*4 #886830/#c8a048', 'Mud Shot':'projectile:blob*4 #886830/#c8a048', 'Bulldoze':'quake+rise:rock*4',
+  'Stomping Tantrum':'impact:boot*2^+quake', 'Bullet Seed':'projectile:seed*6', 'Wood Hammer':'impact:hammer! #a06830/#d0a060', 'Bone Club':'impact:bone',
+  'Bonemerang':'projectile:bone*2~@', 'Bone Rush':'impact:bone*3', 'Power Whip':'whip*2!', 'Magical Leaf':'projectile:leaf*4~@', 'Energy Ball':'projectile:orb!',
+  'High Horsepower':'impact:boot*2^+quake', 'Grass Whistle':'notes:note*8', 'Needle Arm':'impact:needle*3', 'Seed Flare':'gather:seed*8+rise:hit*12!+flash',
+  'Horn Leech':'impact:horn+drain:orb*6', 'Leafage':'projectile:leaf*2', 'Solar Blade':'gather:hit*10 #f8f070/#fff+slash*1! #f8f070/#fff', 'Trop Kick':'impact:boot+burst:petal*6 #f890c0/#fff',
+  "Land’s Wrath":'quake!+rise:rock*10', 'Precipice Blades':'quake!+rise:shard*10 #c83020/#f88060',
+  // Electric
+  'Thunder Shock':'bolt', 'Thunder Wave':'rings*3+bolt', 'Spark':'rush+bolt', 'Nuzzle':'rush+bolt', 'Discharge':'burst:bolt*10!+bolt*2', 'Thunderbolt':'bolt*3',
+  'Wild Charge':'rush:bolt*6!+bolt*2', 'Thunder':'bolt!+flash', 'Charge Beam':'gather:bolt*6+beam', 'Zap Cannon':'gather:bolt*6+projectile:orb!+bolt*3',
+  'Shock Wave':'rings*3+bolt', 'Volt Switch':'projectile:orb!+bolt*2', 'Electroweb':'projectile:web!@+bind', 'Fusion Bolt':'rush:bolt*8!+bolt*3', 'Bolt Strike':'rush:bolt*10!+bolt!+flash',
+  'Parabolic Charge':'bolt*2+drain:bolt*6', 'Zing Zap':'rush+bolt*3', 'Plasma Fists':'impact:fist*2+bolt*2', 'Thunder Fang':'jaws+bolt*2', 'Thunder Punch':'impact:fist+bolt*2',
+  // Ice
+  'Icy Wind':'stream:snow*18', 'Ice Shard':'projectile:shard*3', 'Aurora Beam':'beam #88f8c8/#f8a0e0', 'Ice Beam':'gather:snow*6+beam', 'Icicle Spear':'projectile:shard*5',
+  'Icicle Crash':'rain:shard*8!', 'Avalanche':'rain:rock*8! #e8f8ff/#a8d8f8', 'Blizzard':'stream:snow*28!', 'Powder Snow':'stream:snow*14', 'Freeze-Dry':'rings*2+burst:snow*10',
+  'Frost Breath':'stream:snow*16', 'Ice Ball':'projectile:orb!~ #d8f0ff/#88d8f8', 'Glaciate':'rain:shard*12!+burst:snow*10', 'Ice Hammer':'impact:hammer! #88d8f8/#ffffff',
+  'Ice Fang':'jaws+burst:snow*8', 'Ice Punch':'impact:fist+burst:snow*8',
+  // Fighting
+  'Double Kick':'impact:boot*2', 'Triple Kick':'impact:boot*3', 'Jump Kick':'impact:boot^', 'High Jump Kick':'impact:boot!^', 'Rolling Kick':'impact:boot~', 'Low Sweep':'impact:boot',
+  'Superpower':'gather:hit*8+rush!', 'Close Combat':'impact:fist*2+impact:boot*2', 'Submission':'rush~+flip', 'Circle Throw':'rush+flip', 'Vital Throw':'rush+flip', 'Storm Throw':'rush!+flip',
+  'Karate Chop':'slash*1', 'Cross Chop':'slash*2x!', 'Dynamic Punch':'impact:fist!+burst:hit*12!', 'Revenge':'rush!+burst:hit*6 #f84040/#f8a0a0', 'Brick Break':'impact:palm!+burst:rock*6',
+  'Vacuum Wave':'projectile:orb! #d8e8f8/#fff', 'Aura Sphere':'gather:orb*6 #3868f8/#a8d8ff+projectile:orb! #3868f8/#a8d8ff', 'Focus Blast':'gather:hit*8+projectile:orb!',
+  'Focus Punch':'gather:hit*8+impact:fist!', 'Mach Punch':'impact:fist', 'Sky Uppercut':'impact:fist!', 'Hammer Arm':'impact:fist!+quake', 'Drain Punch':'impact:fist+drain:orb*6',
+  'Force Palm':'impact:palm+rings', 'Arm Thrust':'impact:palm*3', 'Wake-Up Slap':'impact:palm*2', 'Power-Up Punch':'impact:fist+gather:star*6', 'Rock Smash':'impact:fist+burst:rock*8',
+  'Flying Press':'vanish:up+impact:boot^!', 'Sacred Sword':'slash*1!', 'Bullet Punch':'impact:fist*2', 'Double Iron Bash':'impact:fist*2!+burst:star*6',
+  // Poison
+  'Poison Powder':'powder:blob*18', 'Poison Sting':'projectile:needle', 'Venoshock':'stream:drop*12+rise:bubble*6', 'Poison Jab':'impact:horn+rise:bubble*6', 'Acid':'projectile:drop*4@',
+  'Acid Spray':'stream:drop*14', 'Belch':'stream:blob*16', 'Gunk Shot':'projectile:blob!@+burst:blob*10', 'Poison Fang':'jaws+rise:bubble*6', 'Toxic':'rise:bubble*14',
+  'Cross Poison':'slash*2x', 'Poison Gas':'powder:blob*20', 'Sludge':'projectile:blob*2@+burst:bubble*6', 'Sludge Bomb':'projectile:blob!@+burst:bubble*10', 'Sludge Wave':'rings*3!+rise:bubble*10',
+  'Smog':'stream:blob*14 #807088/#b0a0b8', 'Clear Smog':'stream:blob*14 #d8d0e0/#f8f8f8', 'Poison Tail':'whip+rise:bubble*5',
+  // Flying
+  'Wing Attack':'impact:blade*2 #f8f8f8/#c8d0e0', 'Air Slash':'projectile:blade*3', 'Gust':'vortex:blade*10', 'Hurricane':'vortex:blade*20!', 'Peck':'impact:horn', 'Aerial Ace':'rush+slash*1',
+  'Drill Peck':'impact:horn~', 'Pluck':'impact:horn*2', 'Air Cutter':'projectile:blade*4', 'Brave Bird':'rush:blade*8!+flash', 'Acrobatics':'rush~+rush', 'Bounce':'vanish:up+impact:hit^!',
+  'Fly':'vanish:up+impact:hit^!', 'Sky Drop':'vanish:up+rain:hit*4!', 'Sky Attack':'gather:hit*10+rush:blade*10!+flash', 'Chatter':'notes:note*8', 'Aeroblast':'gather:blade*6+beam! #d8e8f8/#f8a0c0',
+  'Oblivion Wing':'beam #f83850/#f8a0a8+drain:orb*8 #f83850/#f8a0a8', 'Beak Blast':'gather:flame*6+impact:horn!', 'Steel Wing':'impact:blade*2 #b8b8d0/#fff',
+  // Psychic
+  'Confusion':'ringin*2', 'Psybeam':'beam #f85888/#88c8f8', 'Stored Power':'gather:orb*8+ringin*2', 'Extrasensory':'impact:eye!+ringin*2', 'Zen Headbutt':'rush+ringin', 'Psychic':'ringin*3!+flash',
+  'Hypnosis':'ringin*4 #c858f8/#f8b8f8', 'Psycho Cut':'projectile:blade*2', 'Future Sight':'gather:orb*6+rain:orb!', 'Synchronoise':'rings*4', 'Psyshock':'projectile:shard*5',
+  'Dream Eater':'drain:orb*10 #c858f8/#f8b8f8', 'Heart Stamp':'impact:heart!', 'Psystrike':'rain:shard*10!', 'Mist Ball':'projectile:orb! #f8b8d0/#fff+powder:blob*12 #f8f8f8/#f8b8d0',
+  'Luster Purge':'projectile:orb! #f8d848/#fff+flash', 'Psycho Boost':'gather:orb*10+burst:orb*10!+flash', 'Hyperspace Hole':'ringin*3 #504070/#b8a0e0+burst:star*6', 'Psychic Fangs':'jaws+ringin*2',
+  'Photon Geyser':'gather:hit*8+rise:hit*14!+flash', 'Prismatic Laser':'gather:star*8+beam! #f8f8f8/#88c8f8+flash',
+  // Bug
+  'Bug Bite':'jaws', 'Silver Wind':'stream:blob*16 #c8c8d8/#f8f8f8', 'Bug Buzz':'rings*4', 'Twineedle':'projectile:needle*2', 'Pin Missile':'projectile:needle*5', 'Fell Stinger':'impact:needle!',
+  'Fury Cutter':'slash*2', 'Megahorn':'impact:horn!', 'Leech Life':'impact:horn+drain:orb*6 #f83850/#f8a0a8', 'X-Scissor':'slash*2x', 'Signal Beam':'beam #f85888/#58c8f8', 'Steamroller':'rush~!',
+  'U-turn':'rush+rush', 'Struggle Bug':'burst:hit*10', 'Infestation':'vortex:blob*16', 'Attack Order':'rain:hit*12', 'Lunge':'rush!', 'First Impression':'rush!+flash', 'Pollen Puff':'projectile:orb!@ #f8d848/#fff+burst:blob*10 #f8d848/#fff',
+  // Rock
+  'Rollout':'rush~', 'Power Gem':'projectile:shard*4 #f83850/#f8a0a8', 'Rock Throw':'projectile:rock*2@', 'Smack Down':'projectile:rock!', 'Rock Blast':'projectile:rock*4',
+  'Stone Edge':'rise:shard*8! #b8a038/#e8d898', 'Rock Tomb':'rain:rock*6', 'Rock Slide':'rain:rock*10!', 'Ancient Power':'rise:rock*6+projectile:rock*3', 'Head Smash':'rush!+burst:rock*10+flash',
+  'Rock Wrecker':'projectile:rock!+burst:rock*12!', 'Diamond Storm':'rain:shard*12! #f8f8f8/#a8e8f8', 'Accelerock':'rush:rock*6',
+  // Ghost
+  'Shadow Claw':'slash*3', 'Lick':'whip #f890b0/#f8c8d8', 'Astonish':'impact:eye!', 'Hex':'rise:wisp*8', 'Shadow Ball':'projectile:orb!', 'Shadow Punch':'impact:fist+rise:wisp*4',
+  'Shadow Sneak':'vanish:down+impact:hit', 'Phantom Force':'vanish:fade+burst:wisp*8', 'Shadow Force':'vanish:fade+burst:wisp*12!+flash', 'Ominous Wind':'vortex:wisp*12', 'Spirit Shackle':'projectile:needle!+bind',
+  'Moongeist Beam':'gather:moon*4+beam! #705898/#f8f0a0', 'Spectral Thief':'vanish:fade+drain:orb*8',
+  // Dragon
+  'Dragon Claw':'slash*3', 'Twister':'vortex:blade*14', 'Outrage':'thrash!+burst:flame*8 #7038f8/#f86050', 'Dragon Breath':'stream:flame*18', 'Dual Chop':'slash*2',
+  'Dragon Pulse':'projectile:orb*2!+rings*2', 'Dragon Tail':'whip!', 'Dragon Rush':'rush:flame*10!+burst:shard*8', 'Roar of Time':'rings*5!+flash', 'Spacial Rend':'slash*2x!+flash',
+  'Clanging Scales':'rings*4+burst:shard*8',
+  // Dark
+  'Bite':'jaws', 'Crunch':'jaws*2!', 'Pursuit':'rush', 'Assurance':'rush+burst:hit*6', 'Sucker Punch':'vanish:fade+impact:fist', 'Payback':'rush+burst:hit*8',
+  'Feint Attack':'vanish:fade+rush', 'Night Slash':'slash*1!', 'Knock Off':'impact:palm+burst:star*5', 'Dark Pulse':'rings*4', 'Snarl':'notes:note*5+rings*2', 'Thief':'rush+drain:star*4 #f8d848/#fff',
+  'Foul Play':'vanish:fade+rush!', 'Night Daze':'rings*4!+flash', 'Power Trip':'gather:star*6+rush', 'Dark Void':'ringin*4', 'Darkest Lariat':'rush~!', 'Throat Chop':'slash*1',
+  'Brutal Swing':'rush~+burst:hit*8',
+  // Steel
+  'Flash Cannon':'gather:star*6+beam!', 'Meteor Mash':'rain:rock*3! #b8b8d0/#f8f8f8+impact:fist', 'Iron Tail':'whip!', 'Metal Claw':'slash*3', 'Iron Head':'rush!', 'Magnet Bomb':'projectile:orb*3@',
+  'Mirror Shot':'flash+beam', 'Gear Grind':'projectile:gear*2~', 'Doom Desire':'gather:star*8+rain:orb!+flash', 'Anchor Shot':'projectile:hammer!+bind', 'Sunsteel Strike':'gather:hit*8 #f8d848/#fff+rush!+flash',
+  // Fairy
+  'Disarming Voice':'notes:heart*6+rings*2', 'Moonblast':'gather:moon*4+projectile:moon!', 'Play Rough':'thrash+burst:heart*8+burst:star*6', 'Draining Kiss':'impact:heart+drain:heart*6',
+  'Fairy Wind':'stream:heart*12', 'Dazzling Gleam':'burst:star*14!+flash', 'Fleur Cannon':'gather:petal*8+beam!',
+};
+function mfxScript(mv){
+  let s = MOVE_FX[mv.n];
+  if(s==null){ const r = MFX_RULES.find(([re])=>re.test(mv.n)); s = r ? r[1] : ''; }
+  if(!s) s = mv.c==='phys' ? 'rush+burst:hit*6' : 'projectile:orb!+burst:hit*8';
+  return s.replace('+EL', MFX_EL[mv.t] ? '+'+MFX_EL[mv.t] : '');
+}
+function mfxParse(s, type){
+  return s.split('+').map(step=>{
+    const [head, cols] = step.trim().split(/\s+/), m = head.match(/^(\w+)(?::(\w+))?(?:\*(\d+))?([\^x!~@]*)$/) || [];
+    const col = cols ? cols.split('/') : (TYPE_COL[type] || TYPE_COL.Normal);
+    return {kind:m[1], shape:m[2], n:+m[3] || 1, above:/\^/.test(m[4]), cross:/x/.test(m[4]), big:/!/.test(m[4]), spin:/~/.test(m[4]), arc:/@/.test(m[4]), c1:col[0], c2:col[1], custom:!!cols};
+  });
+}
 function atkFx(fx, done){
   const scene = document.querySelector('#battle .battle-scene'), from = document.getElementById('bs-'+fx.from), to = document.getElementById('bs-'+fx.to);
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(!scene || !from || !to || !to.animate || reduce || !to.offsetWidth) return done();
-  const [c1, c2, shape, motion] = ATK_FX[fx.atk] || ATK_FX.Normal, sr = scene.getBoundingClientRect();
-  const k = sr.width/scene.offsetWidth || 1;   // the handheld may scale the screen
-  const mid = el=>{ const r = (el.querySelector("img") || el).getBoundingClientRect(); return [(r.left - sr.left + r.width/2)/k, (r.top - sr.top + r.height*0.55)/k, r.width/k]; };
-  const [fx0, fy0] = mid(from), [tx, ty, tw] = mid(to), px = Math.max(8, Math.round(scene.offsetWidth/28)), rnd = (a,b)=>a + Math.random()*(b-a);
-  const wait = ms=>new Promise(r=>setTimeout(r, ms)), anims = [];
-  const spawn = (x, y, kf, dur, delay, col, sz=px)=>{
-    const p = document.createElement('div'); p.className = 'fx-p';
-    p.style.cssText = `left:${x-sz/2}px; top:${y-sz/2}px; width:${sz}px; height:${sz}px; background:${shape==='ring'||shape==='bubble' ? 'transparent' : col};`
-      + (FX_CLIP[shape] ? `clip-path:${FX_CLIP[shape]};` : '') + (shape==='ring'||shape==='bubble' ? `border:${Math.max(1, sz/5)}px solid ${col}; border-radius:50%;` : '');
+  const mv = MOVEDATA.find(m=>m.n===fx.mv);
+  if(!scene || !from || !to || !to.animate || reduce || !to.offsetWidth || !mv) return done();
+  const sr = scene.getBoundingClientRect(), k = sr.width/scene.offsetWidth || 1;   // the handheld may scale the screen
+  const box = el=>{ const r = (el.querySelector('img') || el).getBoundingClientRect(); return {x:(r.left-sr.left+r.width/2)/k, y:(r.top-sr.top+r.height*0.55)/k, w:r.width/k, h:r.height/k}; };
+  const A = box(from), T = box(to), u = Math.max(8, Math.round(scene.offsetWidth/28)), flip = T.x < A.x, all = [];
+  const wait = ms=>new Promise(r=>setTimeout(r, ms)), rnd = (a,b)=>a + Math.random()*(b-a);
+  const track = a=>{ const f = a.finished.catch(()=>{}); all.push(f); return f; };
+  // One pixel sprite (or a plain ring), animated by keyframes; removed when done.
+  const put = (st, shape, x, y, size, kf, dur, delay=0, ease='ease-out')=>{
+    const p = document.createElement('div'), P = PIX[shape], h = P ? size*P.length/P[0].length : size;
+    p.className = 'fx-p'; p.style.cssText = `left:${x-size/2}px; top:${y-h/2}px; width:${size}px; height:${h}px;`;
+    if(P){ p.innerHTML = pixSvg(shape, st.c1, st.c2); if(flip && /fist|palm|boot|horn|needle|blade/.test(shape)) p.firstChild.style.transform = 'scaleX(-1)'; }
+    else p.style.cssText += `border:${Math.max(2, Math.round(size/10))}px solid ${st.c1}; border-radius:50%;`;
     scene.appendChild(p);
-    const a = p.animate(kf, {duration:dur, delay, easing:'ease-out', fill:'both'}); a.finished.then(()=>p.remove(), ()=>p.remove()); anims.push(a.finished.catch(()=>{}));
+    const a = p.animate(kf, {duration:dur, delay, easing:ease, fill:'both'}); a.finished.catch(()=>{}).then(()=>p.remove());
+    return track(a);
+  };
+  // A bar from (x1,y1) to (x2,y2): slashes, beams, whips, binds.
+  const bar = (x1, y1, x2, y2, thick, bg, kf, dur, delay=0)=>{
+    const len = Math.hypot(x2-x1, y2-y1), ang = Math.atan2(y2-y1, x2-x1)*180/Math.PI, p = document.createElement('div');
+    p.className = 'fx-p'; p.style.cssText = `left:${x1}px; top:${y1-thick/2}px; width:${len}px; height:${thick}px; background:${bg}; transform-origin:0 50%; box-shadow:0 0 0 1px #0003;`;
+    scene.appendChild(p);
+    const a = p.animate(kf.map(f=>({...f, transform:`rotate(${ang}deg) ${f.transform||''}`})), {duration:dur, delay, easing:'ease-out', fill:'both'}); a.finished.catch(()=>{}).then(()=>p.remove());
+    return track(a);
+  };
+  const sparks = (st, x, y, n=5)=>{ for(let i=0;i<n;i++){ const a = i/n*Math.PI*2, r = u*1.6;
+    put(st, 'hit', x, y, u, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(${Math.cos(a)*r}px,${Math.sin(a)*r}px) scale(1)`, opacity:0}], 260); } };
+  const K = {
+    rush: async st=>{ const dx = (T.x-A.x)*(st.big?0.62:0.5), dy = (T.y-A.y)*(st.big?0.62:0.5) - (st.above ? T.h*0.4 : 0), d = st.spin ? ' rotate(720deg)' : '';
+      if(st.shape) for(let i=0;i<st.n;i++){ const f = (i+1)/(st.n+1); put(st, st.shape, A.x+dx*f, A.y+dy*f, u*1.2, [{opacity:0}, {opacity:1, offset:.3}, {opacity:0, transform:'scale(1.4)'}], 380, i*25); }
+      await from.animate([{transform:'none'}, {transform:`translate(${dx}px,${dy}px)${d}`, offset:.55}, {transform:'none'}], {duration:st.big ? 520 : 420, easing:'ease-in-out'}).finished;
+      sparks(st, T.x, T.y, st.big ? 8 : 5); await wait(120); },
+    jaws: async st=>{ const w = T.w*(st.big?0.95:0.75), off = T.h*0.45, cl = st.custom ? st : {c1:'#ffffff', c2:'#c8c8d8'};
+      for(let i=0;i<st.n;i++){
+        const kf = s=>[{transform:`translateY(${s*off}px)`, opacity:0}, {transform:`translateY(${s*off}px)`, opacity:1, offset:.3}, {transform:'translateY(0)', opacity:1, offset:.65}, {transform:'translateY(0)', opacity:0}];
+        put(cl, 'jawTop', T.x, T.y-w*0.16, w, kf(-1), 480, 0, 'ease-in'); await put(cl, 'jawBot', T.x, T.y+w*0.16, w, kf(1), 480, 0, 'ease-in');
+        to.animate([{transform:'translateX(0)'}, {transform:`translateX(${u/3}px)`}, {transform:`translateX(${-u/3}px)`}, {transform:'translateX(0)'}], {duration:200}); }
+      sparks(st, T.x, T.y); },
+    slash: async st=>{ const L = T.w*(st.big?0.9:0.7), col = st.c1==='#f8f8f8' ? '#ffffff' : st.c1;
+      for(let i=0;i<st.n;i++){ const o = st.cross ? 0 : (i-(st.n-1)/2)*u*1.1, back = st.cross && i%2;
+        bar(T.x-L/2+o+(back?L:0), T.y-L/2, T.x+L/2+o-(back?L:0), T.y+L/2, Math.max(3, u/3), `linear-gradient(${col}, #ffffff, ${col})`,
+          [{transform:'scaleX(0)', opacity:1}, {transform:'scaleX(1)', opacity:1, offset:.45}, {transform:'scaleX(1)', opacity:0}], 320, i*110); }
+      await wait(320 + st.n*110); sparks(st, T.x, T.y, 4); },
+    impact: async st=>{ const sz = T.w*(st.big?0.6:0.45), cl = /fist|palm|boot/.test(st.shape) && !st.custom ? {c1:'#f8f8f8', c2:'#c8c8d8'} : st;
+      for(let i=0;i<st.n;i++){ const ox = st.n>1 ? (i%2 ? 1 : -1)*T.w*0.14 : 0, oy = st.n>1 ? (i-(st.n-1)/2)*T.h*0.14 : 0;
+        const start = st.above ? `translate(0,${-T.h*0.9}px)` : `scale(2.2)${st.spin ? ' rotate(-360deg)' : ''}`;
+        await put(cl, st.shape||'hit', T.x+ox, T.y+oy, sz, [{transform:start, opacity:0}, {transform:'none', opacity:1, offset:.6}, {transform:'scale(.9)', opacity:0}], 300, 0, 'ease-in');
+        sparks(st, T.x+ox, T.y+oy, 4); } },
+    projectile: async st=>{ const sz = u*(st.big ? 2.4 : 1.3);
+      for(let i=0;i<st.n;i++){ const jx = st.n>1 ? rnd(-.25,.25)*T.w : 0, jy = st.n>1 ? rnd(-.2,.2)*T.h : 0, ex = T.x-A.x+jx, ey = T.y-A.y+jy, r = st.spin ? 540 : 0;
+        put(st, st.shape||'orb', A.x, A.y, sz, [{transform:'translate(0,0) rotate(0)', opacity:1}, {transform:`translate(${ex/2}px,${ey/2-(st.arc ? T.h*0.6 : 0)}px) rotate(${r/2}deg)`, opacity:1}, {transform:`translate(${ex}px,${ey}px) rotate(${r}deg)`, opacity:1}], 420, i*110, 'linear'); }
+      await wait(420 + (st.n-1)*110); sparks(st, T.x, T.y, st.big ? 8 : 5); },
+    stream: async st=>{ const n = st.n, sz = u*(st.big ? 1.8 : 1.3);
+      for(let i=0;i<n;i++){ const ex = T.x-A.x+rnd(-.15,.15)*T.w, ey = T.y-A.y+rnd(-.15,.15)*T.h, wob = rnd(-1,1)*u;
+        put(st, st.shape||'drop', A.x, A.y, sz, [{transform:'translate(0,0) scale(.4)', opacity:1}, {transform:`translate(${ex/2+wob}px,${ey/2-wob}px) scale(.9)`, opacity:1}, {transform:`translate(${ex}px,${ey}px) scale(1.4)`, opacity:.15}], 360, i*38, 'linear'); }
+      await wait(360 + n*38); },
+    beam: async st=>{ const th = u*(st.big ? 1.7 : 1);
+      bar(A.x, A.y, T.x, T.y, th, `linear-gradient(${st.c1}, ${st.c2}, #ffffff, ${st.c2}, ${st.c1})`,
+        [{transform:'scaleX(0)', opacity:1}, {transform:'scaleX(1)', offset:.3, opacity:1}, {transform:'scaleX(1) scaleY(1.4)', offset:.5, opacity:1}, {transform:'scaleX(1) scaleY(.8)', offset:.75, opacity:1}, {transform:'scaleX(1) scaleY(.1)', opacity:0}], 700);
+      await wait(260); sparks(st, T.x, T.y, 8); await wait(440); },
+    gather: async st=>{ for(let i=0;i<st.n;i++){ const a = i/st.n*Math.PI*2, r = A.w*0.7;
+        put(st, st.shape||'hit', A.x+Math.cos(a)*r, A.y+Math.sin(a)*r, u, [{transform:'translate(0,0)', opacity:0}, {opacity:1, offset:.3}, {transform:`translate(${-Math.cos(a)*r}px,${-Math.sin(a)*r}px) scale(.4)`, opacity:1}], 420, i*30, 'ease-in'); }
+      await wait(420 + st.n*30); },
+    rain: async st=>{ const sz = u*(st.big ? 1.9 : 1.4);
+      for(let i=0;i<st.n;i++){ const x = T.x + (st.n>1 ? rnd(-.5,.5)*T.w : 0), h = T.h*1.1;
+        put(st, st.shape||'rock', x, T.y-h, sz, [{transform:'translateY(0)', opacity:1}, {transform:`translateY(${h}px) rotate(${st.spin?360:0}deg)`, opacity:1, offset:.8}, {transform:`translateY(${h}px)`, opacity:0}], 420, i*80, 'ease-in'); }
+      await wait(420 + st.n*80); sparks(st, T.x, T.y); },
+    rise: async st=>{ const sz = u*(st.big ? 1.9 : 1.4);
+      for(let i=0;i<st.n;i++) put(st, st.shape||'flame', T.x + rnd(-.45,.45)*T.w, T.y+T.h*0.4, sz, [{transform:'translateY(0) scale(.6)', opacity:1}, {transform:`translateY(${-T.h*0.9}px) scale(1.2)`, opacity:0}], 520, i*55);
+      await wait(520 + st.n*55); },
+    burst: async st=>{ const R = T.w*(st.big ? 0.6 : 0.45);
+      for(let i=0;i<st.n;i++){ const a = i/st.n*Math.PI*2;
+        put(st, st.shape||'hit', T.x, T.y, u*(st.big ? 1.6 : 1.2), [{transform:'translate(0,0) scale(.5)', opacity:1}, {transform:`translate(${Math.cos(a)*R}px,${Math.sin(a)*R}px) scale(1.2) rotate(90deg)`, opacity:0}], 460, i*18); }
+      await wait(460 + st.n*18); },
+    vortex: async st=>{ const R = T.w*(st.big ? 0.6 : 0.45);
+      for(let i=0;i<st.n;i++){ const a0 = i/st.n*Math.PI*2;
+        put(st, st.shape||'blade', T.x, T.y, u*1.2, [0,.2,.4,.6,.8,1].map(f=>({transform:`translate(${Math.cos(a0+f*9)*R*(1-f*0.4)}px,${Math.sin(a0+f*9)*R*0.5 - f*T.h*0.5 + T.h*0.25}px) rotate(${f*540}deg)`, opacity:f<0.8 ? 1 : 0})), 800, i*20, 'linear'); }
+      await wait(800 + st.n*20); },
+    rings: async st=>{ const d = Math.hypot(T.x-A.x, T.y-A.y);
+      for(let i=0;i<st.n;i++) put(st, 'ring', A.x, A.y, u*2, [{transform:'scale(.3)', opacity:1}, {transform:`scale(${d/u})`, opacity:0}], 600, i*140);
+      await wait(600 + (st.n-1)*140); },
+    ringin: async st=>{ for(let i=0;i<st.n;i++) put(st, 'ring', T.x, T.y, T.w*(st.big ? 1.6 : 1.2), [{transform:'scale(1)', opacity:0}, {transform:'scale(.7)', opacity:1, offset:.4}, {transform:'scale(.1)', opacity:0}], 520, i*160);
+      to.animate([{filter:'none'}, {filter:`drop-shadow(0 0 3px ${st.c1}) hue-rotate(60deg)`}, {filter:'none'}], {duration:520 + st.n*160});
+      await wait(520 + (st.n-1)*160); },
+    notes: async st=>{ for(let i=0;i<st.n;i++){ const ex = T.x-A.x+rnd(-.3,.3)*T.w, ey = T.y-A.y+rnd(-.3,.3)*T.h;
+        put(st, st.shape||'note', A.x, A.y-A.h*0.2, u*1.3, [0,.25,.5,.75,1].map(f=>({transform:`translate(${ex*f}px,${ey*f + Math.sin(f*Math.PI*3)*u}px)`, opacity:f<0.9 ? 1 : 0})), 700, i*110, 'linear'); }
+      await wait(700 + (st.n-1)*110); },
+    bind: async st=>{ const L = T.w*0.9;
+      for(let i=0;i<3;i++){ const y = T.y + (i-1)*T.h*0.22;
+        bar(T.x-L/2, y, T.x+L/2, y, Math.max(3, u/2.5), `linear-gradient(${st.c1}, ${st.c2}, ${st.c1})`, [{transform:'scaleX(0)'}, {transform:'scaleX(1)', offset:.3}, {transform:'scaleX(.85) translateX(7%)', offset:.55}, {transform:'scaleX(1)', offset:.75}, {transform:'scaleX(.85) translateX(7%)', opacity:0}], 700, i*60); }
+      to.animate([{transform:'scaleX(1)'}, {transform:'scaleX(.88)', offset:.5}, {transform:'scaleX(1)'}], {duration:700, iterations:1});
+      await wait(820); },
+    whip: async st=>{ const L = T.w*(st.big ? 1.1 : 0.9);
+      for(let i=0;i<st.n;i++){ const s = i%2 ? -1 : 1, px = T.x - s*L*0.55, py = T.y - T.h*0.5;
+        bar(px, py, px + s*L, py, Math.max(3, u/2.5), `linear-gradient(${st.c1}, ${st.c2})`, [{transform:`rotate(${-50*s}deg)`, opacity:1}, {transform:`rotate(${40*s}deg)`, opacity:1, offset:.6}, {transform:`rotate(${45*s}deg)`, opacity:0}], 360, i*200); }
+      await wait(260 + (st.n-1)*200); sparks(st, T.x, T.y, 4); await wait(120); },
+    bolt: async st=>{ const sz = T.w*(st.big ? 0.7 : 0.45);
+      for(let i=0;i<st.n;i++) put(st, 'bolt', T.x + (st.n>1 ? rnd(-.3,.3)*T.w : 0), T.y-T.h*0.25, sz, [{transform:`translateY(${-T.h*0.6}px) scaleY(.3)`, opacity:0}, {transform:'none', opacity:1, offset:.35}, {opacity:.2, offset:.55}, {opacity:1, offset:.75}, {opacity:0}], 380, i*120);
+      to.animate([{filter:'none'}, {filter:'brightness(2.2) sepia(1) saturate(4)'}, {filter:'none'}], {duration:300, delay:120});
+      await wait(380 + (st.n-1)*120); },
+    quake: async st=>{ const j = u*(st.big ? 0.6 : 0.4);
+      await scene.animate([0,1,2,3,4,5,6,7,8].map(i=>({transform:`translate(${i%2 ? j : -j}px,${i%3 ? j/2 : 0}px)`})).concat([{transform:'none'}]), {duration:520}).finished; },
+    drain: async st=>{ for(let i=0;i<st.n;i++){ const ex = A.x-T.x, ey = A.y-T.y, b = rnd(-1,1)*T.h*0.5;
+        put(st, st.shape||'orb', T.x, T.y, u, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(${ex/2}px,${ey/2+b}px) scale(1)`, opacity:1}, {transform:`translate(${ex}px,${ey}px) scale(.5)`, opacity:0}], 520, i*60, 'ease-in-out'); }
+      await wait(520 + st.n*60);
+      await from.animate([{filter:'none'}, {filter:'brightness(1.6)'}, {filter:'none'}], {duration:300}).finished; },
+    powder: async st=>{ for(let i=0;i<st.n;i++){ const x = T.x + rnd(-.5,.5)*T.w, y = T.y - T.h*0.6 + rnd(0,.3)*T.h, sw = rnd(-1,1)*u;
+        put(st, st.shape||'blob', x, y, u*0.7, [{transform:'translate(0,0)', opacity:0}, {transform:`translate(${sw}px,${T.h*0.3}px)`, opacity:1, offset:.4}, {transform:`translate(${-sw}px,${T.h*0.75}px)`, opacity:0}], 700, i*30, 'linear'); }
+      await wait(700 + st.n*30); },
+    thrash: async st=>{ const p = from.animate([0,1,2,3,4,5].map(i=>({transform:`translate(${(i%2 ? 1 : -1)*u*0.6}px,0)`})).concat([{transform:'none'}]), {duration:500});
+      for(let i=0;i<3;i++){ await wait(150); sparks(st, T.x + rnd(-.3,.3)*T.w, T.y + rnd(-.3,.3)*T.h, 4); }
+      await p.finished; },
+    flip: async ()=>{ await to.animate([{transform:'none'}, {transform:`translateY(${-T.h*0.3}px) rotate(180deg)`}, {transform:'rotate(360deg)'}], {duration:500, easing:'ease-in-out'}).finished; },
+    vanish: async st=>{ const dy = st.shape==='up' ? -A.h*1.5 : st.shape==='down' ? A.h*0.8 : 0;
+      await from.animate([{transform:'none', opacity:1}, {transform:`translateY(${dy}px)`, opacity:0}], {duration:320, fill:'forwards'}).finished;
+      await wait(250); from.getAnimations().forEach(a=>a.cancel());
+      from.animate([{opacity:0}, {opacity:1}], {duration:300}); },
+    self: async st=>{ for(let i=0;i<12;i++){ const a = i/12*Math.PI*2, R = A.w*0.7;
+        put(st, 'hit', A.x, A.y, u*1.8, [{transform:'scale(.5)', opacity:1}, {transform:`translate(${Math.cos(a)*R}px,${Math.sin(a)*R}px) scale(1.6)`, opacity:0}], 520, i*15); }
+      K.flash(st); await wait(560); },
+    flash: async st=>{ const f = document.createElement('div'); f.className = 'fx-p'; f.style.cssText = `inset:0; background:${st.c2 && st.c2!=='#ffffff' ? st.c2 : '#ffffff'};`;
+      scene.appendChild(f); await track(f.animate([{opacity:0}, {opacity:.75}, {opacity:0}], {duration:320})); f.remove(); },
   };
   msgBusy = true;
   (async()=>{
-    if(fx.cat==='phys'){
-      const dx = (tx-fx0)*0.18, dy = (ty-fy0)*0.18;
-      await from.animate([{transform:'translate(0,0)'}, {transform:`translate(${dx}px,${dy}px)`}, {transform:'translate(0,0)'}], {duration:260, easing:'ease-in-out'}).finished;
-    } else {
-      for(let i=0; i<6; i++) spawn(fx0, fy0, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(${tx-fx0}px,${ty-fy0}px) scale(1)`, opacity:1}], 320, i*45, i%2 ? c2 : c1);
-      await wait(320 + 5*45);
-    }
+    const steps = mfxParse(mfxScript(mv), mv.t);
+    if(mv.c==='phys' && /^(jaws|slash|impact|whip|bind)$/.test(steps[0].kind))   // a small lunge before a physical hit
+      await from.animate([{transform:'none'}, {transform:`translate(${(T.x-A.x)*0.12}px,${(T.y-A.y)*0.12}px)`}, {transform:'none'}], {duration:200}).finished;
+    for(const st of steps) if(K[st.kind]) await K[st.kind](st);
     sfx('hit');
-    const N = motion==='ring' ? 3 : 10, R = tw*0.45;
-    for(let i=0; i<N; i++){
-      const col = i%2 ? c2 : c1, a = i/N*Math.PI*2, d = i*25;
-      const x = tx + rnd(-R*0.6, R*0.6), y = ty + rnd(-R*0.6, R*0.6);
-      if(motion==='burst') spawn(tx, ty, [{transform:'translate(0,0) scale(.5)', opacity:1}, {transform:`translate(${Math.cos(a)*R}px,${Math.sin(a)*R}px) scale(1.2) rotate(90deg)`, opacity:0}], 420, d/2, col);
-      if(motion==='rise') spawn(x, ty + R*0.6, [{transform:'translate(0,0) scale(.6)', opacity:1}, {transform:`translate(0,${-R*1.2}px) scale(1.2)`, opacity:0}], 480, d, col, px*1.3);
-      if(motion==='fall') spawn(x, ty - R*1.3, [{transform:'translate(0,0)', opacity:1}, {transform:`translate(0,${R*1.3}px) rotate(180deg)`, opacity:1, offset:.8}, {transform:`translate(0,${R*1.3}px)`, opacity:0}], 450, d, col, px*1.2);
-      if(motion==='spin') spawn(tx, ty, [0,.25,.5,.75,1].map(k=>({transform:`translate(${Math.cos(a+k*4)*R*(0.3+k*0.7)}px,${Math.sin(a+k*4)*R*(0.3+k*0.7)}px) rotate(${k*360}deg)`, opacity:1-k*0.8})), 520, 0, col);
-      if(motion==='zap') spawn(x, y, [{opacity:0, transform:'scale(.6)'}, {opacity:1, transform:'scale(1.6)', offset:.3}, {opacity:0, transform:'scale(1.2)'}], 260, d*1.5, col, px*2);
-      if(motion==='ring') spawn(tx, ty, [{transform:'scale(.3)', opacity:1}, {transform:'scale(6)', opacity:0}], 520, i*150, col, px*2);
-    }
-    to.animate([{filter:'none'}, {filter:`drop-shadow(0 0 0 ${c1}) brightness(1.8)`}, {filter:'none'}], {duration:300, delay:120});
-    await Promise.all(anims);
-  })().catch(()=>{}).finally(()=>{ msgBusy = false; done(); });
+    await Promise.all(all);
+  })().catch(()=>{}).finally(()=>{ msgBusy = false; from.getAnimations().forEach(a=>a.cancel()); done(); });
 }
 function alive(side){ return side.filter(m=>!m.fainted && !m.caught); }
 // Once its battle is over, a caught Pokémon is just a party (or Box) member.
@@ -4370,7 +4649,11 @@ function submitTurn(){
     if(Math.random()*100 > act.move.a){ addLog(`${dname(act.user)} used ${act.move.n} — missed!`); continue; }
 
     if(act.move.c==='status'){
+      addLog(`${dname(act.user)} used ${act.move.n}!`);
+      addFx({atk:act.move.t, mv:act.move.n, from:sideKey(act.user), to:sideKey(act.target)});
+      const had = act.target.status;
       applyStatus(act.target, act.move.status, 100);
+      if(act.target.status===had) addLog('But it failed!');
       continue;
     }
 
@@ -4389,7 +4672,7 @@ function submitTurn(){
     act.target.hp = Math.max(0, act.target.hp - dmg);
     let tag = r.eff===0?' (no effect)':r.eff>1?' (super effective!)':r.eff<1?' (not very effective)':'';
     addLog(`${dname(act.user)} used ${act.move.n} on ${dname(act.target)} for ${dmg}${tag}`);
-    addFx({atk:act.move.t, cat:act.move.c, from:sideKey(act.user), to:sideKey(act.target)});
+    addFx({atk:act.move.t, mv:act.move.n, from:sideKey(act.user), to:sideKey(act.target)});
     if(act.move.sec) applyStatus(act.target, act.move.sec.status, act.move.sec.chance);
     if(act.target.hp<=0 && !act.target.fainted){ act.target.fainted=true; addLog(`${dname(act.target)} fainted!`); }
   }

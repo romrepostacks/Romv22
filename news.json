@@ -3,6 +3,19 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.6",
+      "date": "2026-09-27",
+      "title": "Every Move Animated",
+      "changes": [
+        "All 387 moves now have their own animation, based on the move's name",
+        "Bite snaps jaws shut, Flamethrower breathes a stream of fire, Bubble Beam fires a stream of bubbles",
+        "Punches, kicks and slaps land fists, boots and palms; claws and slashes leave marks",
+        "Rock Slide drops boulders, Earthquake shakes the screen, Fly takes off before it strikes, Sing sends music notes",
+        "Elemental moves add their element: Fire Fang bites then burns, Thunder Punch adds lightning",
+        "Status moves like Sleep Powder and Thunder Wave now show their own effect too"
+      ]
+    },
+    {
       "version": "0.11.5",
       "date": "2026-09-27",
       "title": "Attack Animations",
