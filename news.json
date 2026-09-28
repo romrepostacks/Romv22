@@ -1,7 +1,20 @@
 {
   "_howto": "Edit this file to change the title screen message (motd) or add a changelog entry. Newest entry first. Each entry: version, date (YYYY-MM-DD), title, changes (short bullet points, player-facing). The game fetches this file fresh on every launch.",
-  "motd": "Phase 4 is here: DIVE beneath the sea, explore the underwater world and find the Sunken Shrine!",
+  "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
+    {
+      "version": "0.14.0",
+      "date": "2026-09-28",
+      "title": "Phase 5: The Pokémon League",
+      "changes": [
+        "With all 8 badges, take Victory Road from Aeriepeak City. Ace Trainers train in its caves",
+        "The Pokémon League: beat the Elite Four (Morrow, Brakk, Ferrin and Aurelle) back to back, then face Champion Wren",
+        "Black out in the League and you start again from the first room",
+        "Become Champion to enter the Hall of Fame and see the credits",
+        "Music! An original chiptune soundtrack with themes for towns, routes, the sea, caves, the deep, battles, Gym Leaders, the Champion and legendaries",
+        "New OPTION: MUSIC volume (OFF, LOW, MID, HIGH)"
+      ]
+    },
     {
       "version": "0.13.0",
       "date": "2026-09-28",

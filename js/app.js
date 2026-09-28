@@ -903,7 +903,7 @@ const LOCATIONS=[
  {type:'trainer', kind:'rival', name:"Tempest Hideout", at:[7,-2], tier:19, desc:"A cave mouth hidden in the ridge, lit by TEAM TEMPEST lanterns. Wren waits at the back. \"You shouldn't have followed me here.\"", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow'], theme:'cave', grunts:4, pool:['Zubat','Golbat','Koffing','Geodude','Mightyena']},
  {type:'gym', name:"Rimefall Town", at:[6,-2], tier:20, desc:"Frost clings to every roof. Leader Hale's gym is a rink of solid ice.", center:true, leaderName:"Hale", leaderTeam:['Glalie','Piloswine','Dewgong','Walrein']},
  {type:'route', name:"Route 10: Skyreach Cliffs", at:[5,-2], tier:21, desc:"Wind howls along the cliff tops. Dragons are said to nest above the clouds.", pool:['Swablu','Bagon','Trapinch','Skarmory','Noctowl','Fearow'], theme:'rocky'},
- {type:'gym', name:"Aeriepeak City", at:[4,-2], tier:22, desc:"A city of towers above the clouds. Leader Corvin rules the skies with Dragon and Flying Pokémon.", center:true, leaderName:"Corvin", leaderTeam:['Altaria','Skarmory','Flygon','Salamence'], endOfContent:true},
+ {type:'gym', name:"Aeriepeak City", at:[4,-2], tier:22, desc:"A city of towers above the clouds. Leader Corvin rules the skies with Dragon and Flying Pokémon.", center:true, leaderName:"Corvin", leaderTeam:['Altaria','Skarmory','Flygon','Salamence']},
  // Side area: open sea east of Glimmer Coast, for SURF and fishing.
  {type:'route', name:"Glimmer Sea", at:[6,-1], tier:6, desc:"Calm, clear water dotted with sandbars. Something big swims below.", pool:['Wingull','Krabby'], water:['Tentacool','Horsea','Staryu','Wailmer','Mantine','Lapras'], theme:'sea'},
  // Beneath the sea (DIVE). `deep` areas are their own layer: reached by diving, linked to each other only,
@@ -913,7 +913,11 @@ const LOCATIONS=[
  {type:'route', name:"Glimmer Deep", at:[102,0], tier:21, deep:true, surface:27, theme:'deep', desc:"Clear water over pale sand. Old carved stones lie half-buried here.", pool:['Lanturn','Relicanth','Clamperl','Seadra','Frillish','Corsola']},
  {type:'trainer', kind:'boss', name:"Sunken Shrine", at:[102,-1], tier:23, deep:true, theme:'deep', boss:true, legend:'Lugia', grunts:3,
   desc:"The TIDEWARDENS' shrine, deep beneath the sea. TEAM TEMPEST's machines hum around a sleeping giant. \"You're too late. The song is almost complete!\"",
-  leaderName:"Admin Vesper", leaderTeam:['Sharpedo','Crobat','Mightyena','Weezing','Gyarados'], pool:['Lanturn','Relicanth','Seadra','Frillish']}
+  leaderName:"Admin Vesper", leaderTeam:['Sharpedo','Crobat','Mightyena','Weezing','Gyarados'], pool:['Lanturn','Relicanth','Seadra','Frillish']},
+ // Phase 5: the road to the Pokémon League (all 8 badges), the Elite Four and Champion Wren.
+ {type:'route', name:"Victory Road", at:[3,-2], tier:24, badges:8, aces:true, theme:'cave', desc:"A long cave where only the strongest trainers train. The Pokémon League lies beyond.", pool:['Golbat','Graveler','Onix','Hariyama','Lairon','Medicham','Sableye','Mawile']},
+ {type:'town', name:"Pokémon League", at:[2,-2], tier:25, center:true, league:true, champion:true, endOfContent:true,
+  desc:"The Pokémon League of Vellorin. Four elite trainers wait inside, and beyond them, the Champion.", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow','Gyarados']}
 ];
 // Story areas link in order; the way onward from a gym or rival stays shut until they're beaten.
 // Every link works both ways, so you can always walk back.
@@ -933,6 +937,7 @@ function linkAreas(i, j, gate){
 for(let i=0;i<13;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 for(const [i,j] of [[0,14],[1,15],[5,16],[6,17],[16,27]]) linkAreas(i, j, false);
 linkAreas(13, 18, false);
+linkAreas(26, 32, true); linkAreas(32, 33, false);
 linkAreas(28, 29, false); linkAreas(29, 30, false); linkAreas(30, 31, false);
 for(let i=18;i<26;i++) linkAreas(i, i+1, LOCATIONS[i].type==='gym' || LOCATIONS[i].type==='trainer');
 
@@ -1077,7 +1082,7 @@ function buildTown(loc){
   const house = (x,y)=>({kind:'house', x, y, w:4, h:3, door:{x:x+1,y:y+2}, roof:HOUSE_ROOFS[Math.floor(rnd()*4)], lines:HOUSE_LINES[Math.floor(rnd()*HOUSE_LINES.length)]});
   const b = [];
   if(loc.center) b.push({kind:'center', x:R(2,5), y:2+OY, w:5, h:4, door:{x:P(4),y:5+OY}});
-  if(loc.type==='gym') b.push({kind:'gym', x:R(10,6), y:2+OY, w:6, h:4, door:{x:P(12),y:5+OY}});
+  if(loc.type==='gym' || loc.league) b.push({kind:loc.league ? 'league' : 'gym', x:R(10,6), y:2+OY, w:6, h:4, door:{x:P(12),y:5+OY}});
   else b.push(house(R(10,4), 3+OY));
   if(loc.center) b.push({kind:'mart', x:R(17,4), y:3+OY, w:4, h:3, door:{x:P(18),y:5+OY}});
   else b.push(house(R(17,4), 3+OY));
@@ -1333,8 +1338,8 @@ function buildRoute(loc){
     npcs.push({kind, x:sp.x, y:sp.y, facing:'down', lines:ROUTE_TALK[kind] || TOWN_TALK[k % TOWN_TALK.length], home:{...sp}, wander:k%2===1});
   }
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
-  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER'], deep:['SWIMMER','SWIMMER','FISHERMAN']}[loc.theme||'plain'];
-  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass'};
+  const TR_CLASSES = loc.aces ? ['ACE TRAINER'] : {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER'], deep:['SWIMMER','SWIMMER','FISHERMAN']}[loc.theme||'plain'];
+  const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass', 'ACE TRAINER':'boy'};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
   const TR_INTRO = ["Our eyes met! That means we battle!", "Hey! You look tough. Let's see!", "I just caught these guys. Try them out!", "You're not getting past without a battle!", "My Pokémon and I trained all day for this!"];
@@ -1441,6 +1446,10 @@ const ROOMS = {
   center:['##############','######n###m###','#k___h______P#','#_CccccccC___#','#____oooo____#','#qQ_______qgQ#','#p__________p#','#____________#','######MM######'],
   mart:  ['###########','##ww#K#ww##','#_ss_ss_ss#','#_________#','#_ss_ss_p_#','#cc_______#','#_c_______#','#####M#####'],
   house: ['#########','###w##w##','#kv___ep#','#_____e_#','#__tt___#','#_______#','####M####'],
+  league:['###############','###############','#u___________u#','#_____________#','#_____________#','######xxx######',
+          '#####_____#####','#####_____#####','#####_____#####','######xxx######','#####_____#####','#####_____#####','#####_____#####',
+          '######xxx######','#####_____#####','#####_____#####','#####_____#####','######xxx######','#####_____#####','#####_____#####',
+          '#####_____#####','#####_____#####','#####_____#####','#######M#######'],
   gym:   ['###############','###############','#u___________u#','#_____________#','#xxxxx_xxxxxxx#','#_____________#','#_xxxxxxxxxx__#',
           '#_____________#','#xxxxxxx_xxxxx#','#_____________#','#__xxxxxxxxxxx#','#_____________#','#u_____o_____u#','#######M#######']};
 // Junior trainers per gym type (Emerald-like classes) and the Pokémon they use.
@@ -1453,6 +1462,26 @@ const GYM_JUNIORS = {
   grass: {cls:'AROMA LADY', kind:'lass',    team:['Oddish','Roselia','Shroomish','Sunkern','Cherubi','Budew']},
   ice:   {cls:'SKIER',      kind:'girl',    team:['Snorunt','Swinub','Spheal','Seel','Smoochum','Snover']},
   dragon:{cls:'DRAGON TAMER', kind:'gentleman', team:['Swablu','Bagon','Dratini','Gible','Taillow','Trapinch']}};
+// The Elite Four (Phase 5): one per room, in order.
+const ELITES = [
+  {kind:'eliteDark', title:'ELITE FOUR MORROW', team:['Umbreon','Houndoom','Absol','Honchkrow','Weavile','Tyranitar'],
+   intro:"Welcome to the POKéMON LEAGUE. True strength hides in the dark. Show me yours!", after:"...You see clearly, even in the dark. Go on."},
+  {kind:'eliteFight', title:'ELITE FOUR BRAKK', team:['Hariyama','Machamp','Breloom','Hitmonlee','Medicham','Lucario'],
+   intro:"Fists up! My Pokémon hit harder than anything you've faced!", after:"Hah! What a fight. You've earned the next door."},
+  {kind:'eliteSteel', title:'ELITE FOUR FERRIN', team:['Skarmory','Steelix','Aggron','Scizor','Magnezone','Metagross'],
+   intro:"Steel does not bend. Neither do I.", after:"Hm. Even steel has its limits."},
+  {kind:'elitePsy', title:'ELITE FOUR AURELLE', team:['Slowking','Clefable','Alakazam','Togekiss','Espeon','Gardevoir'],
+   intro:"I've already seen how this battle ends. Shall we find out if I'm right?", after:"I didn't foresee that. The CHAMPION is waiting for you."}];
+// Each gate opens once the Elite trainer below it is beaten (and shuts again if you black out mid-run).
+function leagueGates(room, loc){
+  [17,13,9,5].forEach((row,k)=>{ const open = !!adv.cleared[`${loc.name}#elite${k}`]; for(let x=6; x<=8; x++) room.tiles[row][x] = open ? '_' : 'x'; });
+}
+function leagueReset(){
+  const loc = LOCATIONS.find(l=>l.league);
+  if(!loc || adv.cleared[loc.name]) return;
+  for(let k=0; k<4; k++) delete adv.cleared[`${loc.name}#elite${k}`];
+  for(const room of Object.values(loc.__rooms || {})) if(room.interior==='league') leagueGates(room, loc);
+}
 const GYM_STYLE = {Rell:{kind:'leaderFire', type:'Fire'}, Sable:{kind:'leaderWater', type:'Water'}, Orin:{kind:'leaderGround', type:'Ground and Poison'}, Iska:{kind:'leaderGhost', type:'Ghost and Psychic'},
   Juno:{kind:'leaderElectric', type:'Electric'}, Bryn:{kind:'leaderGrass', type:'Grass'}, Hale:{kind:'leaderIce', type:'Ice'}, Corvin:{kind:'leaderDragon', type:'Dragon and Flying'}};
 function getInterior(loc, bi){
@@ -1469,6 +1498,10 @@ function getInterior(loc, bi){
     {kind:'girl', x:7, y:3, facing:'up', wander:true, lines:["Poké Balls are the one thing you can never have too many of."]});
   if(b.kind==='house' && b.home) npcs.push({kind:'mom', x:3, y:5, facing:'down', role:'mom'});
   else if(b.kind==='house') npcs.push({kind:b.resident || 'oldwoman', x:3, y:5, facing:'down', wander:true, lines:b.lines});
+  if(b.kind==='league'){
+    ELITES.forEach((e,k)=>npcs.push({...e, x:5, y:[19,15,11,7][k], facing:'right', trainer:true, id:`${loc.name}#elite${k}`, elite:k}));
+    npcs.push({kind:'rival', x:7, y:2, facing:'down', trainer:true, gymLeader:true, champion:true});
+  }
   if(b.kind==='gym'){
     const g = GYM_STYLE[loc.leaderName] || {kind:'leaderFire', type:'tough'};
     npcs.push({kind:g.kind, x:7, y:2, facing:'down', trainer:true, gymLeader:true},
@@ -1481,7 +1514,9 @@ function getInterior(loc, bi){
       after:`${loc.leaderName} is waiting at the top. Good luck!`}));
   }
   for(const n of npcs) n.home = {x:n.x, y:n.y};
-  return loc.__rooms[bi] = {w, h, tiles, buildings:[], npcs, exits:[], signs:[], interior:b.kind, theme, spawn:{x:matX, y:h-2}, mat:{x:matX, y:h-1}};
+  const room = loc.__rooms[bi] = {w, h, tiles, buildings:[], npcs, exits:[], signs:[], interior:b.kind, theme, spawn:{x:matX, y:h-2}, mat:{x:matX, y:h-1}};
+  if(b.kind==='league') leagueGates(room, loc);
+  return room;
 }
 function tileAt(map,x,y){ return (y<0||y>=map.h||x<0||x>=map.w) ? (map.interior ? '#' : 'T') : map.tiles[y][x]; }
 // Map connections, like Emerald's: each linked area sits against this map's edge, offset so the two
@@ -1561,6 +1596,10 @@ const CHARS = {
   leaderElectric:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#f8d030',B:'#303038',D:'#303038',Y:'#f8d030'},
   leaderGrass: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#40883a',B:'#78c050',D:'#78c050',Y:'#e8e090'},
   leaderIce:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#d8f0f8',B:'#4890c8',D:'#305878',Y:'#d8f0f8'},
+  eliteDark:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#302838',B:'#403050',D:'#282030',Y:'#a080c8'},
+  eliteFight: {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d89868',H:'#402818',B:'#e0e0e0',D:'#303030',Y:'#e05030'},
+  eliteSteel: {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c8a0',H:'#a8b0c0',B:'#607080',D:'#384050',Y:'#c8d0e0'},
+  elitePsy:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#e880b0',B:'#f0a8c8',D:'#f0a8c8',Y:'#fff0f8'},
   leaderDragon:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#402060',B:'#7038c0',D:'#282030',Y:'#e0a030'}};
 const charCache = {};
 // The player: an original trainer on Gen 3's 16×21 overworld frame, following Brendan's row-by-row
@@ -1703,8 +1742,8 @@ function bldPiece(name, roof, wall){
   return cls;
 }
 function buildingHtml(b, ox=0, oy=0, bi=null){
-  const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' ? 'slate' : HOUSE_ROOF_NAMES[HOUSE_ROOFS.indexOf(b.roof)] || 'green';
-  const wall = b.kind==='gym' ? 'grey' : 'cream';
+  const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' || b.kind==='league' ? 'slate' : HOUSE_ROOF_NAMES[HOUSE_ROOFS.indexOf(b.roof)] || 'green';
+  const wall = b.kind==='gym' || b.kind==='league' ? 'grey' : 'cream';
   const dc = b.door.x - b.x, cell = (name, c, r, tall)=>`<div class="bp ${bldPiece(name, roof, wall)}${tall ? ' tall' : ''}" style="left:${c*T}px; top:${r*T - (tall ? 16 : 0)}px"></div>`;
   let html = '';
   for(let c=0; c<b.w; c++){
@@ -1719,7 +1758,7 @@ function buildingHtml(b, ox=0, oy=0, bi=null){
   if(b.kind==='house') html += cell('chimney', Math.min(2, b.w-1), 0, true);
   const plate = b.kind==='center' ? '<div class="plate plate-center"><span class="pc-ball"></span>POKéMON</div>'
     : b.kind==='mart' ? '<div class="plate plate-mart">MART</div>'
-    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : '';
+    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : b.kind==='league' ? '<div class="plate plate-gym">LEAGUE</div>' : '';
   return `<div class="bld bld-${b.kind}"${bi!=null ? ` data-bi="${bi}"` : ''} style="left:${(b.x+ox)*T}px; top:${(b.y+oy)*T}px; width:${b.w*T}px; height:${b.h*T}px">
     ${html}${plate}<div class="door door-${b.kind}" style="left:${dc*T}px; top:${(b.h-1)*T}px"></div></div>`;
 }
@@ -1991,6 +2030,8 @@ function owTryStep(startAt, chained){
     drawPlayer(0);
     return owSay(["It's dangerous to go out without POKéMON!", `${PROF} went toward ROUTE 1...`]);
   }
+  const needBadges = cross && LOCATIONS[cross.exit.to].badges;
+  if(needBadges && badgeCount() < needBadges){ drawPlayer(0); return owSay([`Only trainers with all ${needBadges} badges may pass beyond this point.`]); }
   if(cross && cross.exit.gate && !adv.cleared[loc.name]){
     drawPlayer(0);
     // Slipped past the rival's line of sight? They call you back rather than leave you hunting for them.
@@ -2170,6 +2211,7 @@ function sendToCenter(){
   const li = adv.lastHeal!=null && LOCATIONS[adv.lastHeal].center ? adv.lastHeal : 0;
   if(walkBackNpc && walkBackNpc.trail){ Object.assign(walkBackNpc, walkBackNpc.trail[0]); walkBackNpc.facing = walkBackNpc.postFacing; walkBackNpc.trail = null; walkBackNpc = null; }
   adv.surfing = false;
+  leagueReset();
   const b = getMap(LOCATIONS[li]).buildings.find(b=>b.kind==='center');
   adv.loc = li; adv.inside = null;
   adv.pos = {x:b.door.x, y:b.door.y+1}; adv.facing = 'down';
@@ -2208,7 +2250,8 @@ function triggerTrainer(npc){
     owBusy = false;
     if(npc.trail.length > 1) walkBackNpc = npc;
     if(npc.id) return owSay([`${npc.title}: "${npc.intro}"`], ()=>startTrainerBattle(npc));
-    const quote = npc.gymLeader ? `So, a new challenger has come to the ${loc.name.split(' ')[0]} Gym. Show me what your Pokémon can do!`
+    const quote = npc.champion ? "So you made it. I always knew it'd be you. One last battle, for real this time!"
+      : npc.gymLeader ? `So, a new challenger has come to the ${loc.name.split(' ')[0]} Gym. Show me what your Pokémon can do!`
       : (loc.desc.match(/"([^"]+)"/)||[])[1] || "Let's battle!";
     owSay([`${loc.leaderName}: "${quote}"`], ()=>startTrainerBattle());
   };
@@ -2856,7 +2899,7 @@ function bagDraw(anim){
 const SHELLS = ['RED', 'BLACK', 'WHITE', 'BLUE', 'SILVER', 'PINK', 'YELLOW', 'TEAL'];
 function applyShell(){ const el = document.getElementById('adv'); if(el) el.dataset.shell = ((adv && adv.shell) || 'RED').toLowerCase(); }
 function optionOpen(){
-  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['EXP SHARE', 'expShare', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
+  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['MUSIC', 'music', ['OFF','LOW','MID','HIGH'], 'MID'], ['EXP SHARE', 'expShare', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
   const onOff = {sound:true, expShare:true};   // stored as true/false; missing = ON
   const val = r=> onOff[r[1]] ? (adv[r[1]]===false ? 'OFF' : 'ON') : (adv[r[1]] || r[3]);
   const s = scrOpen('opt', k=>{
@@ -2882,7 +2925,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.13.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3433,6 +3476,7 @@ if(typeof document.addEventListener==='function'){
 // The handheld's buttons also drive the title screen and the opening intro, where there is no overworld.
 const visible = id=>{ const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
 function offWorldButton(k){
+  if(window.creditsNext && ['a','b','start'].includes(k)){ window.creditsNext(); return true; }
   if(visible('newsPage')){
     const el = document.getElementById('newsPage');
     if(k==='up' || k==='down') el.scrollBy({top: k==='up' ? -90 : 90, behavior:'smooth'});
@@ -3892,12 +3936,14 @@ function startTrainerBattle(npc){
   const loc = LOCATIONS[adv.loc], rt = npc && npc.id;
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
   let id=9000;
-  const lv = rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
+  const lv = npc && npc.elite!=null ? Math.min(70, Math.round(partyAvgLevel()) + 1 + npc.elite)
+    : loc.champion && !rt ? Math.min(70, Math.round(partyAvgLevel()) + 4)
+    : rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
   // Rivals and Leaders field six: their signature team, filled out with type-fitting Pokémon.
   // Rivals and Leaders grow with your badges (as in Emerald): at most 2 + badges Pokémon (6 at most). A signature
   // team over that is trimmed but keeps its ace (the last one); under it, they match your party size.
   const cap = Math.min(6, 2 + badgeCount()), sig = rt ? [] : loc.leaderTeam.length > cap ? [...loc.leaderTeam.slice(0, cap-1), loc.leaderTeam[loc.leaderTeam.length-1]] : loc.leaderTeam.slice();
-  const names = rt ? npc.team.slice(0, Math.max(1, adv.party.length)) : sig;
+  const names = rt ? (npc.elite!=null ? npc.team.slice() : npc.team.slice(0, Math.max(1, adv.party.length))) : sig;
   if(!rt){
     const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
@@ -3907,7 +3953,7 @@ function startTrainerBattle(npc){
   }
   // Outnumbered (a small or battered party, e.g. a Nuzlocke run): their team is 2 levels lower per extra Pokémon.
   const extra = Math.max(0, names.length - alive(adv.party).length), lvl = rt ? lv : Math.max(2, lv - 2*extra);
-  const team = names.map(n=>makeMon(dexByName(n), id++, rt || badgeCount() < 2 ? 'none' : 'leftovers', lvl));
+  const team = names.map(n=>makeMon(dexByName(n), id++, (rt && npc.elite==null) || badgeCount() < 2 ? 'none' : 'leftovers', lvl));
   team.forEach(markSeen);
   state = {sideA: adv.party, sideB: team, log:[], mode:'story', trainerLoc: rt ? {type:'route', name:npc.id, leaderName:npc.title} : loc};
   battleIntro(()=>{
@@ -3964,8 +4010,49 @@ function trainerWalkBack(done){
   };
   next();
 }
+// Hall of Fame, then the credits roll (A continues at THE END), then home. The first clear unlocks
+// Adventure Mode for this device (Phase 7).
+function playCredits(){
+  (adv.story ||= {}).champion = true; saveAdv();
+  try{ localStorage.setItem('partyroyale_cleared', '1'); }catch(e){}
+  owBusy = true; held.length = 0;
+  const view = document.getElementById('owView'), el = document.createElement('div');
+  const hof = adv.party.slice(0, 6).map(m=>`<div class="hof-mon"><img src="${spritePath(dexByName(m.name))}" alt=""><small>${dname(m).toUpperCase()}<br>Lv${m.level}</small></div>`).join('');
+  const roll = ['PARTY ROYALE', 'Vellorin Version', '', 'STARRING', `${adv.playerName.toUpperCase()}, the new CHAMPION`, 'WREN, rival and friend', PROF, '',
+    'THE GYM LEADERS', 'RELL · SABLE · ORIN · ISKA', 'JUNO · BRYN · HALE · CORVIN', '', 'THE ELITE FOUR', 'MORROW · BRAKK · FERRIN · AURELLE', '',
+    'ADMIN VESPER and TEAM TEMPEST', 'and LUGIA, guardian of the sea and sky', '', 'Made by the Party Royale team', '',
+    'Thank you to every playtester', 'who pressed FEEDBACK.'];
+  el.id = 'credits';
+  el.innerHTML = `<div class="cr-hof"><h2>HALL OF FAME</h2><div class="hof-row">${hof}</div><p>${adv.playerName.toUpperCase()} became the CHAMPION of VELLORIN!</p></div>
+    <div class="cr-roll">${roll.map(l=>`<p>${l || '&nbsp;'}</p>`).join('')}</div><div class="cr-end hidden">THE END<small>Press A</small></div>`;
+  view.appendChild(el);
+  let ready = false;
+  const finish = ()=>{
+    if(!ready) return;
+    ready = false; document.removeEventListener('keydown', key); el.remove(); window.creditsNext = null;
+    const home = getMap(LOCATIONS[0]).buildings.find(b=>b.home);
+    adv.loc = 0; adv.inside = null; adv.surfing = false; adv.pos = home ? {x:home.door.x, y:home.door.y+1} : {...getMap(LOCATIONS[0]).spawn}; adv.facing = 'down';
+    for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; }
+    saveAdv(); owBusy = false; renderAdventure();
+    owSay(['Back home in DUSKMERE HOLLOW...', `MOM: "${adv.playerName}! The CHAMPION! I'm so proud of you!"`,
+      'Your adventure continues. ADVENTURE MODE is coming in a future update!']);
+  };
+  const key = e=>{ if(['z','Z','Enter',' ','x','X'].includes(e.key)){ e.preventDefault(); e.stopImmediatePropagation(); finish(); } };
+  document.addEventListener('keydown', key, true);
+  window.creditsNext = finish;
+  el.onclick = finish;
+  const rollEl = el.querySelector('.cr-roll');
+  setTimeout(()=>{
+    el.querySelector('.cr-hof').classList.add('gone');
+    rollEl.animate([{transform:'translateY(0)'}, {transform:`translateY(${-(rollEl.offsetHeight + view.clientHeight)}px)`}], {duration:30000, fill:'forwards'}).finished
+      .catch(()=>{}).then(()=>{ el.querySelector('.cr-end').classList.remove('hidden'); ready = true; });
+  }, 5000);
+}
 function afterStory(){
   if(walkBackNpc && !activeTrainer(walkBackNpc)) return trainerWalkBack(afterStory);
+  if(curMap().interior==='league'){ leagueGates(curMap(), LOCATIONS[adv.loc]); renderTiles(adv.pos.x, adv.pos.y); }
+  const league = LOCATIONS.find(l=>l.league);
+  if(league && adv.cleared[league.name] && !(adv.story && adv.story.champion)) return playCredits();
   if(adv.story && adv.story.diveGift){
     delete adv.story.diveGift; adv.items.hm08 = 1; saveAdv();
     return owSay(['HALE: "The ice keeps old secrets, and so does the sea. Take this."'], ()=>obtainItem('HM08 DIVE', 1, 'TMs & HMs', ()=>owSay([
