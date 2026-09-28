@@ -898,6 +898,9 @@ const LOCATIONS=[
 const OPPOSITE = {up:'down', down:'up', left:'right', right:'left'};
 // Party Royale's party: up to 10, and every battle is your whole party against theirs.
 const MAX_PARTY = 10;
+// Your party holds 6 (as in Emerald) until the 4th badge, then up to 10. Screens still lay out 10 slots.
+// Parties already over 6 from before this rule keep everyone; only adding is capped.
+function partyCap(){ return adv && LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length >= 4 ? MAX_PARTY : 6; }
 function linkAreas(i, j, gate){
   const a = LOCATIONS[i], b = LOCATIONS[j];
   const dx = b.at[0]-a.at[0], dy = b.at[1]-a.at[1];
@@ -2374,7 +2377,7 @@ function partyDraw(){
   const s = ptyScr;
   if(s.sum) return summaryDraw();
   s.el.innerHTML = adv.party.map(partyBox).join('')
-    + [...Array(MAX_PARTY).keys()].slice(1).filter(k=>!adv.party[k]).map(k=>`<div class="pb pb-small pb-empty" style="${slotPos(k)}"></div>`).join('')
+    + [...Array(MAX_PARTY).keys()].slice(1).filter(k=>!adv.party[k]).map(k=>`<div class="pb pb-small pb-empty${k>=partyCap() ? ' pb-locked' : ''}" style="${slotPos(k)}"></div>`).join('')
     + `<div class="pty-cancel${s.i===MAX_PARTY?' on':''}" data-k="${MAX_PARTY}">CANCEL</div>
        <div class="pty-msg">${s.swap!=null ? 'Move to where?' : s.msg || 'Choose a POKéMON.'}</div>`;
   s.el.onclick = e=>{ const b = e.target.closest('[data-k]'); if(b){ s.i = +b.dataset.k; uiKey('a'); } };
@@ -2577,7 +2580,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.10.1-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.10.2-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -2837,7 +2840,7 @@ function pcStorageMenu(start){
   const m = uiMenu(document.getElementById('owView'), PC_OPTS.map(o=>o[0]), k=>{
     if(k<0 || k===3) return pcTopMenu();
     // Guards, as in Emerald: the description line is replaced and the menu stays up.
-    const stop = k===0 && adv.party.length>=MAX_PARTY ? 'Your party is full!' : k===1 && adv.party.length<=1 ? 'There is just one POKéMON with you.' : k===0 && !adv.box.length ? 'There are no POKéMON in the BOXES.' : null;
+    const stop = k===0 && adv.party.length>=partyCap() ? 'Your party is full!' : k===1 && adv.party.length<=1 ? 'There is just one POKéMON with you.' : k===0 && !adv.box.length ? 'There are no POKéMON in the BOXES.' : null;
     if(stop){ pcStorageMenu(k); owPrompt(stop); return; }
     owPromptClose(); owBusy = true;
     boxOpen(['withdraw', 'deposit', 'move'][k]);
@@ -2976,7 +2979,7 @@ function boxTitleMenu(){
   }, 'gm-br');
 }
 function boxWithdraw(m){
-  if(adv.party.length>=MAX_PARTY) return boxSay(["Your party's full!"]);
+  if(adv.party.length>=partyCap()) return boxSay(["Your party's full!"]);
   adv.box[adv.box.indexOf(m)] = null; adv.party.push(m);
   while(adv.box.length && !adv.box[adv.box.length-1]) adv.box.pop();
   boxSay([`${dname(m)} was withdrawn.`]);
@@ -3334,7 +3337,7 @@ function npcMove(npc, dir, n, {run=false, fadeIn=false, fadeOut=false, onStep=nu
 const PROF_CALLS = [
   {flag:'call1', badges:1, lines:["Congratulations on your first badge!", "I've been studying stone tablets left around Vellorin by an ancient people, the TIDEWARDENS.", "If you find one, read it! Every line helps."]},
   {flag:'call2', badges:2, lines:["Have you run into TEAM TEMPEST? They've been asking about the TIDEWARDENS too.", "I don't like it. Whatever they're after, please be careful."]},
-  {flag:'call3', badges:4, lines:["The tablets speak of a guardian asleep in a shrine beneath the sea.", "PORTMERE HARBOUR is the closest port to where the shrine should be... and TEAM TEMPEST is heading there."]}];
+  {flag:'call3', badges:4, lines:["The tablets speak of a guardian asleep in a shrine beneath the sea.", "PORTMERE HARBOUR is the closest port to where the shrine should be... and TEAM TEMPEST is heading there.", "Oh, and four badges! Your party can now hold up to 10 POKéMON. Trainers ahead will field bigger teams too!"]}];
 function badgeCount(){ return LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length; }
 function storyEnter(){
   if(!adv || adv.inside!=null || adv.starterPending || !owActive()) return;
@@ -3888,7 +3891,7 @@ function openBox(){
        <div class="mon-body">
          <div class="mon-top"><span>${dname(m)}<span class="lvbadge">Lv.${m.level}</span></span></div>
          <div class="types">${typeBadges(m.types)}</div>
-         ${adv.party.length<MAX_PARTY
+         ${adv.party.length<partyCap()
             ? `<button class="secondary" onclick="swapBox(${i})">Add to party</button>`
             : `Swap in for: ` + adv.party.map((p,pi)=>`<button class="secondary" style="font-size:.7rem" onclick="swapBox(${i},${pi})">${dname(p)}</button>`).join(' ')}
        </div>
@@ -3899,7 +3902,7 @@ function closeBox(){ document.getElementById('boxModal').classList.add('hidden')
 function swapBox(boxIdx, partyIdx){
   const boxed = adv.box[boxIdx];
   if(!boxed) return;
-  if(adv.party.length < MAX_PARTY){
+  if(adv.party.length < partyCap()){
     adv.box.splice(boxIdx,1);
     adv.party.push(boxed);
   } else if(partyIdx!==undefined){
@@ -4182,7 +4185,7 @@ function submitTurn(){
         addLog(`Gotcha! ${dname(act.target)} was caught!`);
         nickQueue.push(act.target);
         if(markOwned(act.target)){ addLog(`${act.target.name.toUpperCase()}'s data was added to the POKéDEX.`); (adv.dexNew ||= []).push(act.target.name); }
-        if(adv.party.length < MAX_PARTY) adv.party.push(act.target);
+        if(adv.party.length < partyCap()) adv.party.push(act.target);
         else { adv.box.push(act.target); addLog(`${dname(act.target)} was sent to the Box (party full).`); }
         saveAdv();
       } else {

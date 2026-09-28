@@ -3,6 +3,17 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.10.2",
+      "date": "2026-09-27",
+      "title": "Balance: Party Size",
+      "changes": [
+        "Your party holds 6 POKéMON until you earn your 4th badge, then grows to 10",
+        "Early rival and Gym battles are now even fights (6 vs 6 at most)",
+        "Locked party slots show on the POKéMON screen until they open up",
+        "Already have more than 6? You keep them all"
+      ]
+    },
+    {
       "version": "0.10.0",
       "date": "2026-09-27",
       "title": "Story Phase 1: Storm Clouds",

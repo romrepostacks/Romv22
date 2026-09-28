@@ -1012,3 +1012,6 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .news-head small{opacity:.65; white-space:nowrap;}
 .news-entry ul{margin:0; padding-left:18px;} .news-entry li{margin:2px 0; font-size:.9em;}
 #newsPage .draft-foot{bottom:0; margin-bottom:0; border-radius:8px 8px 0 0;}
+
+/* Party slots 7-10 stay locked until the 4th badge. */
+.pb-empty.pb-locked{opacity:.45;} .pb-empty.pb-locked::after{content:"🔒"; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:14px;}
