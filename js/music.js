@@ -89,6 +89,27 @@ const MUSIC_TRACKS = {
     harm:'Eb5 ~ ~ ~ G4 ~ ~ ~ D5 ~ ~ ~ Eb5 ~ ~ ~ C5 ~ ~ ~ Ab4 ~ ~ ~ G4 ~ ~ ~ D5 ~ ~ ~',
     bass:'C2 C3 C2 C3 C2 C3 C2 C3 Eb2 Eb3 Eb2 Eb3 Eb2 Eb3 Eb2 Eb3 Ab1 Ab2 Ab1 Ab2 F1 F2 F1 F2 G1 G2 G1 G2 G1 G2 G1 G2',
     drum:'k . s . k k s . k . s . k k s h k . s . k k s . k s k s s s s s'},
+  // The Elite Four: Morrow (dark), Brakk (fighting), Ferrin (steel), Aurelle (psychic).
+  e_dark:{bpm:152,
+    lead:'F#5 ~ ~ A5 ~ G#5 F#5 ~ E5 ~ ~ ~ C#5 ~ ~ ~ D5 ~ ~ F#5 ~ E5 D5 ~ C#5 ~ E#5 ~ G#5 ~ ~ ~',
+    harm:'C#5 ~ ~ ~ ~ ~ ~ ~ A4 ~ ~ ~ ~ ~ ~ ~ A4 ~ ~ ~ ~ ~ ~ ~ G#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'F#1 F#2 F#1 F#2 F#1 F#2 F#1 F#2 C#2 C#3 C#2 C#3 C#2 C#3 C#2 C#3 D2 D3 D2 D3 D2 D3 D2 D3 C#2 C#3 C#2 C#3 C#2 C#3 C#2 C#3',
+    drum:'k . s . k . s h k . s . k . s h k . s . k . s h k s k s s s s s'},
+  e_fight:{bpm:176,
+    lead:'G5 ~ G5 ~ Bb5 ~ G5 ~ F5 ~ F5 ~ A5 ~ F5 ~ Eb5 ~ Eb5 ~ G5 ~ Bb5 ~ D5 ~ F#5 ~ A5 ~ D6 ~',
+    harm:'D5 ~ ~ ~ D5 ~ ~ ~ C5 ~ ~ ~ C5 ~ ~ ~ Bb4 ~ ~ ~ Bb4 ~ ~ ~ A4 ~ ~ ~ C5 ~ ~ ~',
+    bass:'G1 . G2 G1 . G2 G1 G2 F1 . F2 F1 . F2 F1 F2 Eb1 . Eb2 Eb1 . Eb2 Eb1 Eb2 D1 . D2 D1 . D2 D1 D2',
+    drum:'k . s k k . s . k . s k k . s . k . s k k . s . k k s k s s s s'},
+  e_steel:{bpm:140,
+    lead:'C5 C5 G5 ~ C5 C5 Ab5 ~ C5 C5 G5 ~ F5 ~ Eb5 ~ Bb4 Bb4 F5 ~ Bb4 Bb4 G5 ~ B4 ~ D5 ~ F5 ~ G5 ~',
+    harm:'Eb4 ~ ~ ~ Eb4 ~ ~ ~ Eb4 ~ ~ ~ C4 ~ ~ ~ D4 ~ ~ ~ D4 ~ ~ ~ D4 ~ ~ ~ F4 ~ ~ ~',
+    bass:'C2 C2 C2 C2 C2 C2 C2 C2 Ab1 Ab1 Ab1 Ab1 Ab1 Ab1 Ab1 Ab1 Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 Bb1 G1 G1 G1 G1 G1 G1 G1 G1',
+    drum:'k h s h k h s h k h s h k h s h k h s h k h s h k h s h k s s s'},
+  e_psy:{bpm:132,
+    lead:'E5 G#5 B5 A#5 ~ B5 G#5 ~ F#5 A#5 C#6 B5 ~ A#5 F#5 ~ E5 G#5 B5 E6 ~ D#6 C#6 ~ B5 ~ G#5 ~ D#5 ~ ~ ~',
+    harm:'B4 ~ ~ ~ ~ ~ ~ ~ C#5 ~ ~ ~ ~ ~ ~ ~ B4 ~ ~ ~ ~ ~ ~ ~ F#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'E2 . B2 . E2 . B2 . F#2 . C#3 . F#2 . C#3 . C#2 . G#2 . C#2 . G#2 . B1 . F#2 . B1 . D#2 .',
+    drum:'k . . h s . . h k . . h s . . h k . . h s . . h k . h h s s s s'},
   legend:{bpm:140,
     lead:'C5 ~ ~ ~ Eb5 ~ ~ ~ G5 ~ ~ ~ F5 Eb5 D5 ~ C5 ~ ~ ~ Ab5 ~ G5 ~ F5 ~ Eb5 ~ D5 ~ ~ ~',
     harm:'G4 ~ ~ ~ G4 ~ ~ ~ Eb5 ~ ~ ~ B4 ~ ~ ~ Eb4 ~ ~ ~ C5 ~ ~ ~ Ab4 ~ ~ ~ B4 ~ ~ ~',
@@ -167,7 +188,8 @@ function musicWanted(){
     if(state.legendary) return 'legend';
     const tl = state.trainerLoc;
     if(!tl) return 'wild';
-    if(tl.champion || /#elite/.test(tl.name||'')) return 'champion';
+    if(tl.champion) return 'champion';
+    const elite = (tl.name||'').match(/#elite(\d)/); if(elite) return ['e_dark','e_fight','e_steel','e_psy'][+elite[1]];
     return tl.type==='route' ? 'trainer' : tl.type==='gym' && LEADER_THEME[tl.leaderName] || 'leader';
   }
   const loc = LOCATIONS[adv.loc];

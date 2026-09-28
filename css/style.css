@@ -634,9 +634,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
   animation:ashFall 11s linear infinite, ashSway 3.7s ease-in-out infinite alternate;}
 @keyframes ashFall{to{background-position:-121px 330px,-121px 330px,-121px 330px,-121px 330px,97px 178px,97px 178px,97px 178px,0 0;}}
 @keyframes ashSway{from{translate:-6px 0;} to{translate:6px 0;}}
-.ow-view.wx-rain::before{background:repeating-linear-gradient(105deg,transparent 0 14px,#c8e0ff88 14px 15px,transparent 15px 31px) 0 0/62px 62px, #20305018;
-  animation:wxRain .35s linear infinite;}
-@keyframes wxRain{to{background-position:-17px 62px;}}
+/* Rain: separate streaks of uneven length and spacing, in six sets falling at different speeds, slanted by the wind. */
+.ow-view.wx-rain::before{inset:-60px; transform:rotate(14deg); background:
+  radial-gradient(0.9px 8px at 20% 30%,#d8e8ffb0 55%,transparent), radial-gradient(0.7px 6px at 70% 60%,#c8dcffa0 55%,transparent),
+  radial-gradient(1px 10px at 45% 85%,#e0ecffb8 55%,transparent), radial-gradient(0.8px 7px at 85% 15%,#c8dcff90 55%,transparent),
+  radial-gradient(0.7px 5px at 10% 70%,#d0e4ff90 55%,transparent), radial-gradient(0.9px 9px at 60% 40%,#d8e8ffa8 55%,transparent), #20305018;
+  background-size:53px 61px,71px 67px,89px 97px,47px 59px,67px 83px,79px 73px,auto;
+  animation:wxRain .6s linear infinite;}
+@keyframes wxRain{to{background-position:0 122px,0 134px,0 194px,0 118px,0 166px,0 146px,0 0;}}
 .ow-view.wx-fog::before{background:
   radial-gradient(ellipse 160px 60px at 30% 40%,#ffffff88,transparent 70%),
   radial-gradient(ellipse 200px 70px at 75% 70%,#ffffff77,transparent 70%), #e8e8f040;
@@ -1047,8 +1052,15 @@ body:has(#adv:not(.hidden)){background:#141418;}
 /* Phase 3 weather: snow on the ridge and in Rimefall, darkness in the Tempest hideout. */
 .ow-view.wx-snow #owTiles{filter:saturate(.3) brightness(1.22);}
 .ow-view.wx-snow::before,.ow-view.wx-cave::before{content:""; position:absolute; inset:0; z-index:44; pointer-events:none;}
-.ow-view.wx-snow::before{background:radial-gradient(circle,#fff 0 1.5px,transparent 2px) 0 0/37px 41px, radial-gradient(circle,#fff 0 1px,transparent 1.5px) 11px 17px/23px 29px; animation:snowFall 3s linear infinite; opacity:.85;}
-@keyframes snowFall{to{background-position:-20px 82px, -6px 75px;}}
+/* Snow: flakes of different sizes in two sets, falling slowly at different speeds with a sway. */
+.ow-view.wx-snow::before{inset:-40px; opacity:.9; background:
+  radial-gradient(2px 2px at 15% 20%,#fff 60%,transparent), radial-gradient(1.4px 1.4px at 55% 70%,#ffffffee 60%,transparent),
+  radial-gradient(2.6px 2.6px at 80% 35%,#fff 55%,transparent), radial-gradient(1.2px 1.2px at 35% 90%,#ffffffdd 60%,transparent),
+  radial-gradient(1.8px 1.8px at 65% 10%,#fff 60%,transparent), radial-gradient(3px 3px at 25% 55%,#ffffffcc 50%,transparent),
+  radial-gradient(1.4px 1.4px at 90% 80%,#ffffffee 60%,transparent);
+  background-size:97px 89px,97px 89px,97px 89px,97px 89px,137px 121px,137px 121px,137px 121px;
+  animation:snowFall 9s linear infinite, ashSway 3.1s ease-in-out infinite alternate;}
+@keyframes snowFall{to{background-position:-97px 178px,-97px 178px,-97px 178px,-97px 178px,137px 242px,137px 242px,137px 242px;}}
 .ow-view.wx-cave::before{background:radial-gradient(circle at 50% 50%, transparent 38%, #0008 90%);}
 /* Four new Gyms: Electric, Grass, Ice, Dragon. */
 .gym-electric{--floor:#f0d860; --floor2:#c8a830; --wall:#f8e890; --wall2:#b09020;}
@@ -1086,10 +1098,14 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .t.deep.t-tree.face::before{background-image:var(--art-deep_face);}
 .t.shaft{box-shadow:inset 0 0 0 32px #d8f8ff40; animation:shaftGlow 2s ease-in-out infinite;}
 @keyframes shaftGlow{50%{box-shadow:inset 0 0 0 32px #d8f8ff70;}}
-.ow-view.wx-deep::before{content:""; position:absolute; inset:0; z-index:44; pointer-events:none;
-  background:radial-gradient(circle,#e8fbff66 0 1.5px,transparent 2px) 0 0/43px 53px, radial-gradient(circle,#e8fbff44 0 1px,transparent 1.5px) 17px 29px/29px 37px, linear-gradient(#2a70b030,#0a204870);
-  animation:bubbleRise 4s linear infinite;}
-@keyframes bubbleRise{to{background-position:6px -106px, 23px -45px, 0 0;}}
+/* Underwater: bubbles (rings and specks) of different sizes rising at different speeds with a wobble, over a blue haze. */
+.ow-view.wx-deep::before{content:""; position:absolute; inset:-40px; z-index:44; pointer-events:none; background:
+  radial-gradient(3px 3px at 20% 30%,transparent 50%,#e8fbffaa 55% 85%,transparent 90%), radial-gradient(2px 2px at 70% 60%,#e8fbff99 60%,transparent),
+  radial-gradient(4.5px 4.5px at 45% 85%,transparent 55%,#e8fbff88 60% 85%,transparent 90%), radial-gradient(1.5px 1.5px at 85% 20%,#e8fbffaa 60%,transparent),
+  radial-gradient(2.5px 2.5px at 10% 75%,transparent 50%,#e8fbff99 55% 85%,transparent 90%), linear-gradient(#2a70b030,#0a204870);
+  background-size:83px 131px,83px 131px,113px 157px,113px 157px,97px 173px,auto;
+  animation:bubbleRise 7s linear infinite, ashSway 2.3s ease-in-out infinite alternate;}
+@keyframes bubbleRise{to{background-position:0 -262px,0 -262px,0 -157px,0 -157px,0 -346px,0 0;}}
 #owPlayer.diving .ow-surf{filter:brightness(.8) saturate(1.2);}
 .ow-legend img{position:absolute; width:96px; height:96px; left:-36px; top:-56px; image-rendering:pixelated; animation:legendFloat 3s ease-in-out infinite;}
 @keyframes legendFloat{50%{translate:0 -4px;}}

@@ -3,6 +3,15 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.4",
+      "date": "2026-09-28",
+      "title": "Elite Four Themes and Weather",
+      "changes": [
+        "Each of the Elite Four now has their own battle theme, and Champion Wren has theirs",
+        "Rain, snow and underwater bubbles now fall and rise as loose drops, flakes and bubbles of different sizes, not a flat pattern"
+      ]
+    },
+    {
       "version": "0.14.3",
       "date": "2026-09-28",
       "title": "Gym Themes and Polish",
