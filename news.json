@@ -3,6 +3,17 @@
   "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
   "changelog": [
     {
+      "version": "0.12.5",
+      "date": "2026-09-28",
+      "title": "Balance: Rivals and Gym Leaders",
+      "changes": [
+        "Rival and Gym Leader teams now grow with your badges: 2 Pokémon at the start, up to 6 later on",
+        "Your first battles with Wren and Rell are now 2 Pokémon each, like the real games. Leaders always keep their ace",
+        "Outnumbered? When a Rival or Leader brings more Pokémon than you have standing, their team is a little lower level",
+        "Small teams are now viable, so runs with fewer Pokémon can reach the later Gyms"
+      ]
+    },
+    {
       "version": "0.12.3",
       "date": "2026-09-28",
       "title": "Fixes from an Automated Playtest",

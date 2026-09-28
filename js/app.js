@@ -2765,7 +2765,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.12.3-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.12.5-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3768,21 +3768,26 @@ function startTrainerBattle(npc){
   let id=9000;
   const lv = rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
   // Rivals and Leaders field six: their signature team, filled out with type-fitting Pokémon.
-  const names = rt ? npc.team.slice(0, Math.max(1, adv.party.length)) : loc.leaderTeam.slice();
+  // Rivals and Leaders grow with your badges (as in Emerald): at most 2 + badges Pokémon (6 at most). A signature
+  // team over that is trimmed but keeps its ace (the last one); under it, they match your party size.
+  const cap = Math.min(6, 2 + badgeCount()), sig = rt ? [] : loc.leaderTeam.length > cap ? [...loc.leaderTeam.slice(0, cap-1), loc.leaderTeam[loc.leaderTeam.length-1]] : loc.leaderTeam.slice();
+  const names = rt ? npc.team.slice(0, Math.max(1, adv.party.length)) : sig;
   if(!rt){
     const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
-    const size = Math.min(6, Math.max(names.length, adv.party.length));
+    const size = Math.min(cap, Math.max(names.length, adv.party.length));
     for(const n of extra) if(names.length<size && !names.includes(n)) names.push(n);
     for(let i=0; names.length<size; i++) names.push(extra[i % extra.length]);
   }
-  const team = names.map(n=>makeMon(dexByName(n), id++, rt || badgeCount() < 2 ? 'none' : 'leftovers', lv));
+  // Outnumbered (a small or battered party, e.g. a Nuzlocke run): their team is 2 levels lower per extra Pokémon.
+  const extra = Math.max(0, names.length - alive(adv.party).length), lvl = rt ? lv : Math.max(2, lv - 2*extra);
+  const team = names.map(n=>makeMon(dexByName(n), id++, rt || badgeCount() < 2 ? 'none' : 'leftovers', lvl));
   team.forEach(markSeen);
   state = {sideA: adv.party, sideB: team, log:[], mode:'story', trainerLoc: rt ? {type:'route', name:npc.id, leaderName:npc.title} : loc};
   battleIntro(()=>{
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
-  addLog(rt ? `${npc.title} would like to battle!` : `${loc.type==='gym'?'Gym Leader':'Rival'} ${loc.leaderName} challenges you with ${team.length} Pokémon! (Lv.${lv})`);
+  addLog(rt ? `${npc.title} would like to battle!` : `${loc.type==='gym'?'Gym Leader':'Rival'} ${loc.leaderName} challenges you with ${team.length} Pokémon! (Lv.${lvl})`);
   startBattleUI();
   });
 }
