@@ -3,6 +3,15 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.15.1",
+      "date": "2026-09-28",
+      "title": "In-Game Clock",
+      "changes": [
+        "Day and night now run on your playtime instead of the real clock: each time of day lasts 30 minutes of play, so a full day is 2 hours",
+        "A new game starts in the morning, then day, evening and night"
+      ]
+    },
+    {
       "version": "0.15.0",
       "date": "2026-09-28",
       "title": "Day and Night",

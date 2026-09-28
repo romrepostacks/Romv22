@@ -2971,7 +2971,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.15.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.15.1-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -4170,14 +4170,16 @@ function dexRegisterNext(){
   dexDraw();
 }
 
-// Day and night (the device's clock, like the Gen 2-4 games). Each time of day favours some types: their
+// Day and night, on the in-game clock (see timeOfDay). Each time of day favours some types: their
 // species turn up three times as often. At night, Dark, Ghost and Fairy visitors also wander outdoors.
 const TIME_TYPES = {morning:['Grass','Bug','Normal','Flying'], day:['Fire','Ground','Rock','Fighting','Steel'],
   evening:['Water','Electric','Psychic','Dragon','Ice'], night:['Dark','Ghost','Fairy','Poison']};
 const NIGHT_VISITORS = ['Murkrow','Poochyena','Gastly','Misdreavus','Duskull','Shuppet','Clefairy','Snubbull'];
+const TIMES_OF_DAY = ['morning','day','evening','night'];
+// Game time runs on playtime: each time of day lasts 30 minutes, so a full day is 2 hours of play. A new game starts in the morning.
 function timeOfDay(){
-  const h = typeof window!=='undefined' && window.__todHour!=null ? window.__todHour : new Date().getHours();   // __todHour: a test override
-  return h>=4 && h<10 ? 'morning' : h>=10 && h<17 ? 'day' : h>=17 && h<20 ? 'evening' : 'night';
+  if(typeof window!=='undefined' && window.__todPeriod) return window.__todPeriod;   // test override
+  return TIMES_OF_DAY[Math.floor(((typeof adv!=='undefined' && adv && adv.playSec) || 0) / 1800) % 4];
 }
 // Pick n species from the pool, weighted toward the types of this time of day (no repeats).
 function timePicks(pool, n){
