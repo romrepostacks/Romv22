@@ -48,6 +48,47 @@ const MUSIC_TRACKS = {
     harm:'G5 ~ ~ ~ E5 ~ ~ ~ F#5 ~ ~ ~ D5 ~ ~ ~ E5 ~ ~ ~ E5 ~ ~ ~ B4 ~ ~ ~ F#4 ~ ~ ~',
     bass:'E2 E3 E2 E3 E2 E3 E2 E3 D2 D3 D2 D3 B1 B2 B1 B2 C2 C3 C2 C3 A1 A2 A1 A2 B1 B2 B1 B2 B1 B2 B1 B2',
     drum:'k . s . k k s . k . s . k k s h k . s . k k s . k s k s s s s s'},
+  // Gym Leaders (#23): Rell fire, Sable water, Orin ground, Iska ghost, Juno electric, Bryn grass, Hale ice, Corvin dragon.
+  g_fire:{bpm:168,
+    lead:'A5 A5 ~ G5 A5 ~ C6 ~ B5 A5 ~ G5 E5 ~ ~ ~ F5 F5 ~ E5 F5 ~ A5 ~ G#5 ~ B5 ~ E6 ~ ~ ~',
+    harm:'E5 ~ ~ ~ E5 ~ ~ ~ D5 ~ ~ ~ B4 ~ ~ ~ C5 ~ ~ ~ C5 ~ ~ ~ B4 ~ ~ ~ G#4 ~ ~ ~',
+    bass:'A1 A2 A1 A2 A1 A2 A1 A2 G1 G2 G1 G2 G1 G2 G1 G2 F1 F2 F1 F2 F1 F2 F1 F2 E1 E2 E1 E2 E1 E2 E1 E2',
+    drum:'k h s h k k s h k h s h k k s h k h s h k k s h k s k s s s s s'},
+  g_water:{bpm:144,
+    lead:'D5 F5 A5 D6 ~ A5 F5 ~ C5 E5 G5 C6 ~ G5 E5 ~ Bb4 D5 F5 Bb5 ~ F5 D5 ~ A4 C#5 E5 A5 ~ ~ G5 ~',
+    harm:'F4 ~ ~ ~ ~ ~ ~ ~ E4 ~ ~ ~ ~ ~ ~ ~ D4 ~ ~ ~ ~ ~ ~ ~ C#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'D2 . D3 . A2 . D3 . C2 . C3 . G2 . C3 . Bb1 . Bb2 . F2 . Bb2 . A1 . A2 . E2 . A2 .',
+    drum:'k . h . s . h h k . h . s . h h k . h . s . h h k . h . s s s s'},
+  g_ground:{bpm:132,
+    lead:'E5 ~ ~ ~ G5 ~ E5 ~ D5 ~ ~ ~ B4 ~ ~ ~ C5 ~ ~ ~ E5 ~ C5 ~ B4 ~ ~ ~ D#5 ~ ~ ~',
+    harm:'B4 ~ ~ ~ ~ ~ ~ ~ G4 ~ ~ ~ ~ ~ ~ ~ G4 ~ ~ ~ ~ ~ ~ ~ F#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'E1 E1 E2 E1 E1 E1 E2 E1 D1 D1 D2 D1 D1 D1 D2 D1 C1 C1 C2 C1 C1 C1 C2 C1 B0 B0 B1 B0 B1 B1 B2 B1',
+    drum:'k k s . k k s . k k s . k k s . k k s . k k s . k k s s k s s s'},
+  g_ghost:{bpm:120,
+    lead:'B4 ~ C5 ~ B4 ~ A#4 ~ B4 ~ ~ ~ F5 ~ ~ ~ E5 ~ D#5 ~ D5 ~ C#5 ~ C5 ~ ~ ~ B4 ~ ~ ~',
+    harm:'F4 ~ ~ ~ ~ ~ ~ ~ F4 ~ ~ ~ ~ ~ ~ ~ G4 ~ ~ ~ ~ ~ ~ ~ F#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'B1 ~ ~ B1 ~ ~ B1 ~ F2 ~ ~ F2 ~ ~ F2 ~ E2 ~ ~ E2 ~ ~ E2 ~ F#2 ~ ~ F#2 ~ ~ B1 ~',
+    drum:'k . . h . . s . k . . h . . s . k . . h . . s . k . . h s . s h'},
+  g_electric:{bpm:176,
+    lead:'G5 B5 D6 B5 G5 B5 D6 B5 F#5 A5 D6 A5 F#5 A5 D6 A5 E5 G5 C6 G5 E5 G5 C6 G5 D5 F#5 A5 D6 ~ ~ C6 ~',
+    harm:'D5 ~ ~ ~ D5 ~ ~ ~ D5 ~ ~ ~ C5 ~ ~ ~ C5 ~ ~ ~ B4 ~ ~ ~ A4 ~ ~ ~ F#4 ~ ~ ~',
+    bass:'G1 G2 G1 G2 G1 G2 G1 G2 D1 D2 D1 D2 D1 D2 D1 D2 C2 C3 C2 C3 C2 C3 C2 C3 D2 D3 D2 D3 D2 D3 D2 D3',
+    drum:'k h s h k h s h k h s h k h s h k h s h k h s h k h s h s s s s'},
+  g_grass:{bpm:138,
+    lead:'C5 ~ F5 ~ A5 ~ G5 F5 G5 ~ ~ ~ C5 ~ ~ ~ Bb4 ~ D5 ~ F5 ~ E5 D5 C5 ~ E5 ~ G5 ~ ~ ~',
+    harm:'A4 ~ ~ ~ C5 ~ ~ ~ E4 ~ ~ ~ E4 ~ ~ ~ D4 ~ ~ ~ Bb4 ~ ~ ~ G4 ~ ~ ~ Bb4 ~ ~ ~',
+    bass:'F2 . C3 . F2 . C3 . C2 . G2 . C2 . G2 . Bb1 . F2 . Bb1 . F2 . C2 . G2 . C2 . E2 .',
+    drum:'k . h . s . h . k . h . s . h . k . h . s . h . k . h . s s s s'},
+  g_ice:{bpm:128,
+    lead:'F#6 ~ ~ D6 ~ ~ B5 ~ C#6 ~ ~ A5 ~ ~ F#5 ~ G5 ~ ~ B5 ~ ~ D6 ~ C#6 ~ ~ ~ A#5 ~ ~ ~',
+    harm:'B4 ~ ~ ~ ~ ~ ~ ~ A4 ~ ~ ~ ~ ~ ~ ~ G4 ~ ~ ~ ~ ~ ~ ~ F#4 ~ ~ ~ ~ ~ ~ ~',
+    bass:'B1 . F#2 . B1 . F#2 . A1 . E2 . A1 . E2 . G1 . D2 . G1 . D2 . F#1 . C#2 . F#1 . C#2 .',
+    drum:'k . . . h . . . k . . . h . . . k . . . h . . . k . . . s . s .'},
+  g_dragon:{bpm:160,
+    lead:'C5 ~ G5 ~ Eb5 ~ C6 ~ Bb5 ~ Ab5 ~ G5 ~ ~ ~ Ab5 ~ F5 ~ Eb5 ~ D5 ~ Eb5 ~ F5 ~ G5 ~ B5 ~',
+    harm:'Eb5 ~ ~ ~ G4 ~ ~ ~ D5 ~ ~ ~ Eb5 ~ ~ ~ C5 ~ ~ ~ Ab4 ~ ~ ~ G4 ~ ~ ~ D5 ~ ~ ~',
+    bass:'C2 C3 C2 C3 C2 C3 C2 C3 Eb2 Eb3 Eb2 Eb3 Eb2 Eb3 Eb2 Eb3 Ab1 Ab2 Ab1 Ab2 F1 F2 F1 F2 G1 G2 G1 G2 G1 G2 G1 G2',
+    drum:'k . s . k k s . k . s . k k s h k . s . k k s . k s k s s s s s'},
   legend:{bpm:140,
     lead:'C5 ~ ~ ~ Eb5 ~ ~ ~ G5 ~ ~ ~ F5 Eb5 D5 ~ C5 ~ ~ ~ Ab5 ~ G5 ~ F5 ~ Eb5 ~ D5 ~ ~ ~',
     harm:'G4 ~ ~ ~ G4 ~ ~ ~ Eb5 ~ ~ ~ B4 ~ ~ ~ Eb4 ~ ~ ~ C5 ~ ~ ~ Ab4 ~ ~ ~ B4 ~ ~ ~',
@@ -67,6 +108,7 @@ const MUSIC_TRACKS = {
 const NOTE_IDX = {C:0, D:2, E:4, F:5, G:7, A:9, B:11};
 const noteHz = n=>{ const m = n.match(/^([A-G])([#b]?)(\d)$/); if(!m) return 0; const semi = NOTE_IDX[m[1]] + (m[2]==='#' ? 1 : m[2]==='b' ? -1 : 0) + (+m[3]+1)*12; return 440*Math.pow(2, (semi-69)/12); };
 for(const t of Object.values(MUSIC_TRACKS)) for(const ch of ['lead','harm','bass','drum']) t[ch] = t[ch].split(/\s+/);
+const LEADER_THEME = {Rell:'g_fire', Sable:'g_water', Orin:'g_ground', Iska:'g_ghost', Juno:'g_electric', Bryn:'g_grass', Hale:'g_ice', Corvin:'g_dragon'};
 const Music = {cur:null, want:null, step:0, next:0, bus:null, pulse:{}, noise:null};
 const MUSIC_VOL = {OFF:0, LOW:0.35, MID:0.7, HIGH:1};
 function musicLevel(){ if(typeof adv!=='undefined' && adv && adv.sound===false) return 0; const v = typeof adv!=='undefined' && adv && adv.music; return MUSIC_VOL[v || 'MID'] ?? 0.7; }
@@ -116,6 +158,7 @@ function musicSchedule(){
 // Which track fits right now (checked a few times a second; changes fade across).
 function musicWanted(){
   if(document.hidden) return null;
+  if(typeof musicHush!=='undefined' && musicHush) return null;   // at the PC / while the Nurse heals (#22)
   if(document.getElementById('credits')) return 'credits';
   if(typeof adv==='undefined' || !adv) return document.getElementById('owTitle') ? 'credits' : null;
   const shown = id=>{ const e = document.getElementById(id); return e && !e.classList.contains('hidden'); };
@@ -125,7 +168,7 @@ function musicWanted(){
     const tl = state.trainerLoc;
     if(!tl) return 'wild';
     if(tl.champion || /#elite/.test(tl.name||'')) return 'champion';
-    return tl.type==='route' ? 'trainer' : 'leader';
+    return tl.type==='route' ? 'trainer' : tl.type==='gym' && LEADER_THEME[tl.leaderName] || 'leader';
   }
   const loc = LOCATIONS[adv.loc];
   if(loc.deep) return 'deep';

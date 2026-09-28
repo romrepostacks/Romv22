@@ -3,6 +3,17 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.3",
+      "date": "2026-09-28",
+      "title": "Gym Themes and Polish",
+      "changes": [
+        "Every Gym Leader now has their own battle theme: fire, water, ground, ghost, electric, grass, ice and dragon",
+        "Gym trainers are now a warm-up for their Leader: smaller teams, a little lower level",
+        "The music pauses while you use the PC or the Nurse heals your team",
+        "Cindergate's ash now falls as drifting flakes instead of a flat haze"
+      ]
+    },
+    {
       "version": "0.14.2",
       "date": "2026-09-28",
       "title": "Fixes",

@@ -2506,6 +2506,7 @@ function nurseFace(n, dir){
 // Timings from pokeemerald: a ball every 25 frames (the first at once), 32 frames' pause, then the
 // 160-frame jingle with the machine glowing for 150 of them; she heals you after turning back.
 function nurseHeal(n){
+  musicHush = true;
   const F = 1000/60, machine = document.querySelector('#owWorld .t-healer'), count = adv.party.length;
   nurseFace(n, 'left');
   for(let i=0;i<count;i++) setTimeout(()=>{ sfx('ball'); if(machine) machine.insertAdjacentHTML('beforeend', `<span class="heal-ball" style="left:${7+(i%2)*10}px; top:${7+Math.floor(i/2)*6}px"></span>`); }, (4 + 25*i)*F);
@@ -2515,7 +2516,7 @@ function nurseHeal(n){
   setTimeout(()=>{
     nurseFace(n, 'down');
     healParty(); adv.lastHeal = adv.loc; saveAdv();
-    owHold = false;
+    owHold = false; musicHush = false;
     owSay(['Thank you for waiting.'], ()=>{
       // She bows (52 frames) while this line is up.
       const el = nurseFace(n, 'down');
@@ -2931,7 +2932,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.2-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.3-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3133,8 +3134,9 @@ function owPrompt(text){
 }
 function owPromptClose(){ document.getElementById('owText').classList.add('hidden'); owBusy = false; }
 
+let musicHush = false;   // music.js stays quiet while this is set
 function usePC(){
-  sfx('pcOn');
+  sfx('pcOn'); musicHush = true;
   owBusy = true; held.length = 0;
   // The screen tile flickers on: 5 toggles, one every 6 frames.
   const [dx,dy] = DIRS[adv.facing];
@@ -3180,6 +3182,7 @@ function playerPC(){
   storage();
 }
 function pcLogOff(){
+  musicHush = false;
   sfx('pcOff');
   document.querySelectorAll('#owWorld .t-pc.on').forEach(el=>el.classList.remove('on'));
   owPromptClose();
@@ -3942,14 +3945,16 @@ function startTrainerBattle(npc){
   const loc = LOCATIONS[adv.loc], rt = npc && npc.id;
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
   let id=9000;
-  const lv = npc && npc.elite!=null ? Math.min(70, Math.round(partyAvgLevel()) + npc.elite)
+  const junior = rt && /#gym\d/.test(npc.id);
+  const lv = junior ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 2))
+    : npc && npc.elite!=null ? Math.min(70, Math.round(partyAvgLevel()) + npc.elite)
     : loc.champion && !rt ? Math.min(70, Math.round(partyAvgLevel()) + 3)
     : rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
   // Rivals and Leaders field six: their signature team, filled out with type-fitting Pokémon.
   // Rivals and Leaders grow with your badges (as in Emerald): at most 2 + badges Pokémon (6 at most). A signature
   // team over that is trimmed but keeps its ace (the last one); under it, they match your party size.
   const cap = Math.min(6, 2 + badgeCount()), sig = rt ? [] : loc.leaderTeam.length > cap ? [...loc.leaderTeam.slice(0, cap-1), loc.leaderTeam[loc.leaderTeam.length-1]] : loc.leaderTeam.slice();
-  const names = rt ? (npc.elite!=null ? npc.team.slice() : npc.team.slice(0, Math.max(1, adv.party.length))) : sig;
+  const names = rt ? (npc.elite!=null ? npc.team.slice() : npc.team.slice(0, Math.max(1, junior ? Math.min(adv.party.length, 1 + badgeCount()) : adv.party.length))) : sig;
   if(!rt){
     const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
