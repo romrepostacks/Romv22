@@ -1829,7 +1829,7 @@ let owShownLoc = null;
 function renderOverworld(){
   const loc = LOCATIONS[adv.loc], map = curMap();
   const world = document.getElementById('owWorld'), view = document.getElementById('owView');
-  view.className = 'ow-view' + (map.interior ? ` indoors room-${map.interior}${map.theme ? ` gym-${map.theme}` : ''}` : WEATHER[loc.name] ? ` wx-${WEATHER[loc.name]}` : '');
+  view.className = 'ow-view' + (map.interior ? ` indoors room-${map.interior}${map.theme ? ` gym-${map.theme}` : ''}` : WEATHER[loc.name] ? ` wx-${WEATHER[loc.name]}` : '') + (adv.weatherFx===false ? ' nofx' : '');
   if(map.theme==='ghost') view.style.setProperty('--sight', (70 + 45*map.npcs.filter(n=>n.id && adv.cleared[n.id]).length) + 'px');
   let html = '<div id="owTiles"></div>';
   html += curNpcs().map(n=>npcHtml(n, map.npcs.indexOf(n))).join('');
@@ -2929,8 +2929,8 @@ function bagDraw(anim){
 const SHELLS = ['RED', 'BLACK', 'WHITE', 'BLUE', 'SILVER', 'PINK', 'YELLOW', 'TEAL'];
 function applyShell(){ const el = document.getElementById('adv'); if(el) el.dataset.shell = ((adv && adv.shell) || 'RED').toLowerCase(); }
 function optionOpen(){
-  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['MUSIC', 'music', ['OFF','LOW','MID','HIGH'], 'MID'], ['EXP SHARE', 'expShare', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
-  const onOff = {sound:true, expShare:true};   // stored as true/false; missing = ON
+  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['MUSIC', 'music', ['OFF','LOW','MID','HIGH'], 'MID'], ['EXP SHARE', 'expShare', ['ON','OFF'], 'ON'], ['WEATHER', 'weatherFx', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
+  const onOff = {sound:true, expShare:true, weatherFx:true};   // stored as true/false; missing = ON
   const val = r=> onOff[r[1]] ? (adv[r[1]]===false ? 'OFF' : 'ON') : (adv[r[1]] || r[3]);
   const s = scrOpen('opt', k=>{
     if(k==='b' || k==='a' && s.i===rows.length){ saveAdv(); return scrClose(); }
@@ -2939,6 +2939,7 @@ function optionOpen(){
     if(r && (k==='left' || k==='right')){
       const v = r[2][(r[2].indexOf(val(r)) + (k==='left' ? r[2].length-1 : 1)) % r[2].length];
       if(onOff[r[1]]) adv[r[1]] = v==='ON'; else adv[r[1]] = v;
+      document.getElementById('owView').classList.toggle('nofx', adv.weatherFx===false);
       if(r[1]==='shell') applyShell();
     }
     draw();
@@ -2955,7 +2956,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.5-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.6-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];

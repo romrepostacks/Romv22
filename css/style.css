@@ -1156,3 +1156,8 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .ow-wxfx.ashpuff::before{content:""; position:absolute; left:4px; top:12px; width:24px; height:14px; border-radius:50%;
   background:radial-gradient(#8a8a92dd,#8a8a9200 70%); animation:ashPuff .65s ease-out forwards;}
 @keyframes ashPuff{from{transform:scale(.4) translateY(4px); opacity:1;} to{transform:scale(1.6) translateY(-8px); opacity:0;}}
+
+/* OPTION > WEATHER OFF: no falling rain, snow or ash and no bubbles; the ground (puddles, drifts, ash, footprints) stays,
+   and so does the underwater haze. */
+.ow-view.nofx:is(.wx-rain,.wx-snow,.wx-ash)::before{display:none;}
+.ow-view.nofx.wx-deep::before{background:linear-gradient(#2a70b030,#0a204870); animation:none;}
