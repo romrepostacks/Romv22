@@ -900,7 +900,7 @@ const LOCATIONS=[
  {type:'route', name:"Route 8: Thornwood Path", at:[7,1], tier:16, desc:"Brambles and giant ferns close in over a winding trail.", pool:['Gloom','Shroomish','Skiploom','Tangela','Nuzleaf','Weepinbell'], theme:'forest'},
  {type:'gym', name:"Mossgrove Town", at:[7,0], tier:17, desc:"A town grown into the forest itself. Leader Bryn's gym is a greenhouse full of Grass Pokémon.", center:true, leaderName:"Bryn", leaderTeam:['Breloom','Victreebel','Tangrowth','Roserade']},
  {type:'route', name:"Route 9: Frostpine Ridge", at:[7,-1], tier:18, desc:"Snow drifts between pines on the climb north. The air bites.", pool:['Snorunt','Swinub','Sneasel','Snover','Delibird','Spheal'], theme:'forest'},
- {type:'trainer', kind:'rival', name:"Tempest Hideout", at:[7,-2], tier:19, desc:"A cave mouth hidden in the ridge, lit by TEAM TEMPEST lanterns. Wren waits at the back. \"You shouldn't have followed me here.\"", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow'], theme:'rocky', grunts:4},
+ {type:'trainer', kind:'rival', name:"Tempest Hideout", at:[7,-2], tier:19, desc:"A cave mouth hidden in the ridge, lit by TEAM TEMPEST lanterns. Wren waits at the back. \"You shouldn't have followed me here.\"", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow'], theme:'cave', grunts:4, pool:['Zubat','Golbat','Koffing','Geodude','Mightyena']},
  {type:'gym', name:"Rimefall Town", at:[6,-2], tier:20, desc:"Frost clings to every roof. Leader Hale's gym is a rink of solid ice.", center:true, leaderName:"Hale", leaderTeam:['Glalie','Piloswine','Dewgong','Walrein']},
  {type:'route', name:"Route 10: Skyreach Cliffs", at:[5,-2], tier:21, desc:"Wind howls along the cliff tops. Dragons are said to nest above the clouds.", pool:['Swablu','Bagon','Trapinch','Skarmory','Noctowl','Fearow'], theme:'rocky'},
  {type:'gym', name:"Aeriepeak City", at:[4,-2], tier:22, desc:"A city of towers above the clouds. Leader Corvin rules the skies with Dragon and Flying Pokémon.", center:true, leaderName:"Corvin", leaderTeam:['Altaria','Skarmory','Flygon','Salamence'], endOfContent:true},
@@ -1117,7 +1117,8 @@ const ROUTE_THEMES = {
   forest:{grass:7, trees:55, rocks:0.05, ponds:[]},
   lake:  {grass:4, trees:16, rocks:0.1,  ponds:[[7,4],[3,2]]},
   rocky: {grass:4, trees:10, rocks:0.55, ponds:[]},
-  sea:   {grass:2, trees:4,  rocks:0.1,  ponds:[]}};
+  sea:   {grass:2, trees:4,  rocks:0.1,  ponds:[]},
+  cave:  {grass:0, trees:14, rocks:0.5,  ponds:[]}};
 // Routes are long corridors like Emerald's: about 125×42 running east–west, 42×125 north–south,
 // or ~80×68 where they turn or branch (seeded ±10% per route). A two-tree-thick border with an
 // opening per exit, a two-wide path that meanders in L-shaped legs from each opening to the middle,
@@ -1306,13 +1307,13 @@ function buildRoute(loc){
   // Locals with tips, spread along the route.
   const who = {forest:'bugcatcher', lake:'fisher', rocky:'hiker', sea:'fisher'}[loc.theme] || 'youngster';
   const locals = ['youngster', 'lass', who, 'gentleman', 'girl'];
-  for(let k=0; k<Math.max(1, Math.round(A/1100)); k++){
+  for(let k=0; loc.theme!=='cave' && k<Math.max(1, Math.round(A/1100)); k++){
     const sp = freeSpot(); if(!sp) break;
     const kind = locals[k % locals.length];
     npcs.push({kind, x:sp.x, y:sp.y, facing:'down', lines:ROUTE_TALK[kind] || TOWN_TALK[k % TOWN_TALK.length], home:{...sp}, wander:k%2===1});
   }
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
-  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER']}[loc.theme||'plain'];
+  const TR_CLASSES = {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER']}[loc.theme||'plain'];
   const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass'};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
@@ -1356,12 +1357,14 @@ function buildRoute(loc){
     for(const s of signs) isle(s.x, s.y, 1);
     for(const k of Object.keys(itemTypes)){ const [x,y] = k.split(',').map(Number); isle(x, y, 1); }
     for(let y=0; y<H; y++) for(let x=0; x<W; x++) if(inside(x,y) && !land.has(y*W+x)) tiles[y][x] = '~';
-    for(const k of land){ const x = k % W, y = Math.floor(k/W); if(inside(x,y) && tiles[y][x]==='T') tiles[y][x] = '.'; }
+    for(const k of land){ const x = k % W, y = Math.floor(k/W); if(inside(x,y) && 'TL<>'.includes(tiles[y][x])) tiles[y][x] = '.'; }   // no trees or ledges on the islets
   }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
+  if(loc.theme==='cave') for(const row of tiles) row.forEach((ch,x)=>{ if(':"*L<>'.includes(ch)) row[x] = '.'; else if(ch==='b') row[x] = 'r'; });
   const first = spots[exits[0].dir];
   const built = finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
   built.itemTypes = itemTypes;
+  built.cave = loc.theme==='cave';
   return built;
 }
 function finishMap(tiles, buildings, npcs, exits, spawn, signs){
@@ -1709,6 +1712,7 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   let extra = '', style = '';
   if(cls==='grass') extra = ` v${v%4}`;
   if(cls==='tree' && (x+y)%2) extra = ' alt';
+  if(map.cave){ extra += ' cave'; if(cls==='tree' && (y+1>=map.h || map.tiles[y+1][x]!=='T')) extra += ' face'; }
   // Two-tile furniture (tables 'tt', Mart shelves 'ss'): left and right halves alternate along a run.
   if(cls==='table' || cls==='shelf'){ let n = 0; while(x-n-1>=0 && map.tiles[y][x-n-1]===ch) n++; extra = n%2 ? ' right' : ' left'; }
   if(cls==='bed' && (y===0 || map.tiles[y-1][x]!=='e')) extra = ' top';   // pillow end
@@ -1824,13 +1828,11 @@ function drawPlayer(frame, run){
 }
 // Put player + camera at fractional tile coords. The camera keeps the player centred; both use
 // the same whole-pixel offset so tiles stay crisp and the player never jitters against them.
-const SURF_ROWS = {down:['....KKKKKKKK....','..KKBBBBBBBBKK..','.KBBBBBBBBBBBBK.','KBWKBBBBBBBBKWBK','KBKKBBBBBBBBKKBK','KbBBBBBBBBBBBBbK','KbbBBBBBBBBBBbbK','.KbbbbbbbbbbbbK.','w.KKKKKKKKKKKK.w','.ww..w.ww.w..ww.'],
-  up:['....KKKKKKKK....','..KKBBBBBBBBKK..','.KBBBBBBBBBBBBK.','KBBBBBBLLBBBBBBK','KBBBBBLLLLBBBBBK','KbBBBBBLLBBBBBbK','KbbBBBBBBBBBBbbK','.KbbbbbbbbbbbbK.','w.KKKKKKKKKKKK.w','.ww..w.ww.w..ww.'],
-  left:['...KKKKKKKK.....','.KKBBBBBBBBKK...','KBWKBBBBBBBBBKK.','KBKKBBBBBBBBBBBK','KBBBBBBBBBBBBBLK','KbBBBBBBBBBBBBBK','.KbBBBBBBBBBBbK.','..KbbbbbbbbbbK..','w..KKKKKKKKKK..w','.ww..w.ww.w..ww.']};
+const SURF_ROWS = {"down":[".......KKKKKKKK.......",".....KKBBBBBBBBKK.....","...KKBBBBBBBBBBBBKK...","..KBBBBBBBBBBBBBBBBK..",".KBBLLBBBBBBBBBBLLBBK.","KFBBLLBBBBBBBBBBLLBBFK","KFFBBBBBBBBBBBBBBBBFFK",".KBBBBWKBBBBBBKWBBBBK.",".KbBBBKKBBBBBBKKBBBbK.","..KbbBBBBBBBBBBBBbbK..","...KKbbbbbbbbbbbbKK...","w.....KKKKKKKKKK.....w",".www..w.wwwww.w..www.."],"up":[".......KKKKKKKK.......",".....KKBBBBBBBBKK.....","...KKBBBBBBBBBBBBKK...","..KBBBBBBBBBBBBBBBBK..",".KBBBBBBBLLLBBBBBBBBK.","KFBBBBBBLLLLLBBBBBBBFK","KFFBBBBBBLLLBBBBBBBFFK",".KBBBBBBBBBBBBBBBBBBK.",".KbBBBBBBBBBBBBBBBBbK.","..KbbBBBBBBBBBBBBbbK..","...KKbbbbbbbbbbbbKK...","w.....KKKKKKKKKK.....w",".www..w.wwwww.w..www.."],"left":["....KKKKKKKK..........","..KKBBBBBBBBKKKK......",".KBBBBBBBBBBBBBBKK....","KBBWKBBBBBBBBBBBBBK...","KBBKKBBBBBBBBBBBBBBK..","KBBBBBBBBBBBBLLBBBBBK.","KbBBBBBBBBBBBLLLBBBFFK",".KbBBBBBBBBBBBBBBBFFFK","..KbbBBBBBBBBBBBbbKFFK","...KKbbbbbbbbbbbbK.KK.",".....KKKKKKKKKKKK.....","w....................w",".www..w.wwwww.w..www.."]};
 function surfSvg(f){
-  const rows = SURF_ROWS[f==='right' ? 'left' : f] || SURF_ROWS.down, C = {K:'#202838', B:'#4888e0', b:'#3060b0', W:'#f8f8f8', L:'#a8d0f8', w:'#e8f8ff'};
+  const rows = SURF_ROWS[f==='right' ? 'left' : f] || SURF_ROWS.down, C = {K:'#202838', B:'#5090e8', b:'#3468c0', W:'#ffffff', L:'#a8d8ff', F:'#88c0f8', w:'#e8f8ff'};
   let r = ''; rows.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(C[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${C[ch]}"/>`; }));
-  return `<svg viewBox="0 0 16 10" width="32" height="20" shape-rendering="crispEdges"${f==='right' ? ' style="transform:scaleX(-1)"' : ''}>${r}</svg>`;
+  return `<svg viewBox="0 0 22 13" width="44" height="26" shape-rendering="crispEdges"${f==='right' ? ' style="transform:scaleX(-1)"' : ''}>${r}</svg>`;
 }
 function setActorPos(px, py){
   const el = document.getElementById('owPlayer'), world = document.getElementById('owWorld');
@@ -2035,6 +2037,7 @@ function owArrive(ch, endedAt){
   if(ch==='"'){
     if(Math.random()<0.08){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
   }
+  if(ch==='.' && map.cave && Math.random()<0.05){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
   if(ch==='~' && adv.surfing && !adv.surfFresh && Math.random()<0.05){ held.length = 0; saveAdv(); startWildBattle(null, 'water'); return; }
   adv.surfFresh = false;
   // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between).
@@ -2757,7 +2760,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.12.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.12.1-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];

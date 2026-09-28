@@ -3,6 +3,17 @@
   "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
   "changelog": [
     {
+      "version": "0.12.1",
+      "date": "2026-09-27",
+      "title": "Polish: Hideout and Surf",
+      "changes": [
+        "The Tempest Hideout is now a real cave: rock walls, an earth floor, and wild Pokémon anywhere inside",
+        "Only Team Tempest in the hideout now, no stray townsfolk",
+        "Your SURF ride is bigger and more detailed, and faces the way you travel",
+        "Removed stray ledges from the little islands at sea"
+      ]
+    },
+    {
       "version": "0.12.0",
       "date": "2026-09-27",
       "title": "Phases 2 and 3: Surf and the Eastern Gyms",
