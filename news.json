@@ -3,6 +3,17 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.5",
+      "date": "2026-09-28",
+      "title": "Weather You Can Walk Through",
+      "changes": [
+        "Rain: the ground looks wet, puddles ripple, and your steps splash",
+        "Snow: drifts on the grass, snow on the trees, and footprints behind you that slowly fade",
+        "Ash: grey ash settles on the grass and trees around Cindergate; walking through the grass kicks it up and leaves a clear trail",
+        "Underwater: the kelp sways"
+      ]
+    },
+    {
       "version": "0.14.4",
       "date": "2026-09-28",
       "title": "Elite Four Themes and Weather",

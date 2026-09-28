@@ -1429,7 +1429,7 @@ function finishMap(tiles, buildings, npcs, exits, spawn, signs){
   return {w:tiles[0].length, h:tiles.length, tiles, buildings, npcs, exits, signs, spawn};
 }
 function getMap(loc){
-  if(!loc.__map) loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc);
+  if(!loc.__map){ loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc); loc.__map.weather = WEATHER[loc.name] || null; }
   // Item balls you've already picked up stay gone (adv.picked holds "Area@x,y").
   if(typeof adv!=='undefined' && adv && adv.picked) for(const k in adv.picked){
     if(!k.startsWith(loc.name+'@2:')) continue;   // "@2:" = the Phase 1.5 route layouts
@@ -1801,6 +1801,11 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   if(cls==='tree' && (x+y)%2) extra = ' alt';
   if(map.cave || map.deep){ extra += map.deep ? ' deep' : ' cave'; if(cls==='tree' && (y+1>=map.h || map.tiles[y+1][x]!=='T')) extra += ' face'; }
   if(map.diveSpots && map.diveSpots.has(x+','+y)) extra += ' divespot';
+  // Weather on the ground: puddles in the rain, drifts in the snow, ash on the grass (cleared where you've walked).
+  const wth = !map.interior && map.weather, h = v % 11;
+  if(wth==='rain' && cls==='grass' && h<2) extra += ' puddle';
+  if(wth==='snow' && cls==='grass' && h<4) extra += ' drift';
+  if(wth==='ash' && (cls==='grass' && h<6 || cls==='tall') && !(map.ashClean && map.ashClean.has(x+','+y))) extra += ' ashy';
   if(map.shafts && map.shafts.has(x+','+y)) extra += ' shaft';
   // Two-tile furniture (tables 'tt', Mart shelves 'ss'): left and right halves alternate along a run.
   if(cls==='table' || cls==='shelf'){ let n = 0; while(x-n-1>=0 && map.tiles[y][x-n-1]===ch) n++; extra = n%2 ? ' right' : ' left'; }
@@ -2078,7 +2083,25 @@ function updateReflect(){
   const el = document.getElementById('owPlayer');
   if(el) el.classList.toggle('reflect', worldTile(adv.pos.x, adv.pos.y+1)==='~');
 }
+function weatherStep(x, y, facing){
+  const map = curMap(), wx = map.weather, world = document.getElementById('owWorld');
+  if(!wx || map.interior || adv.surfing || !world || !inMap(map, x, y)) return;
+  const ch = map.tiles[y][x];
+  if(wx==='ash' && (ch==='.' || ch==='"')){
+    const k = x+','+y, tile = document.querySelector(`#owTiles > [data-x="${x}"][data-y="${y}"].ashy`);
+    if(tile || ch==='"'){ (map.ashClean ||= new Set()).add(k); if(tile) tile.classList.remove('ashy'); }
+    else return;
+  }
+  const kind = {rain:'splash', snow:'print', ash:'ashpuff'}[wx];
+  if(!kind || !WALKABLE.has(ch)) return;
+  const el = document.createElement('div');
+  el.className = 'ow-wxfx ' + kind;
+  el.style.cssText = `left:${x*T}px; top:${y*T}px; z-index:${19+2*y};` + (kind==='print' ? `transform:rotate(${({up:0, right:90, down:180, left:270})[facing]||0}deg);` : '');
+  world.appendChild(el);
+  setTimeout(()=>el.remove(), kind==='print' ? 5000 : 700);
+}
 function owStart(a){
+  if(!a.inPlace && !a.jump) weatherStep(Math.round(a.fx), Math.round(a.fy), adv.facing);
   updateReflect();
   owStepFoot = !owStepFoot;   // feet alternate step to step
   a.foot = owStepFoot ? 1 : 2;
@@ -2932,7 +2955,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.4-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.5-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
