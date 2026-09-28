@@ -3,6 +3,17 @@
   "motd": "Phases 2 and 3 are here: SURF across the sea, go fishing, and take on four new Gyms beyond Portmere!",
   "changelog": [
     {
+      "version": "0.12.3",
+      "date": "2026-09-28",
+      "title": "Fixes from an Automated Playtest",
+      "changes": [
+        "Fixed: a beaten trainer could end up standing in the only gap in a Gym maze and block the Leader. Trainers now walk back to their post after a battle",
+        "If you slip past your rival without being spotted, they now stop you at the exit instead of leaving you to hunt for them",
+        "Rivals and Gym Leaders now bring as many Pokémon as you have (at least their own team), not always six",
+        "Rivals and Leaders only hold Leftovers from your 2nd badge on"
+      ]
+    },
+    {
       "version": "0.12.1",
       "date": "2026-09-27",
       "title": "Polish: Hideout and Surf",

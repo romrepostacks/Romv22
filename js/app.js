@@ -1925,6 +1925,8 @@ function owTryStep(startAt, chained){
   }
   if(cross && cross.exit.gate && !adv.cleared[loc.name]){
     drawPlayer(0);
+    // Slipped past the rival's line of sight? They call you back rather than leave you hunting for them.
+    if(loc.type==='trainer') return owSay([`${loc.leaderName.toUpperCase()}: "Hey! Not so fast! You're not getting past without a battle!"`], ()=>startTrainerBattle());
     return owSay([`You should challenge ${loc.type==='gym'?'Gym Leader':'your rival'} ${loc.leaderName} before moving on.`]);
   }
   // Surfing: glide over water; step toward land and you hop off onto it.
@@ -2098,6 +2100,7 @@ function leaveBuilding(){
 // one tile below it, facing down, with the party healed. Home is the default.
 function sendToCenter(){
   const li = adv.lastHeal!=null && LOCATIONS[adv.lastHeal].center ? adv.lastHeal : 0;
+  if(walkBackNpc && walkBackNpc.trail){ Object.assign(walkBackNpc, walkBackNpc.trail[0]); walkBackNpc.facing = walkBackNpc.postFacing; walkBackNpc.trail = null; walkBackNpc = null; }
   adv.surfing = false;
   const b = getMap(LOCATIONS[li]).buildings.find(b=>b.kind==='center');
   adv.loc = li; adv.inside = null;
@@ -2117,10 +2120,11 @@ function triggerTrainer(npc){
   if(bang) bang.classList.remove('hidden');
   sfx('spot');
   let foot = 1;
+  npc.trail = [{x:npc.x, y:npc.y}]; npc.postFacing = npc.facing;
   const walkUp = ()=>{
     if(Math.abs(adv.pos.x-npc.x) + Math.abs(adv.pos.y-npc.y) <= 1) return challenge();
     npc.facing = npc.x<adv.pos.x ? 'right' : npc.x>adv.pos.x ? 'left' : npc.y<adv.pos.y ? 'down' : 'up';
-    npc.x += DIRS[npc.facing][0]; npc.y += DIRS[npc.facing][1];
+    npc.x += DIRS[npc.facing][0]; npc.y += DIRS[npc.facing][1]; npc.trail.push({x:npc.x, y:npc.y});
     if(el){
       el.firstElementChild.outerHTML = charSvg(npc.kind, npc.facing, foot = 3-foot);
       el.style.transform = `translate(${npc.x*T+4}px,${npc.y*T-6}px)`;
@@ -2134,6 +2138,7 @@ function triggerTrainer(npc){
     drawPlayer(0);
     faceNpcToPlayer(npc);
     owBusy = false;
+    if(npc.trail.length > 1) walkBackNpc = npc;
     if(npc.id) return owSay([`${npc.title}: "${npc.intro}"`], ()=>startTrainerBattle(npc));
     const quote = npc.gymLeader ? `So, a new challenger has come to the ${loc.name.split(' ')[0]} Gym. Show me what your Pokémon can do!`
       : (loc.desc.match(/"([^"]+)"/)||[])[1] || "Let's battle!";
@@ -2760,7 +2765,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.12.1-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.12.3-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3767,10 +3772,11 @@ function startTrainerBattle(npc){
   if(!rt){
     const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
-    for(const n of extra) if(names.length<6 && !names.includes(n)) names.push(n);
-    for(let i=0; names.length<6; i++) names.push(extra[i % extra.length]);
+    const size = Math.min(6, Math.max(names.length, adv.party.length));
+    for(const n of extra) if(names.length<size && !names.includes(n)) names.push(n);
+    for(let i=0; names.length<size; i++) names.push(extra[i % extra.length]);
   }
-  const team = names.map(n=>makeMon(dexByName(n), id++, rt ? 'none' : 'leftovers', lv));
+  const team = names.map(n=>makeMon(dexByName(n), id++, rt || badgeCount() < 2 ? 'none' : 'leftovers', lv));
   team.forEach(markSeen);
   state = {sideA: adv.party, sideB: team, log:[], mode:'story', trainerLoc: rt ? {type:'route', name:npc.id, leaderName:npc.title} : loc};
   battleIntro(()=>{
@@ -3810,7 +3816,25 @@ function movePromptNext(done){
     }, 'gm-yesno');
   });
 }
+// A beaten trainer walks back along the way they came, so they never block a path.
+let walkBackNpc = null;
+function trainerWalkBack(done){
+  const npc = walkBackNpc; walkBackNpc = null;
+  if(!npc || !npc.trail || !curMap().npcs.includes(npc)) return done();
+  const path = npc.trail.slice(0, -1).reverse(); npc.trail = null;
+  const el = ()=>document.getElementById(`npc-${curMap().npcs.indexOf(npc)}`);
+  let foot = 1; owBusy = true;
+  const next = ()=>{
+    const p = path.shift(), e = el();
+    if(!p){ npc.facing = npc.postFacing || npc.facing; if(e) e.firstElementChild.outerHTML = charSvg(npc.kind, npc.facing, 0); owBusy = false; return done(); }
+    npc.facing = p.x>npc.x ? 'right' : p.x<npc.x ? 'left' : p.y>npc.y ? 'down' : 'up'; npc.x = p.x; npc.y = p.y;
+    if(e){ e.firstElementChild.outerHTML = charSvg(npc.kind, npc.facing, foot = 3-foot); e.style.transform = `translate(${npc.x*T+4}px,${npc.y*T-6}px)`; e.style.zIndex = 20 + 2*npc.y; }
+    setTimeout(next, WALK_MS);
+  };
+  next();
+}
 function afterStory(){
+  if(walkBackNpc && !activeTrainer(walkBackNpc)) return trainerWalkBack(afterStory);
   if(adv.story && adv.story.surfGift){
     delete adv.story.surfGift; adv.items.hm03 = 1; saveAdv();
     return owSay(['SABLE: "The sea chose well today. Take this as well."'], ()=>obtainItem('HM03 SURF', 1, 'TMs & HMs', ()=>owSay([
