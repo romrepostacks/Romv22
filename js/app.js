@@ -1368,7 +1368,8 @@ function buildRoute(loc){
   // Items (tester #15): a mix of useful things, waiting at the end of the side paths first.
   const ITEM_DROPS = ['potion','potion','pokeball','antidote','superpotion','parlyzheal','pokeball','awakening','burnheal','potion'];
   const itemTypes = {};
-  const drop = (x,y)=>{ tiles[y][x] = 'I'; itemTypes[`${x},${y}`] = ITEM_DROPS[Math.floor(rnd()*ITEM_DROPS.length)]; };
+  const DROPS = (loc.tier||0) >= 20 ? [...ITEM_DROPS, 'hyperpotion', 'revive', 'revive'] : ITEM_DROPS;   // late areas: stronger medicine
+  const drop = (x,y)=>{ tiles[y][x] = 'I'; itemTypes[`${x},${y}`] = DROPS[Math.floor(rnd()*DROPS.length)]; };
   for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x]) && reach.has(pk.y*W+pk.x)) drop(pk.x, pk.y);   // only clearings you can walk to
   for(let k=Object.keys(itemTypes).length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
   if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
@@ -2838,6 +2839,9 @@ const ITEM_INFO = {pokeball:{name:'POKé BALL', pocket:1, desc:'A tool for catch
   parlyzheal:{name:'PARLYZ HEAL', pocket:0, desc:'Heals a paralyzed POKéMON.', price:200, cure:'par'},
   awakening:{name:'AWAKENING', pocket:0, desc:'Awakens a sleeping POKéMON.', price:250, cure:'slp'},
   burnheal:{name:'BURN HEAL', pocket:0, desc:'Heals a POKéMON of a burn.', price:250, cure:'brn'},
+  hyperpotion:{name:'HYPER POTION', pocket:0, desc:'Restores the HP of a POKéMON by 200 points.', price:1200, heal:200},
+  revive:{name:'REVIVE', pocket:0, desc:'Revives a fainted POKéMON, restoring half its HP.', price:1500, revive:0.5},
+  fullrestore:{name:'FULL RESTORE', pocket:0, desc:'Fully restores the HP and status of a POKéMON.', price:3000, full:true},
   hm03:{name:'HM03 SURF', pocket:2, desc:'Lets a POKéMON carry you across water. Face the water and press A.'},
   hm08:{name:'HM08 DIVE', pocket:2, desc:'Lets a POKéMON take you underwater. Use it on dark, deep water while you SURF.'},
   oldrod:{name:'OLD ROD', pocket:4, desc:'An old fishing rod. Face the water and press A to fish.'}};
@@ -2846,6 +2850,8 @@ const CURED = {psn:'poisoning', par:'paralysis', slp:'sleep', brn:'its burn'};
 // Use a medicine on m. Returns the message, or null if it would do nothing (nothing is used up).
 function useItem(id, m){
   const it = ITEM_INFO[id];
+  if(it && it.revive && adv.items[id]){ if(!(m.fainted || m.hp<=0)) return null; adv.items[id]--; m.fainted = false; m.hp = Math.max(1, Math.floor(m.maxhp*it.revive)); return `${dname(m)} was revived!`; }
+  if(it && it.full && adv.items[id] && !(m.fainted || m.hp<=0)){ if(m.hp>=m.maxhp && !m.status) return null; adv.items[id]--; m.hp = m.maxhp; m.status = null; m.sleepTurns = 0; return `${dname(m)} was fully restored!`; }
   if(!it || !adv.items[id] || m.fainted || m.hp<=0) return null;
   if(it.heal){
     if(m.hp>=m.maxhp) return null;
@@ -2859,7 +2865,7 @@ function useItem(id, m){
   }
   return null;
 }
-const isMedicine = id=>ITEM_INFO[id] && (ITEM_INFO[id].heal || ITEM_INFO[id].cure);
+const isMedicine = id=>ITEM_INFO[id] && (ITEM_INFO[id].heal || ITEM_INFO[id].cure || ITEM_INFO[id].revive || ITEM_INFO[id].full);
 let bagPocket = 1;
 function bagOpen(){
   const s = scrOpen('bag', k=>{
@@ -2925,7 +2931,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.14.1-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3010,7 +3016,7 @@ function martOpen(){
   };
   // SELL: anything you carry, at half price.
   const sell = ()=>{
-    const have = Object.keys(ITEM_INFO).filter(id=>adv.items[id]>0);
+    const have = Object.keys(ITEM_INFO).filter(id=>adv.items[id]>0 && ITEM_INFO[id].price);   // key items and HMs can't be sold
     if(!have.length){ owPrompt("You don't have anything to sell."); return setTimeout(top, 1200); }
     owPrompt('What would you like to sell?');
     uiMenu(view, have.map(id=>`${ITEM_INFO[id].name} ×${adv.items[id]}`).concat('CANCEL'), k=>{
@@ -3030,7 +3036,7 @@ function martOpen(){
     }, 'gm-br');
   };
   const badges = LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length;
-  const stock = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening'].concat(badges>=2 ? ['superpotion', 'burnheal'] : []);
+  const stock = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening'].concat(badges>=2 ? ['superpotion', 'burnheal'] : [], badges>=5 ? ['hyperpotion', 'revive'] : [], badges>=8 ? ['fullrestore'] : []);
   const list = ()=>{
     owPrompt('What would you like?');
     uiMenu(view, stock.map(id=>`${ITEM_INFO[id].name}  ₽${ITEM_INFO[id].price}`).concat('CANCEL'), k=>{
@@ -3936,8 +3942,8 @@ function startTrainerBattle(npc){
   const loc = LOCATIONS[adv.loc], rt = npc && npc.id;
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
   let id=9000;
-  const lv = npc && npc.elite!=null ? Math.min(70, Math.round(partyAvgLevel()) + 1 + npc.elite)
-    : loc.champion && !rt ? Math.min(70, Math.round(partyAvgLevel()) + 4)
+  const lv = npc && npc.elite!=null ? Math.min(70, Math.round(partyAvgLevel()) + npc.elite)
+    : loc.champion && !rt ? Math.min(70, Math.round(partyAvgLevel()) + 3)
     : rt ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 1)) : trainerLevel();
   // Rivals and Leaders field six: their signature team, filled out with type-fitting Pokémon.
   // Rivals and Leaders grow with your badges (as in Emerald): at most 2 + badges Pokémon (6 at most). A signature

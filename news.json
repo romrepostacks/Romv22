@@ -3,6 +3,17 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.14.1",
+      "date": "2026-09-28",
+      "title": "League Balance and New Medicine",
+      "changes": [
+        "New in Poké Marts: HYPER POTION and REVIVE from your 5th badge, FULL RESTORE with all 8",
+        "Victory Road and the late areas can hold Hyper Potions and Revives",
+        "The Elite Four and Champion Wren are a little easier",
+        "Fixed: key items and HMs showed up in the Mart's SELL list (selling one broke your money)"
+      ]
+    },
+    {
       "version": "0.14.0",
       "date": "2026-09-28",
       "title": "Phase 5: The Pokémon League",
