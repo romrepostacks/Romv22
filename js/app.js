@@ -2587,15 +2587,16 @@ function bagDraw(anim){
 const SHELLS = ['RED', 'BLACK', 'WHITE', 'BLUE', 'SILVER', 'PINK', 'YELLOW', 'TEAL'];
 function applyShell(){ const el = document.getElementById('adv'); if(el) el.dataset.shell = ((adv && adv.shell) || 'RED').toLowerCase(); }
 function optionOpen(){
-  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
-  const val = r=> r[1]==='sound' ? (adv.sound===false ? 'OFF' : 'ON') : (adv[r[1]] || r[3]);
+  const rows = [['TEXT SPEED', 'textSpeed', ['SLOW','MID','FAST'], 'MID'], ['SOUND', 'sound', ['ON','OFF'], 'ON'], ['EXP SHARE', 'expShare', ['ON','OFF'], 'ON'], ['FRAME', 'shell', SHELLS, 'RED']];
+  const onOff = {sound:true, expShare:true};   // stored as true/false; missing = ON
+  const val = r=> onOff[r[1]] ? (adv[r[1]]===false ? 'OFF' : 'ON') : (adv[r[1]] || r[3]);
   const s = scrOpen('opt', k=>{
     if(k==='b' || k==='a' && s.i===rows.length){ saveAdv(); return scrClose(); }
     if(k==='up' || k==='down') s.i = (s.i + (k==='up' ? rows.length : 1)) % (rows.length+1);
     const r = rows[s.i];
     if(r && (k==='left' || k==='right')){
       const v = r[2][(r[2].indexOf(val(r)) + (k==='left' ? r[2].length-1 : 1)) % r[2].length];
-      if(r[1]==='sound') adv.sound = v==='ON'; else adv[r[1]] = v;
+      if(onOff[r[1]]) adv[r[1]] = v==='ON'; else adv[r[1]] = v;
       if(r[1]==='shell') applyShell();
     }
     draw();
@@ -2612,7 +2613,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.11.0-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.11.1-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3981,7 +3982,7 @@ function render(snap){
     hud.innerHTML = side.map((m,i)=>`<div class="hpbox" id="hb-${key}${i}">
       <div class="hb-top"><span class="hb-name">${dname(m)}<span class="hb-st"></span></span><span class="hb-lv">Lv${m.level||50}</span></div>
       <div class="hb-bar"><b>HP</b><div class="hb-track"><div class="hb-fill"></div></div></div>
-      ${player?'<div class="hb-num"></div>':''}
+      ${player?`<div class="hb-xp" title="EXP"><i style="width:${Math.max(0, Math.min(100, Math.round(100*(m.xp||0)/(m.xpNext||1))))}%"></i></div><div class="hb-num"></div>`:''}
     </div>`).join('');
   }
   applySnap(snap, true);
@@ -4015,6 +4016,7 @@ function applySnap(snap, instant){
 let cmd = null;
 function startBattleUI(){
   cmd = null;
+  if(adv) adv.party.forEach(m=>{ delete m.fought; });
   state.lastMove = {};
   document.getElementById('battleCmd').innerHTML = '';
   render();
@@ -4226,6 +4228,7 @@ function submitTurn(){
       continue;
     }
     if(!canAct(act.user)) continue;
+    act.user.fought = true;   // took part (for EXP SHARE OFF)
     if(Math.random()*100 > act.move.a){ addLog(`${dname(act.user)} used ${act.move.n} — missed!`); continue; }
 
     if(act.move.c==='status'){
@@ -4275,7 +4278,8 @@ function checkEnd(){
         document.getElementById('storyResultText').textContent = '🏆 Victory!';
         const xpAmount = state.trainerLoc ? (state.trainerLoc.type==='gym'?60:35) : 18*state.sideB.length;
         const growStart = state.log.length;
-        for(const m of adv.party) grantXp(m, xpAmount);
+        const earners = adv.expShare===false ? adv.party.filter(m=>m.fought) : adv.party;
+        for(const m of earners) grantXp(m, xpAmount);
         const grew = state.log.slice(growStart);   // level-ups, new moves, evolutions
         const head = state.trainerLoc ? `You defeated ${state.trainerLoc.type==='gym'?'Gym Leader ':''}${state.trainerLoc.leaderName}! (+${xpAmount} XP)` : `The wild Pokémon retreated. (+${xpAmount} XP)`;
         if(state.trainerLoc){

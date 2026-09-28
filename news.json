@@ -3,6 +3,15 @@
   "motd": "Welcome to the Party Royale playtest! Tap FEEDBACK on the handheld anytime to tell us what you think.",
   "changelog": [
     {
+      "version": "0.11.1",
+      "date": "2026-09-27",
+      "title": "EXP Share and EXP Bar",
+      "changes": [
+        "New OPTION: EXP SHARE ON (whole party earns EXP) or OFF (only Pokémon that attacked)",
+        "Your Pokémon now show an EXP bar under their HP in battle"
+      ]
+    },
+    {
       "version": "0.11.0",
       "date": "2026-09-27",
       "title": "Phase 1.5: Guided Routes",

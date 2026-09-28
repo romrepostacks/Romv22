@@ -1015,3 +1015,7 @@ body:has(#adv:not(.hidden)){background:#141418;}
 
 /* Party slots 7-10 stay locked until the 4th badge. */
 .pb-empty.pb-locked{opacity:.45;} .pb-empty.pb-locked::after{content:"🔒"; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:14px;}
+
+/* EXP bar under your Pokémon's HP (battle HUD). */
+.hb-xp{height:4px; margin:2px 3px 0 22px; background:#404850; border-radius:2px; overflow:hidden;}
+.hb-xp i{display:block; height:100%; background:linear-gradient(#78d0f8,#3898d8);}

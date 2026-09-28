@@ -20,7 +20,7 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    you have to cross at points on the main path; trainers watching the path; ledges as real one-way shortcuts;
    rocks that shape the path; item variety (Potions, Antidotes, Super Potions, Poké Balls) at the end of side paths;
    a lower wild encounter rate.
-2. **Surf** (after 1.5; folds in #10 land/water encounter split and #17 bigger water + fishing). Sable (badge 2) gives SURF; ride water tiles; surf sprite; water encounters; sea routes out of
+2. **Surf — PAUSED until the owner says go** (after 1.5; folds in #10 land/water encounter split and #17 bigger water + fishing). Sable (badge 2) gives SURF; ride water tiles; surf sprite; water encounters; sea routes out of
    Glimmer Coast / Portmere.
 3. **Four new towns + gyms** (Electric, Grass, Ice, Dragon/Flying → 8 badges) and routes between them;
    Tempest's hideout (with Wren's turn).
