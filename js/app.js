@@ -1826,10 +1826,14 @@ function npcHtml(n, i){
 const WEATHER = {"Stormwake Depths":'deep', "Coral Trench":'deep', "Glimmer Deep":'deep', "Sunken Shrine":'deep', "Cindergate Town":'ash', "Route 2: Marrow Pass":'ash', "Wispgate City":'fog', "Route 5: Cragmoor Trail":'fog', "Route 3: Hollow Bluffs":'rain', "Glimmer Coast":'rain',
   "Route 7: Stormwake Strait":'rain', "Route 9: Frostpine Ridge":'snow', "Rimefall Town":'snow', "Tempest Hideout":'cave', "Route 10: Skyreach Cliffs":'fog'};
 let owShownLoc = null;
+if(typeof setInterval==='function') setInterval(()=>{ if(typeof adv!=='undefined' && adv) weatherClasses(document.getElementById('owView')); }, 60000);
 // How much weather falls: OFF hides it (the ground keeps its puddles, snow and ash), MED and HIGH add layers.
 function weatherAmount(){ return adv.weatherAmt || (adv.weatherFx===false ? 'OFF' : 'LOW'); }
 function weatherClasses(view){
   if(!view) return;
+  const tod = timeOfDay();
+  for(const t of ['morning','day','evening','night']) view.classList.toggle('tod-'+t, t===tod);
+  if(!view.querySelector('.tod-layer')) view.insertAdjacentHTML('beforeend', '<div class="tod-layer"></div>');
   const amt = weatherAmount();
   view.classList.toggle('nofx', amt==='OFF');
   view.classList.toggle('wx-amt-med', amt==='MED');
@@ -1856,7 +1860,7 @@ function renderOverworld(){
   if(owShownLoc !== adv.loc && !map.interior){
     owShownLoc = adv.loc;
     const pop = document.getElementById('owPopup');
-    pop.textContent = loc.name;
+    pop.textContent = loc.name + (loc.deep || map.interior ? '' : ' · ' + timeOfDay().toUpperCase());
     pop.classList.remove('show'); void pop.offsetWidth; pop.classList.add('show');
     clearTimeout(pop.__t); pop.__t = setTimeout(()=>pop.classList.remove('show'), 2200);
   }
@@ -2967,7 +2971,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.14.7-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.15.0-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3960,7 +3964,9 @@ function startWildBattle(fixed, where){
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
   // A wild pack: 1 up to half your (living) party, at most 4.
   const n = 1 + Math.floor(Math.random()*Math.min(4, Math.ceil(alive(adv.party).length/2)));
-  const picks = fixed ? fixed.names : shuffle(where==='water' ? waterPool(loc) : areaPool(loc)).slice(0,n);
+  const outdoors = where!=='water' && !loc.deep && loc.theme!=='cave';
+  const pool = where==='water' ? waterPool(loc) : areaPool(loc).concat(outdoors && timeOfDay()==='night' && Math.random() < 0.25 ? [NIGHT_VISITORS[Math.floor(Math.random()*NIGHT_VISITORS.length)]] : []);
+  const picks = fixed ? fixed.names : timePicks(pool, n);
   let id=9000;
   const wild = picks.map(n=>makeMon(dexByName(n), id++, 'none', fixed ? fixed.level : wildLevel()));
   wild.forEach(markSeen);
@@ -4164,6 +4170,26 @@ function dexRegisterNext(){
   dexDraw();
 }
 
+// Day and night (the device's clock, like the Gen 2-4 games). Each time of day favours some types: their
+// species turn up three times as often. At night, Dark, Ghost and Fairy visitors also wander outdoors.
+const TIME_TYPES = {morning:['Grass','Bug','Normal','Flying'], day:['Fire','Ground','Rock','Fighting','Steel'],
+  evening:['Water','Electric','Psychic','Dragon','Ice'], night:['Dark','Ghost','Fairy','Poison']};
+const NIGHT_VISITORS = ['Murkrow','Poochyena','Gastly','Misdreavus','Duskull','Shuppet','Clefairy','Snubbull'];
+function timeOfDay(){
+  const h = typeof window!=='undefined' && window.__todHour!=null ? window.__todHour : new Date().getHours();   // __todHour: a test override
+  return h>=4 && h<10 ? 'morning' : h>=10 && h<17 ? 'day' : h>=17 && h<20 ? 'evening' : 'night';
+}
+// Pick n species from the pool, weighted toward the types of this time of day (no repeats).
+function timePicks(pool, n){
+  const boost = TIME_TYPES[timeOfDay()];
+  const bag = [...new Set(pool)].map(name=>({name, w:dexByName(name).types.some(t=>boost.includes(t)) ? 3 : 1})), out = [];
+  while(out.length < n && bag.length){
+    let r = Math.random() * bag.reduce((a,b)=>a+b.w, 0), i = 0;
+    while(r >= bag[i].w){ r -= bag[i].w; i++; }
+    out.push(bag.splice(i, 1)[0].name);
+  }
+  return out;
+}
 // Wild Pokémon in the water (surfing) and on the line (fishing).
 function waterPool(loc){ return loc.water || ['Magikarp','Psyduck','Poliwag','Goldeen']; }
 function fishPool(loc){ const sea = loc.theme==='sea' || /Coast|Harbour|Tidalkeep|Bluffs/.test(loc.name);

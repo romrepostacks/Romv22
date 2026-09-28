@@ -3,6 +3,17 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.15.0",
+      "date": "2026-09-28",
+      "title": "Day and Night",
+      "changes": [
+        "Vellorin now follows your device's clock: morning (4 AM-10 AM), day (10 AM-5 PM), evening (5 PM-8 PM) and night (8 PM-4 AM)",
+        "The overworld lights up and darkens with the time of day. The area name shows the time as you arrive",
+        "Each time of day favours different types in the wild: morning Grass, Bug, Normal and Flying; day Fire, Ground, Rock, Fighting and Steel; evening Water, Electric, Psychic, Dragon and Ice; night Dark, Ghost, Fairy and Poison",
+        "At night, Dark, Ghost and Fairy Pokémon sometimes wander into areas they don't normally live in"
+      ]
+    },
+    {
       "version": "0.14.7",
       "date": "2026-09-28",
       "title": "Weather Amount",
