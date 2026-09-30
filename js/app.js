@@ -1846,7 +1846,7 @@ function renderOverworld(){
   view.className = 'ow-view' + (map.interior ? ` indoors room-${map.interior}${map.theme ? ` gym-${map.theme}` : ''}` : WEATHER[loc.name] ? ` wx-${WEATHER[loc.name]}` : '');
   weatherClasses(view);
   if(map.theme==='ghost') view.style.setProperty('--sight', (70 + 45*map.npcs.filter(n=>n.id && adv.cleared[n.id]).length) + 'px');
-  let html = '<div id="owTiles"></div>';
+  let html = '<div class="ow-backdrop" id="owBackdrop"></div><div id="owTiles"></div>';
   html += curNpcs().map(n=>npcHtml(n, map.npcs.indexOf(n))).join('');
   html += nbNpcs().map(({n, x, y})=>`<div class="ow-actor npc nb-npc" style="transform:translate(${x*T+4}px,${y*T-6}px); z-index:${20+2*y}">${charSvg(n.kind, n.facing, 0)}</div>`).join('');
   html += `<div class="ow-actor" id="owPlayer"><div class="ow-surf"></div><div class="ow-body"></div><div class="ow-reflect"></div></div>`;
@@ -1892,6 +1892,8 @@ function renderTiles(cx, cy, inc){
     if(x<win.x0 || x>win.x1 || y<win.y0 || y>win.y1) el.remove();
   }
   layer.__win = win;
+  const bd = document.getElementById('owBackdrop');   // the forest behind the window (past the map edges)
+  if(bd) bd.style.cssText = `left:${win.x0*T}px; top:${win.y0*T}px; width:${(win.x1-win.x0+1)*T}px; height:${(win.y1-win.y0+1)*T}px`;
   let html = '', fronts = '';
   for(let y=win.y0; y<=win.y1; y++) for(let x=win.x0; x<=win.x1; x++){
     if(inOld(x,y)) continue;
@@ -1970,7 +1972,6 @@ function setActorPos(px, py){
   const cx = (VIEW_W*T - T)/2, cy = (VIEW_H*T - T)/2;
   const wx = snap(cx - px*T), wy = snap(cy - py*T);
   world.style.transform = `translate(${wx}px,${wy}px)`;
-  world.parentNode.style.backgroundPosition = `${wx}px ${wy}px`;   // the forest past the maps scrolls too
   el.style.transform = `translate(${cx - wx + 4}px,${cy - wy - 6}px)`;
 }
 function placePlayer(){
@@ -2971,7 +2972,7 @@ function optionOpen(){
 // issue with a token only it holds, so testers stay anonymous. With no endpoint set, or if the relay
 // can't be reached, it falls back to a pre-filled GitHub issue link (that needs a GitHub account).
 // Either way the game adds where they are and what they carry.
-const GAME_VERSION = '0.15.1-playtest';   // bump on each push so reports show which build they came from
+const GAME_VERSION = '0.15.2-playtest';   // bump on each push so reports show which build they came from
 const FEEDBACK_REPO = 'romrepostacks/romv22';   // set to the GitHub repo that should receive issues
 const FEEDBACK_ENDPOINT = 'https://party-royale-feedback.kylemeadows.workers.dev';                    // the Worker's URL, e.g. https://party-royale-feedback.<you>.workers.dev
 const FEEDBACK_KINDS = ['Bug', 'Looks wrong', 'Feels off', 'Idea', 'Praise'];
@@ -3557,7 +3558,10 @@ function offWorldButton(k){
   }
   return false;
 }
-function saveAdv(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){} }
+function saveAdv(){
+  if(adv) for(const m of adv.box || []) if(m && !m.caught){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.sleepTurns = 0; }   // the Box heals (#27)
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){}
+}
 // Phones close backgrounded apps without warning, so save the moment the game is hidden (the game
 // already saves whenever you stop walking and after most events). And ask the browser to keep the
 // save: Safari otherwise clears a site's storage after about a week without a visit.

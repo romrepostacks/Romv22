@@ -3,6 +3,16 @@
   "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
   "changelog": [
     {
+      "version": "0.15.2",
+      "date": "2026-09-30",
+      "title": "Smoother Walking and Box Healing",
+      "changes": [
+        "Walking and running should be much smoother, especially on phones: the screen no longer repaints fully every frame",
+        "The day and night lighting is lighter on your device",
+        "Pokémon in the PC Box are now fully healed, including ones sent there when caught"
+      ]
+    },
+    {
       "version": "0.15.1",
       "date": "2026-09-28",
       "title": "In-Game Clock",

@@ -1174,8 +1174,12 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .wx-layer.l1{animation-delay:-2.3s,-1.1s !important;} .wx-layer.l2{animation-delay:-4.7s,-2.9s !important;}
 
 /* Day and night: a light over the overworld (outdoors only). */
-.tod-layer{position:absolute; inset:0; z-index:43; pointer-events:none; mix-blend-mode:multiply; transition:background-color 3s; background-color:transparent;}
-.ow-view.tod-morning .tod-layer{background-color:#fff0dc;}
-.ow-view.tod-evening .tod-layer{background-color:#f4c090;}
-.ow-view.tod-night .tod-layer{background-color:#5a6aa8;}
+.tod-layer{position:absolute; inset:0; z-index:43; pointer-events:none; transition:background-color 3s; background-color:transparent;}
+.ow-view.tod-morning .tod-layer{background-color:#ffd8a014;}
+.ow-view.tod-evening .tod-layer{background-color:#e0703030;}
+.ow-view.tod-night .tod-layer{background-color:#0c184c70;}
 .ow-view.indoors .tod-layer, .ow-view.wx-deep .tod-layer, .ow-view.wx-cave .tod-layer{display:none;}
+
+/* The forest past the map edges: a backdrop in the world, sized to the tile window (#25/#26). */
+.ow-backdrop{position:absolute; background:var(--art-forest_fill) 0 0/32px 32px; image-rendering:pixelated; z-index:0;}
+.indoors .ow-backdrop{background:#000;}
