@@ -11,6 +11,7 @@
 #include "bn_sprite_text_generator.h"
 #include "bn_string_view.h"
 #include "bn_vector.h"
+#include "bn_fixed_point.h"
 #include "pr_ui_data.h"
 
 namespace pr
@@ -26,7 +27,10 @@ enum class text_color
 {
     INK,        // dark text with a light shadow (windows)
     WHITE,      // white text with a dark shadow (battle messages, dark screens)
-    HUD         // dark text on the cream HP boxes
+    HUD,        // dark text on the cream HP boxes
+    PLANK,      // dark brown on the area name plank
+    RED,        // OPTION's chosen value
+    BLUE        // headings on light pages
 };
 
 // The window layer: a 32x32 tile map over everything; boxes are drawn in 8x8 tiles.
@@ -63,6 +67,8 @@ struct menu_spec
     void (*on_move)(void* ctx, int index) = nullptr;
     void* ctx = nullptr;
     bool keep_window = false;               // leave the window drawn afterwards
+    int rows = 0;                           // visible rows (one column); more options scroll. 0: all
+    bool silent = false;                    // no select sound (OPTION)
 };
 
 class ui
@@ -89,7 +95,9 @@ public:
 
     // Prints text into the message box letter by letter (A or B finishes the line, then turns the page),
     // two lines per page, word-wrapped.
-    void say(const bn::string_view& text);
+    // The message box, letter by letter, then A. after_typed (if given) runs once the text is all out, before
+    // the wait for A (a battle's move animation plays then, as the web game's message box does).
+    void say(const bn::string_view& text, void (*after_typed)(void*) = nullptr, void* ctx = nullptr);
     // Prints it all at once and moves on after `frames` without input (SAVING..., the nurse).
     void say_timed(const bn::string_view& text, int frames);
     // Shows text without waiting, until clear_text() (a prompt above a menu). width_px limits the lines.
@@ -99,9 +107,16 @@ public:
     int menu(const menu_spec& spec);
     // Emerald's YES/NO box, above the message box on the right. Returns true for YES.
     bool yes_no(bool default_yes = true);
-    // A one-column list in a box at the right, sized to fit, standing on the message box.
+    // A one-column list in a box at the right, sized to fit, standing on the message box (at most six
+    // rows show at once; the rest scroll).
     int list(const bn::string_view* options, int count, int start = 0, bool cancel = true,
              void (*on_move)(void*, int) = nullptr, void* ctx = nullptr);
+    // The same list in the top left corner (gm-topleft: the PC's menus).
+    int list_top_left(const bn::string_view* options, int count, int start = 0, bool cancel = true,
+                      void (*on_move)(void*, int) = nullptr, void* ctx = nullptr);
+
+    // The naming screen (names, nicknames, box names): returns false if cancelled with nothing typed.
+    bool keyboard(const bn::string_view& title, char* out, int max_length, const bn::string_view& initial = "");
 
     // Text in a colour; sprites go into out (top-left at screen x, y).
     void print(int x, int y, const bn::string_view& text, text_color color, bn::ivector<bn::sprite_ptr>& out,
@@ -109,6 +124,9 @@ public:
     [[nodiscard]] int width(const bn::string_view& text, bool small = false);
 
     void tick();       // per-frame animation (called by pr::frame)
+
+    // Emerald's area name on a wooden plank, dropping in from the top left for a couple of seconds.
+    void show_place(const bn::string_view& text);
 
     // Something to animate every frame while the UI waits (the battle's active Pokémon bobbing).
     void set_frame_hook(void (*hook)(void*), void* ctx)
@@ -127,6 +145,10 @@ private:
     windows _windows;
     bn::vector<bn::sprite_ptr, 40> _message;
     bn::optional<bn::sprite_ptr> _arrow;
+    bn::vector<bn::sprite_ptr, 12> _plank;
+    bn::vector<bn::sprite_ptr, 12> _plank_text;
+    bn::vector<bn::fixed_point, 12> _plank_base;
+    int _plank_timer = 0;
     bool _battle = false;
     bool _box_open = false;
     int _arrow_frame = 0;
@@ -136,6 +158,9 @@ private:
     void _open_box();
     void _close_box();
     int _wrap(const bn::string_view& text, bn::string_view* lines, int max_lines, int width) const;
+    int _list_at(const bn::string_view* options, int count, int start, bool cancel, void (*on_move)(void*, int), void* ctx,
+                 bool top_left);
+    void _place_plank(int y);
     void _draw_lines(const bn::string_view* lines, int count, int last_chars = -1);
 };
 

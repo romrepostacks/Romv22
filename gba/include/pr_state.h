@@ -1,4 +1,5 @@
-// Everything that persists: where you are, your party, PC box and bag. Saved to cartridge SRAM.
+// Everything that persists (the web game's adv): where you are, your party, the PC's boxes, the bag, the
+// story and the options. Saved to cartridge SRAM.
 #ifndef PR_STATE_H
 #define PR_STATE_H
 
@@ -10,14 +11,59 @@
 namespace pr
 {
 
-constexpr int max_party = 6;            // partyCap() before the 4th badge
+constexpr int max_party = 10;           // MAX_PARTY: screens lay out 10 slots
+constexpr int small_party = 6;          // partyCap() before the 4th badge
 constexpr int box_size = 30;            // one PC box
-constexpr int name_length = 7;          // Emerald's player names
+constexpr int box_count = 14;           // Emerald's 14 boxes
+constexpr int box_slots = box_size * box_count;
+constexpr int name_length = 12;         // the web game's names (maxlength 12)
+constexpr int box_name_length = 8;
 
-// Story progress (the web game's adv.starterPending / adv.starterThanks).
-constexpr uint8_t story_starter = 1;    // got a partner from the professor's bag
-constexpr uint8_t story_thanks = 2;     // the professor still has to thank you after the first battle
-constexpr uint8_t story_call1 = 4;      // the professor's call after the first badge (PROF_CALLS)
+// Story progress (adv.starterPending / starterThanks / story.*), as bits.
+namespace story
+{
+    constexpr uint32_t STARTER = 1u << 0;         // got a partner from the professor's bag
+    constexpr uint32_t THANKS = 1u << 1;          // the professor still has to thank you after the first battle
+    constexpr uint32_t CALL1 = 1u << 2;           // PROF_CALLS
+    constexpr uint32_t CALL2 = 1u << 3;
+    constexpr uint32_t CALL3 = 1u << 4;
+    constexpr uint32_t SCENE_TEMPEST_RUN = 1u << 5;   // SCENES, once each
+    constexpr uint32_t SCENE_PORTMERE = 1u << 6;
+    constexpr uint32_t SCENE_HIDEOUT = 1u << 7;
+    constexpr uint32_t SCENE_SHRINE = 1u << 8;
+    constexpr uint32_t SURF_GIFT = 1u << 9;       // Sable still has to hand over HM03 (afterStory)
+    constexpr uint32_t DIVE_GIFT = 1u << 10;      // Hale, HM08
+    constexpr uint32_t LEGEND_FIGHT = 1u << 11;   // just fought the guardian (afterStory)
+    constexpr uint32_t STORM_ENDED = 1u << 12;
+    constexpr uint32_t LEGEND_CAUGHT = 1u << 13;
+    constexpr uint32_t CHAMPION = 1u << 14;       // saw the credits
+    constexpr uint32_t OLD_ROD = 1u << 15;        // (unused: the rod is an item)
+}
+
+enum class text_speed : uint8_t
+{
+    SLOW,
+    MID,
+    FAST
+};
+
+enum class level4 : uint8_t
+{
+    OFF,
+    LOW,
+    MID,
+    HIGH
+};
+
+// OPTION (optionOpen): TEXT SPEED, SOUND, MUSIC, EXP SHARE, WEATHER.
+struct options
+{
+    text_speed speed = text_speed::MID;
+    bool sound = true;
+    level4 music = level4::MID;
+    bool exp_share = true;
+    level4 weather = level4::LOW;
+};
 
 template<int Bits>
 struct bitset
@@ -28,19 +74,33 @@ struct bitset
     {
         return i >= 0 && i < Bits && (bytes[i >> 3] >> (i & 7)) & 1;
     }
-    void set(int i)
+    void set(int i, bool on = true)
     {
         if(i >= 0 && i < Bits)
         {
-            bytes[i >> 3] = uint8_t(bytes[i >> 3] | (1 << (i & 7)));
+            if(on)
+            {
+                bytes[i >> 3] = uint8_t(bytes[i >> 3] | (1 << (i & 7)));
+            }
+            else
+            {
+                bytes[i >> 3] = uint8_t(bytes[i >> 3] & ~(1 << (i & 7)));
+            }
         }
+    }
+    void reset(int i)
+    {
+        set(i, false);
     }
     [[nodiscard]] int count() const
     {
         int n = 0;
-        for(int i = 0; i < Bits; ++i)
+        for(uint8_t b : bytes)
         {
-            n += test(i);
+            for(; b; b &= uint8_t(b - 1))
+            {
+                ++n;
+            }
         }
         return n;
     }
@@ -48,43 +108,74 @@ struct bitset
 
 struct game_state
 {
-    int8_t map = 0;                     // world_data::maps index (an area or a room)
-    int8_t x = 0;
-    int8_t y = 0;
+    int16_t map = 0;                    // world_data::maps index (an area or a room)
+    int16_t x = 0;
+    int16_t y = 0;
     direction facing = direction::DOWN;
     uint8_t party_count = 0;
-    uint8_t box_count = 0;
-    bool mart_gift = false;             // the clerk's free POKé BALLS (talkTo: restockedLoc)
-    uint8_t story = 0;                  // story_* bits
-    int8_t walk_off = -1;               // a beaten rival (trainer id) who still has to say goodbye and leave
-    uint8_t padding[3] = {};
+    bool surfing = false;
+    uint8_t starter_trio = 2;           // STARTER_TRIOS index, picked at random for each new game
+    int16_t walk_off = -1;              // a beaten rival (trainer id) who still has to say goodbye and leave
+    int16_t last_heal = -1;             // the area whose POKéMON CENTER (or home) you last healed at
+    int16_t restocked = -1;             // the area where the clerk last gave you free POKé BALLS
+    uint16_t trainer_id = 0;            // TRAINER CARD IDNo.
+    uint32_t story = 0;                 // story:: bits
     uint32_t money = 3000;              // introFinish(): ₽3000
     uint32_t play_frames = 0;
+    options opt;
     char name[name_length + 1] = {};
     bn::array<uint8_t, items_count> items = {};
+    bn::array<uint8_t, items_count> pc_items = {};
     bn::array<mon, max_party> party;
-    bn::array<mon, box_size> box;
-    bitset<64> beaten;                  // route trainers (trainer::id)
-    bitset<64> picked;                  // item balls (item_ball::id)
-    bitset<256> seen;                   // POKéDEX, by species index
-    bitset<256> owned;
+    bn::array<mon, box_slots> box;      // box b holds b * 30 ... b * 30 + 29; empty slots have level 0
+    char box_names[box_count][box_name_length + 1] = {};
+    uint8_t box_wall[box_count] = {};   // 0: the box's default
+    bitset<256> beaten;                 // trainers (trainer::id); a rival or leader beaten = the place cleared
+    bitset<256> picked;                 // item balls (item_ball::id)
+    bitset<1024> seen;                  // POKéDEX, by species index
+    bitset<1024> owned;
+    bitset<64> visited;                 // areas you've been to (the region map, the TRAINER CARD)
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1
     void heal_party();
-    // Party first, then the PC box. Returns false if both are full.
-    bool add_mon(const mon& m, bool& to_box);
+    [[nodiscard]] int party_cap() const;        // 6, then 10 from the 4th badge (partyCap)
+    // Party first (up to party_cap), then the first free box slot. Returns false if both are full;
+    // box_slot gets the slot used, or -1 for the party.
+    bool add_mon(const mon& m, int& box_slot);
+    [[nodiscard]] int box_used() const;
     void add_item(item_id id, int count);
     [[nodiscard]] int item_count(item_id id) const
     {
         return items[int(id)];
     }
-    [[nodiscard]] int average_level() const;
+    [[nodiscard]] int average_level() const;    // partyAvgLevel, rounded
     [[nodiscard]] int badges() const;           // gym leaders beaten (badgeCount)
+    [[nodiscard]] bool has(uint32_t bits) const
+    {
+        return (story & bits) == bits;
+    }
+    void mark_seen(int species);
+    bool mark_owned(int species);               // true the first time
 };
 
 // The one game in progress.
 game_state& state();
+// A fresh game (introFinish), in place: the state is too big for a temporary on the stack.
+void reset_state();
+bool game_active();
+void set_game_active(bool active);
+
+// The time of day (timeOfDay): 30 minutes of play each, morning first.
+enum class time_of_day
+{
+    MORNING,
+    DAY,
+    EVENING,
+    NIGHT
+};
+time_of_day current_time_of_day();
+const char* time_of_day_name(time_of_day t);
 
 // The one random generator. It advances every frame on the title screen and in the overworld, so the
 // player's timing seeds it (the GBA has no clock to seed from).

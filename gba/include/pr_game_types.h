@@ -36,12 +36,13 @@ struct move
     status inflicts;          // status moves
     status secondary;         // damaging moves' side effect
     uint8_t secondary_chance;
+    bool punch;               // Iron Fist boosts it
 };
 
 struct learn_entry
 {
     uint8_t level;
-    uint8_t move;
+    uint16_t move;
 };
 
 struct base_stats
@@ -54,7 +55,27 @@ struct base_stats
     uint8_t spe;
 };
 
-// ITEM_INFO: pocket 0 is ITEMS, 1 is POKé BALLS.
+// What an ability does in battle (damage()): the rest are flavour.
+enum class ability_kind : uint8_t
+{
+    FLAVOR,
+    BOOST,          // its type's moves x1.5 at 1/3 HP or less (Blaze, Torrent...)
+    IMMUNE,         // takes no damage from one type (Levitate, Flash Fire...)
+    PUNCH,          // punching moves x1.2 (Iron Fist)
+    MERCILESS,      // x1.5 against a poisoned target
+    CORROSION,      // Poison moves hit Steel and Poison types
+    DISGUISE        // the first hit does nothing
+};
+
+struct ability
+{
+    const char* name;
+    const char* desc;
+    ability_kind kind;
+    int8_t type;              // BOOST / IMMUNE: the type, else -1
+};
+
+// ITEM_INFO: pocket 0 ITEMS, 1 POKé BALLS, 2 TMs & HMs, 3 BERRIES, 4 KEY ITEMS.
 struct item_info
 {
     const char* name;
@@ -67,6 +88,23 @@ struct item_info
     bool full;                // full HP and status
 };
 
+// Held items (ITEMS, FREE BATTLE's draft and the trainers' Leftovers).
+enum class held_item : uint8_t
+{
+    NONE,
+    LEFTOVERS,
+    LIFE_ORB,
+    CHOICE_SCARF,
+    FOCUS_SASH,
+    SITRUS_BERRY
+};
+
+struct held_item_info
+{
+    const char* name;
+    const char* desc;
+};
+
 struct species
 {
     const char* name;
@@ -76,11 +114,18 @@ struct species
     base_stats base;
     const learn_entry* learnset;
     int16_t learnset_count;
-    int8_t evolves_to;        // index into species_list, -1 if none in this build
+    const uint16_t* fixed_moves;    // hand-made entries without a learnset know these
+    int8_t fixed_count;
+    int16_t evolves_to;       // index into species_list, -1 if none
     uint8_t evolve_level;
     uint8_t capture_rate;     // Emerald's catch rate (PokeAPI), 3-255
+    const ability& abil;
+    uint16_t height;          // decimetres (DEXINFO)
+    uint16_t weight;          // hectograms
+    const char* genus;        // "Seed"
     const bn::sprite_item& front;
     const bn::sprite_item& back;
+    const bn::sprite_item& icon;    // 32x32, the party screen and the PC
 };
 
 }

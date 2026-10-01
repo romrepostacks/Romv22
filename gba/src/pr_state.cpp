@@ -1,6 +1,7 @@
 #include "pr_state.h"
 
 #include "bn_common.h"
+#include "bn_memory.h"
 #include "bn_sram.h"
 
 #include "pr_world_data.h"
@@ -11,7 +12,7 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 3;
+    constexpr int save_version = 4;
 
     struct save_block
     {
@@ -21,6 +22,8 @@ namespace
         game_state game;
         uint32_t checksum;
     };
+
+    static_assert(sizeof(save_block) <= 32 * 1024, "the save must fit in SRAM");
 
     uint32_t checksum_of(const save_block& block)
     {
@@ -34,7 +37,7 @@ namespace
         return sum;
     }
 
-    // The save block is ~1.5 KB, so it lives in EWRAM rather than on the stack.
+    // The save block is ~21 KB, so it lives in EWRAM rather than on the stack.
     BN_DATA_EWRAM_BSS save_block block_buffer;
 
     bool read_block(save_block& block)
@@ -51,12 +54,50 @@ namespace
     }
 
     BN_DATA_EWRAM_BSS game_state current;
+    bool active = false;
     bn::random random_generator;
 }
 
 game_state& state()
 {
     return current;
+}
+
+void reset_state()
+{
+    auto* bytes = reinterpret_cast<uint8_t*>(&current);
+    for(int i = 0; i < int(sizeof(game_state)); ++i)
+    {
+        bytes[i] = 0;
+    }
+    current.walk_off = -1;
+    current.last_heal = -1;
+    current.restocked = -1;
+    current.money = 3000;
+    current.opt = options();
+    current.starter_trio = 2;
+}
+
+bool game_active()
+{
+    return active;
+}
+
+void set_game_active(bool on)
+{
+    active = on;
+}
+
+time_of_day current_time_of_day()
+{
+    // Each time of day lasts 30 minutes of play (1800 s), so a full day is 2 hours.
+    return time_of_day((current.play_frames / 60 / 1800) % 4);
+}
+
+const char* time_of_day_name(time_of_day t)
+{
+    constexpr const char* names[] = { "MORNING", "DAY", "EVENING", "NIGHT" };
+    return names[int(t)];
 }
 
 bn::random& rng()
@@ -94,26 +135,45 @@ void game_state::heal_party()
     }
 }
 
-bool game_state::add_mon(const mon& m, bool& to_box)
+int game_state::party_cap() const
 {
-    to_box = false;
-    if(party_count < max_party)
+    return badges() >= 4 ? max_party : small_party;
+}
+
+bool game_state::add_mon(const mon& m, int& box_slot)
+{
+    box_slot = -1;
+    if(party_count < party_cap())
     {
         party[party_count++] = m;
         return true;
     }
-    if(box_count < box_size)
+    for(int i = 0; i < box_slots; ++i)
     {
-        box[box_count++] = m;
-        to_box = true;
-        return true;
+        if(box[i].empty())
+        {
+            box[i] = m;
+            box[i].heal();      // the Box heals (saveAdv)
+            box_slot = i;
+            return true;
+        }
     }
     return false;
 }
 
+int game_state::box_used() const
+{
+    int n = 0;
+    for(const mon& m : box)
+    {
+        n += ! m.empty();
+    }
+    return n;
+}
+
 void game_state::add_item(item_id id, int count)
 {
-    items[int(id)] = uint8_t(bn::min(99, items[int(id)] + count));
+    items[int(id)] = uint8_t(bn::min(255, items[int(id)] + count));
 }
 
 int game_state::average_level() const
@@ -127,7 +187,8 @@ int game_state::average_level() const
     {
         sum += party[i].level;
     }
-    return (sum + party_count / 2) / party_count;
+    // Math.round(sum / n)
+    return (2 * sum + party_count) / (2 * party_count);
 }
 
 int game_state::badges() const
@@ -142,6 +203,19 @@ int game_state::badges() const
         }
     }
     return n;
+}
+
+void game_state::mark_seen(int species)
+{
+    seen.set(species);
+}
+
+bool game_state::mark_owned(int species)
+{
+    seen.set(species);
+    bool first = ! owned.test(species);
+    owned.set(species);
+    return first;
 }
 
 bool save_exists()
@@ -172,6 +246,14 @@ bool load_game()
 void save_game()
 {
     save_block& block = block_buffer;
+    // The Box heals (saveAdv, tester #27).
+    for(mon& m : current.box)
+    {
+        if(! m.empty())
+        {
+            m.heal();
+        }
+    }
     for(int i = 0; i < 8; ++i)
     {
         block.tag[i] = save_tag[i];

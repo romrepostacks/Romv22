@@ -1,6 +1,7 @@
-// Title screen, Emerald's main menu (CONTINUE with the save's details, NEW GAME), and the new-game intro: the
-// professor's welcome on a dark stage with LOTAD beside him (the web game's beginNewStory / INTRO_LINES),
-// choosing your name, and his send-off. Your first partner comes later, on ROUTE 1 (starterEvent).
+// The title screen (handheldTitle), its menu (CONTINUE with the save's details, NEW GAME, FREE BATTLE,
+// WHAT'S NEW), and the new-game intro: the professor's welcome on a dark stage with LOTAD beside him
+// (beginNewStory / INTRO_LINES), your name, and his send-off. Your first partner comes later, on ROUTE 1,
+// from a trio picked at random (STARTER_TRIOS).
 #include "bn_bg_palettes.h"
 #include "bn_common.h"
 #include "bn_keypad.h"
@@ -15,7 +16,9 @@
 #include "bn_sprite_items_cursor.h"
 #include "bn_sprite_items_prof_big.h"
 
+#include "pr_audio.h"
 #include "pr_game_data.h"
+#include "pr_news_data.h"
 #include "pr_scenes.h"
 #include "pr_state.h"
 #include "pr_ui.h"
@@ -27,6 +30,7 @@ namespace pr
 namespace
 {
     constexpr int start_poke_balls = 10;     // introFinish(): items {pokeball: 10}
+    constexpr const char* build_version = "1.0";
 
     BN_DATA_EWRAM_BSS game_state saved_preview;
 
@@ -43,162 +47,21 @@ namespace
         return t;
     }
 
-    // Emerald's naming screen, simplified: a name box and a letter board. A types, B deletes, SELECT
-    // switches case, START jumps to OK.
-    void name_entry(char* out)
-    {
-        ui& u = gui();
-        constexpr const char* pages[2][3] = {
-            { "ABCDEFGHI", "JKLMNOPQR", "STUVWXYZ " },
-            { "abcdefghi", "jklmnopqr", "stuvwxyz " }
-        };
-        constexpr int columns = 9, rows = 3;
-        int page = 0, cx = 0, cy = 0;      // cy == rows: the bottom row (CASE / DEL / OK)
-        bn::string<name_length> name;
-        bn::vector<bn::sprite_ptr, 48> board;
-        bn::vector<bn::sprite_ptr, 8> field;
-        bn::sprite_ptr cursor = bn::sprite_items::cursor.create_sprite(0, 0);
-        cursor.set_bg_priority(0);
-        auto draw_board = [&]()
-        {
-            board.clear();
-            u.win().box(window_style::WINDOW, 1, 1, 28, 5);
-            u.print(16, 12, "YOUR NAME?", text_color::INK, board);
-            u.win().box(window_style::WINDOW, 1, 7, 28, 12);
-            for(int r = 0; r < rows; ++r)
-            {
-                for(int c = 0; c < columns; ++c)
-                {
-                    char ch[2] = { pages[page][r][c], 0 };
-                    if(ch[0] != ' ')
-                    {
-                        u.print(32 + c * 22, 68 + r * 18, ch, text_color::INK, board);
-                    }
-                }
-            }
-            u.print(32, 128, page ? "UPPER" : "lower", text_color::INK, board);
-            u.print(108, 128, "DEL", text_color::INK, board);
-            u.print(172, 128, "OK", text_color::INK, board);
-        };
-        auto draw_field = [&]()
-        {
-            field.clear();
-            bn::string<24> shown(name);
-            for(int i = name.size(); i < name_length; ++i)
-            {
-                shown.append("_");
-            }
-            u.print(120, 26, shown, text_color::INK, field);
-        };
-        draw_board();
-        draw_field();
-        ui::fade_in(12);
-        while(true)
-        {
-            int px = cy == rows ? (cx == 0 ? 32 : cx == 1 ? 108 : 172) : 32 + cx * 22;
-            int py = cy == rows ? 128 : 68 + cy * 18;
-            cursor.set_position(sx(px - 10 + 4), sy(py + 8));
-            frame();
-            if(bn::keypad::left_pressed())
-            {
-                cx = (cx + (cy == rows ? 2 : columns - 1)) % (cy == rows ? 3 : columns);
-            }
-            else if(bn::keypad::right_pressed())
-            {
-                cx = (cx + 1) % (cy == rows ? 3 : columns);
-            }
-            else if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
-            {
-                bool to_bottom_row = cy != rows;
-                cy = (cy + (bn::keypad::up_pressed() ? rows : 1)) % (rows + 1);
-                if(cy == rows && to_bottom_row)
-                {
-                    cx = cx < 3 ? 0 : cx < 6 ? 1 : 2;
-                }
-                else if(cy != rows && ! to_bottom_row)
-                {
-                    cx = cx * 3 + 1;
-                }
-            }
-            else if(bn::keypad::select_pressed())
-            {
-                page ^= 1;
-                draw_board();
-            }
-            else if(bn::keypad::start_pressed())
-            {
-                cy = rows;
-                cx = 2;
-            }
-            else if(bn::keypad::b_pressed())
-            {
-                if(! name.empty())
-                {
-                    name.pop_back();
-                    draw_field();
-                }
-            }
-            else if(bn::keypad::a_pressed())
-            {
-                if(cy == rows)
-                {
-                    if(cx == 0)
-                    {
-                        page ^= 1;
-                        draw_board();
-                    }
-                    else if(cx == 1 && ! name.empty())
-                    {
-                        name.pop_back();
-                        draw_field();
-                    }
-                    else if(cx == 2)
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    char ch = pages[page][cy][cx];
-                    if(ch != ' ' && name.size() < name_length)
-                    {
-                        name.push_back(ch);
-                        draw_field();
-                        if(name.size() == name_length)
-                        {
-                            cy = rows;
-                            cx = 2;
-                        }
-                    }
-                }
-            }
-        }
-        // introFinish(): an empty name becomes "Trainer".
-        if(name.empty())
-        {
-            name = "Trainer";
-        }
-        for(int i = 0; i <= name.size(); ++i)
-        {
-            out[i] = i < name.size() ? name[i] : 0;
-        }
-        ui::fade_out(12);
-        board.clear();
-        field.clear();
-        u.win().clear_all();
-    }
-
     void new_game()
     {
         ui& u = gui();
+        reset_state();
         game_state& g = state();
-        g = game_state();
         const map_def& home = world_data::maps[0];
         g.map = 0;
         g.x = home.spawn_x;
         g.y = home.spawn_y;
         g.facing = direction::DOWN;
         g.add_item(item_id::POKEBALL, start_poke_balls);
+        g.pc_items[int(item_id::POTION)] = 1;       // playerPC(): a POTION stored to begin with
+        constexpr int trios = int(sizeof(game_data::starter_trios) / sizeof(game_data::starter_trios[0]));
+        g.starter_trio = uint8_t(rng().get_int(trios));
+        g.trainer_id = uint16_t(1 + rng().get_int(65535));
 
         {
             // The professor on the web game's dark stage, with LOTAD beside him.
@@ -206,28 +69,27 @@ namespace
             bg.set_priority(3);
             bn::sprite_ptr prof = bn::sprite_items::prof_big.create_sprite(sx(120), sy(52));
             prof.set_bg_priority(2);
-            bn::optional<bn::sprite_ptr> lotad;
+            const species& lotad = game_data::species_list[int(species_id::LOTAD)];
+            bn::sprite_ptr mon = lotad.front.create_sprite(sx(184), sy(66));
+            mon.set_bg_priority(2);
             ui::fade_in(16);
             constexpr int lines = int(sizeof(game_data::intro_lines) / sizeof(game_data::intro_lines[0]));
             for(int i = 0; i < lines; ++i)
             {
-                if(i == 3)
-                {
-                    // "This world is home to creatures called POKéMON": LOTAD hops out.
-                    for(const species& s : game_data::species_list)
-                    {
-                        if(s.dex_number == 270)
-                        {
-                            lotad = s.front.create_sprite(sx(184), sy(66));
-                            lotad->set_bg_priority(2);
-                        }
-                    }
-                }
                 u.say(game_data::intro_lines[i]);
             }
             ui::fade_out(12);
         }
-        name_entry(g.name);
+        u.keyboard("YOUR NAME?", g.name, name_length);
+        // introFinish(): an empty name becomes "Trainer".
+        if(! g.name[0])
+        {
+            const char* fallback = "Trainer";
+            for(int i = 0; i < 8; ++i)
+            {
+                g.name[i] = fallback[i];
+            }
+        }
         {
             bn::regular_bg_ptr bg = bn::regular_bg_items::intro_bg.create_bg(8, 48);
             bg.set_priority(3);
@@ -243,64 +105,172 @@ namespace
             u.say("Dreams, friendships, rivals... they're all waiting out there. I'll see you soon!");
             ui::fade_out(20);
         }
+        save_game();
     }
 
-    // Emerald's main menu: a CONTINUE window with the save's details, and NEW GAME.
-    int main_menu(const game_state& saved)
+    // WHAT'S NEW: the message of the day and the changelog, scrolled with Up/Down.
+    void news_screen()
     {
         ui& u = gui();
         bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
-        bn::vector<bn::sprite_ptr, 32> texts;
-        u.win().box(window_style::WINDOW, 1, 1, 28, 10);
-        u.print(24, 12, "CONTINUE", text_color::INK, texts);
-        auto row = [&](int i, const char* label, const bn::string_view& value)
+        int top = 0;
+        constexpr int rows = 8;
+        bool redraw = true;
+        bn::vector<bn::sprite_ptr, 96> texts;
+        ui::fade_in(8);
+        while(true)
         {
-            u.print(32, 32 + i * 16, label, text_color::INK, texts);
-            u.print(208 - u.width(value), 32 + i * 16, value, text_color::INK, texts);
-        };
-        row(0, "PLAYER", saved.name);
-        row(1, "TIME", play_time(saved.play_frames));
-        row(2, "POKéDEX", bn::to_string<4>(saved.owned.count()));
-        u.win().box(window_style::WINDOW, 1, 12, 28, 4);
-        u.print(24, 108, "NEW GAME", text_color::INK, texts);
+            if(redraw)
+            {
+                texts.clear();
+                u.win().box(window_style::WINDOW, 0, 0, 30, 20);
+                u.print(8, 6, "WHAT'S NEW", text_color::BLUE, texts);
+                for(int r = 0; r < rows && top + r < news_data::lines_count; ++r)
+                {
+                    bn::string_view line(news_data::lines[top + r]);
+                    // Long lines are cut to the window.
+                    bn::string<64> shown;
+                    for(char c : line)
+                    {
+                        if(shown.size() >= 60 || u.width(shown, true) > 212)
+                        {
+                            break;
+                        }
+                        shown.push_back(c);
+                    }
+                    u.print(10, 24 + r * 15, shown, text_color::INK, texts, true);
+                }
+                u.print(150, 146, "B: back", text_color::INK, texts, true);
+                redraw = false;
+            }
+            frame();
+            if(bn::keypad::b_pressed() || bn::keypad::a_pressed() || bn::keypad::start_pressed())
+            {
+                break;
+            }
+            if(bn::keypad::down_held() && top + rows < news_data::lines_count)
+            {
+                ++top;
+                redraw = true;
+                wait(4);
+            }
+            else if(bn::keypad::up_held() && top > 0)
+            {
+                --top;
+                redraw = true;
+                wait(4);
+            }
+        }
+        ui::fade_out(8);
+        texts.clear();
+        u.win().clear_all();
+    }
+
+    enum class title_pick
+    {
+        CONTINUE,
+        NEW_GAME,
+        FREE_BATTLE,
+        NEWS
+    };
+
+    // The title's menu (titleKey): CONTINUE (with the save's details, Emerald-style), NEW GAME, FREE BATTLE,
+    // WHAT'S NEW.
+    title_pick main_menu(bool has_save, const game_state& saved)
+    {
+        ui& u = gui();
+        bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+        bn::vector<bn::sprite_ptr, 40> texts;
+        title_pick picks[4];
+        int n = 0;
+        int y = 1;
+        int rows_y[4];
+        if(has_save)
+        {
+            u.win().box(window_style::WINDOW, 1, y, 28, 10);
+            u.print(24, y * 8 + 4, "CONTINUE", text_color::INK, texts);
+            auto row = [&](int i, const char* label, const bn::string_view& value)
+            {
+                u.print(32, y * 8 + 22 + i * 15, label, text_color::BLUE, texts);
+                u.print(208 - u.width(value), y * 8 + 22 + i * 15, value, text_color::BLUE, texts);
+            };
+            row(0, "PLAYER", saved.name);
+            row(1, "TIME", play_time(saved.play_frames));
+            row(2, "POKéDEX", bn::to_string<4>(saved.owned.count()));
+            row(3, "BADGES", bn::to_string<4>(saved.badges()));
+            rows_y[n] = y * 8 + 4;
+            picks[n++] = title_pick::CONTINUE;
+            y += 10;
+        }
+        constexpr const char* names[] = { "NEW GAME", "FREE BATTLE", "WHAT'S NEW" };
+        constexpr title_pick kinds[] = { title_pick::NEW_GAME, title_pick::FREE_BATTLE, title_pick::NEWS };
+        u.win().box(window_style::WINDOW, 1, y, 28, 2 + 3 * 2);
+        for(int i = 0; i < 3; ++i)
+        {
+            u.print(24, y * 8 + 4 + i * 16, names[i], text_color::INK, texts);
+            rows_y[n] = y * 8 + 4 + i * 16;
+            picks[n++] = kinds[i];
+        }
         bn::sprite_ptr cursor = bn::sprite_items::cursor.create_sprite(0, 0);
         cursor.set_bg_priority(0);
         int index = 0;
         ui::fade_in(12);
         while(true)
         {
-            cursor.set_position(sx(14 + 4), sy((index ? 108 : 12) + 8));
+            cursor.set_position(sx(14 + 4), sy(rows_y[index] + 8));
+            rng().update();
             frame();
-            if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
+            if(bn::keypad::up_pressed())
             {
-                index ^= 1;
+                index = (index + n - 1) % n;
+                audio::play(audio::sfx::SELECT);
+            }
+            else if(bn::keypad::down_pressed())
+            {
+                index = (index + 1) % n;
+                audio::play(audio::sfx::SELECT);
             }
             else if(bn::keypad::a_pressed() || bn::keypad::start_pressed())
             {
+                audio::play(audio::sfx::SELECT);
                 break;
             }
         }
         ui::fade_out(12);
         u.win().clear_all();
-        return index;
+        return picks[index];
     }
 }
 
-void title_scene()
+bool title_scene()
 {
     ui& u = gui();
+    set_game_active(false);
+    audio::play_music("credits");
     bn::bg_palettes::set_transparent_color(bn::color(0, 0, 0));
     {
         bn::regular_bg_ptr bg = bn::regular_bg_items::title_bg.create_bg(8, 48);
         bg.set_priority(3);
-        bn::vector<bn::sprite_ptr, 16> title;
+        bn::vector<bn::sprite_ptr, 32> title;
         u.win().box(window_style::WINDOW, 3, 2, 24, 6);
         u.text().set_center_alignment();
-        u.print(120, 26, "PARTY ROYALE", text_color::INK, title);
-        u.print(120, 42, "GBA test build 0.3", text_color::INK, title);
+        u.print(120, 26, "PARTY ROYALE", text_color::RED, title);
+        u.print(120, 42, "Vellorin Version", text_color::INK, title);
         bn::vector<bn::sprite_ptr, 16> press;
-        u.print(120, 124, "PRESS START", text_color::WHITE, press);
+        u.print(120, 112, "PRESS START", text_color::WHITE, press);
         u.text().set_left_alignment();
+        // The message of the day (news.json motd): centred, or scrolling by if it's too wide.
+        bn::vector<bn::sprite_ptr, 40> motd;
+        u.print(0, 136, news_data::motd, text_color::WHITE, motd, true);
+        int motd_w = u.width(news_data::motd, true);
+        bn::vector<bn::fixed, 40> motd_x;
+        for(bn::sprite_ptr& s : motd)
+        {
+            motd_x.push_back(s.x());
+        }
+        bn::string<24> build("build ");
+        build.append(build_version);
+        u.print(236 - u.width(build, true), 150, build, text_color::WHITE, title, true);
         ui::fade_in(20);
         int blink = 0;
         while(! bn::keypad::start_pressed() && ! bn::keypad::a_pressed())
@@ -311,19 +281,61 @@ void title_scene()
             {
                 s.set_visible((blink / 30) % 2 == 0);
             }
+            int offset = motd_w <= 232 ? 120 - motd_w / 2 : 240 - (blink / 2) % (motd_w + 240);
+            for(int i = 0; i < motd.size(); ++i)
+            {
+                bn::fixed x = motd_x[i] + offset;
+                motd[i].set_x(x);
+                motd[i].set_visible(x > -152 && x < 152);
+            }
             frame();
         }
+        audio::play(audio::sfx::SELECT);
         ui::fade_out(12);
         u.win().clear_all();
     }
-    if(peek_save(saved_preview))
+    while(true)
     {
-        if(main_menu(saved_preview) == 0 && load_game())
+        bool has = peek_save(saved_preview);
+        title_pick pick = main_menu(has, saved_preview);
+        if(pick == title_pick::CONTINUE && load_game())
         {
-            return;
+            set_game_active(true);
+            set_just_loaded();
+            return true;
+        }
+        if(pick == title_pick::NEWS)
+        {
+            news_screen();
+            continue;
+        }
+        if(pick == title_pick::FREE_BATTLE)
+        {
+            free_battle_scene();
+            return false;
+        }
+        if(pick == title_pick::NEW_GAME)
+        {
+            if(has)
+            {
+                // newAdventurePrompt(): this overwrites the saved game.
+                bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+                ui::fade_in(8);
+                u.show_text("Start a new adventure? This will overwrite your current saved game.");
+                bool yes = u.yes_no(false);
+                u.clear_text();
+                ui::fade_out(8);
+                if(! yes)
+                {
+                    continue;
+                }
+            }
+            new_game();
+            set_game_active(true);
+            set_new_game_started();
+            return true;
         }
     }
-    new_game();
 }
 
 }

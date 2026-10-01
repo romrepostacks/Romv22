@@ -56,7 +56,9 @@ enum class person_role : uint8_t
     MOM
 };
 
-// 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for a group of maps.
+// 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
+// its neighbours) or a kind of room. Water and flowers have a second frame: anim_tiles[i] replaces
+// tiles[anim_index[i]] every other half second.
 struct tileset
 {
     const bn::tile* tiles;
@@ -65,29 +67,31 @@ struct tileset
     int colors_count;
     const uint16_t (*metatiles)[4];
     int16_t fill_metatile;          // drawn past the map's edges (forest, or black around a room)
-    int16_t grass_metatile;         // drawn where an item ball was picked up
+    const uint16_t* anim_index;
+    const bn::tile* anim_tiles;
+    int anim_count;
 };
 
 struct sign
 {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
     const char* const* lines;
     int8_t lines_count;
 };
 
 struct door
 {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
     door_kind kind;
     int8_t room;                    // index into world_data::maps
 };
 
 struct person
 {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
     person_kind kind;
     direction facing;
     person_role role;
@@ -103,14 +107,16 @@ enum class trainer_role : uint8_t
     ROUTE,
     JUNIOR,
     LEADER,
-    RIVAL
+    RIVAL,
+    ELITE,
+    CHAMPION
 };
 
 // A trainer: watches up to 5 tiles ahead and battles you when they see you.
 struct trainer
 {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
     person_kind kind;
     direction facing;
     trainer_role role;
@@ -124,7 +130,10 @@ struct trainer
     const char* const* after;       // said when you talk to them after (a rival says it, then leaves)
     int8_t after_count;
     bool vanish;                    // a rival leaves once beaten
-    int8_t id;                      // bit in game_state::beaten
+    uint8_t id;                     // bit in game_state::beaten
+    int8_t elite;                   // the Elite Four's place in line, or -1
+    int8_t area;                    // the area it belongs to (its own, or the one its room is in)
+    bool scene;                     // only there while a scene puts them there (SCENES.portmere)
 };
 
 // What holds a place's exit shut (linkAreas gate): its rival, or its gym's leader.
@@ -137,10 +146,19 @@ enum class gate_kind : uint8_t
 
 struct item_ball
 {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
     item_id item;
-    int8_t id;                      // bit in game_state::picked
+    uint8_t id;                     // bit in game_state::picked
+    uint16_t ground;                // metatile drawn once it's picked up
+};
+
+// An item ball in a neighbour's strip: where it is (in the neighbour) and its picked-up metatile here.
+struct strip_item
+{
+    int16_t x;
+    int16_t y;
+    uint16_t ground;
 };
 
 // Furniture you can look at (THING_TEXT).
@@ -154,6 +172,8 @@ struct thing
 
 // A connected area, placed at (ox, oy) in this map's tile coordinates (Emerald-style seamless connections).
 // target is the index into world_data::maps, or -1 for an area that isn't in this build yet.
+// The part of the neighbour this area's tileset can draw is its strip (sx, sy, sw, sh in the neighbour's
+// tiles); past it is forest.
 struct link
 {
     int8_t target;
@@ -163,6 +183,120 @@ struct link
     int16_t h;
     const char* name;
     bool gate;                      // shut until this place's leader or rival is beaten
+    int8_t badges;                  // badges needed to go there (Victory Road)
+    int16_t sx;
+    int16_t sy;
+    int16_t sw;
+    int16_t sh;
+    const uint16_t* strip;
+    const strip_item* items;
+    int8_t items_count;
+};
+
+enum class area_kind : uint8_t
+{
+    TOWN,
+    ROUTE,
+    GYM,
+    TRAINER
+};
+
+enum class area_theme : uint8_t
+{
+    PLAIN,
+    FOREST,
+    LAKE,
+    ROCKY,
+    SEA,
+    DEEP,
+    CAVE
+};
+
+enum class area_weather : uint8_t
+{
+    NONE,
+    RAIN,
+    SNOW,
+    ASH,
+    FOG,
+    DEEP,
+    CAVE
+};
+
+namespace area_flag
+{
+    constexpr uint8_t CENTER = 1;
+    constexpr uint8_t LEAGUE = 2;
+    constexpr uint8_t CHAMPION = 4;
+    constexpr uint8_t BOSS = 8;
+    constexpr uint8_t OWN_POOL = 16;      // its own wild Pokémon (the POKéDEX's AREA), not a neighbour's
+}
+
+// What an area is (LOCATIONS): its kind, look and weather, where it sits on the region map, the layer
+// below or above it (DIVE), its scene, and the guardian sleeping there.
+struct area_info
+{
+    area_kind kind;
+    area_theme theme;
+    area_weather weather;
+    uint8_t flags;
+    int8_t tier;
+    int16_t at_x;                   // the region map's grid (DIVE's areas sit apart, at x 100 and up)
+    int16_t at_y;
+    int8_t dive;                    // the area beneath (map index), or -1
+    int8_t surface;                 // the area above, or -1
+    const char* scene;
+    const uint8_t* dive_spots;      // x, y pairs
+    int16_t dive_count;
+    const uint8_t* shafts;
+    int16_t shaft_count;
+    species_id legend;
+    int16_t legend_x;               // -1: none
+    int16_t legend_y;
+    int8_t water_count;
+    int8_t fish_count;
+    const uint16_t* clean;          // ash areas: metatiles once the ash is swept off
+};
+
+enum class room_kind : uint8_t
+{
+    CENTER,
+    MART,
+    HOUSE,
+    GYM,
+    LEAGUE
+};
+
+enum class gym_theme : uint8_t
+{
+    NONE,
+    FIRE,
+    WATER,
+    GROUND,
+    GHOST,
+    ELECTRIC,
+    GRASS,
+    ICE,
+    DRAGON
+};
+
+// A League gate: tiles x0..x1 of row y, open once that Elite Four trainer is beaten.
+struct league_gate
+{
+    int8_t y;
+    int8_t x0;
+    int8_t x1;
+    int8_t elite;
+};
+
+struct room_info
+{
+    room_kind kind;
+    gym_theme theme;
+    const league_gate* gates;
+    int8_t gates_count;
+    int16_t gate_metatile;          // the floor shown in an open gate
+    bool home;
 };
 
 // An area or a room.
@@ -190,16 +324,21 @@ struct map_def
     int8_t links_count;
     const species_id* pool;
     int8_t pool_count;
-    int8_t spawn_x;
-    int8_t spawn_y;
+    int16_t spawn_x;
+    int16_t spawn_y;
     int8_t level_cap;
     int8_t exit_map;                // rooms: the area outside, and the door you came in by
-    int8_t exit_x;
-    int8_t exit_y;
-    int8_t leader_id;               // the trainer id of this place's rival or gym leader, or -1
+    int16_t exit_x;
+    int16_t exit_y;
+    int16_t leader_id;              // the trainer id of this place's rival or gym leader, or -1
     gate_kind gate;
     const char* place_name;         // gyms: the town, for the statues
     const char* leader_name;
+    const area_info* area;          // areas only
+    const species_id* water;        // areas: SURF and fishing pools
+    const species_id* fish;
+    const char* desc;
+    const room_info* room;          // rooms only
 
     [[nodiscard]] bool is_room() const
     {

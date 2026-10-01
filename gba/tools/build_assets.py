@@ -15,16 +15,17 @@ Needs Node.js and Pillow. Called by the Makefile (EXTTOOL) before every build; i
 inputs haven't changed.
 """
 import argparse, hashlib, json, os, re, subprocess
+import numpy as np
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GBA = os.path.dirname(HERE)
 ROOT = os.path.dirname(GBA)
-AREAS = [0, 1, 2, 3]    # Duskmere Hollow, Route 1, Fernway Overlook, Cindergate Town
-MAP_BANKS = 15          # BG palette banks a map tileset may use; the 16th is the UI's
-ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'hyperpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal',
-            'revive', 'fullrestore']
-MART_STOCK = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening']    # martOpen() before 2 badges
+MAP_BANKS = 14          # BG palette banks a map tileset may use; the 15th is the weather's, the 16th the UI's
+MAX_TRAINERS = 256      # bits in game_state::beaten
+MAX_ITEM_BALLS = 256    # bits in game_state::picked
+ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal', 'hyperpotion',
+            'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod']      # ITEM_INFO order
 STATUS = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
           'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
 
@@ -71,9 +72,11 @@ def write_if_changed(path, text):
 
 # ---------------------------------------------------------------------------------------------------
 # Tilesets: cut pictures into 8x8 tiles, share them (with flips), pack their colours into 4bpp banks,
-# then describe each picture as 16x16 metatiles of four cells.
+# then describe each picture as 16x16 metatiles of four cells. Every area has its own tileset, holding the
+# area and the strips of its neighbours that can be seen from it; rooms have one per look. A tile is a pair
+# of 8x8 blocks, its two animation frames (water and flowers change every half second); most are the same.
 
-def pack_palettes(color_sets, max_banks, what):
+def pack_palettes(color_sets, max_banks, what, trials=120):
     """Packs tile colour sets into banks of 15 colours (index 0 is transparent). Only the sets that aren't
     contained in another need packing; it tries many seeded orders and keeps the fewest banks."""
     import random
@@ -95,7 +98,7 @@ def pack_palettes(color_sets, max_banks, what):
         return banks
     rnd = random.Random(1234)
     best = None
-    for trial in range(400):
+    for trial in range(trials):
         order = list(maximal)
         if trial:
             rnd.shuffle(order)
@@ -103,29 +106,38 @@ def pack_palettes(color_sets, max_banks, what):
             banks = pack(order, by_overlap)
             if best is None or len(banks) < len(best):
                 best = banks
+        if len(best) <= max_banks and trial >= 20:
+            break
     if len(best) > max_banks:
         raise SystemExit('%s needs %d palette banks (max %d)' % (what, len(best), max_banks))
     assign = [next(i for i, b in enumerate(best) if cs <= b) for cs in color_sets]
     return best, assign
 
-def cut(img, cx, cy):
-    px = img.load()
-    return tuple(rgb555(px[cx * 8 + x, cy * 8 + y]) for y in range(8) for x in range(8))
+def to555(img):
+    """A picture as an array of rgb555 values (r | g << 5 | b << 10, as the GBA stores them)."""
+    a = np.asarray(img.convert('RGB'), dtype=np.uint16)
+    return (a[:, :, 0] >> 3) | ((a[:, :, 1] >> 3) << 5) | ((a[:, :, 2] >> 3) << 10)
 
-def reduce_block(b, max_colors=15):
+def blocks(arr):
+    """(H, W) -> (H/8, W/8, 64) 8x8 blocks."""
+    h, w = arr.shape
+    return arr.reshape(h // 8, 8, w // 8, 8).transpose(0, 2, 1, 3).reshape(h // 8, w // 8, 64)
+
+def reduce_colors(b, max_colors=15):
     """A 4bpp tile has 15 colours: merge the closest pair (keeping the more common) until it fits."""
     counts = {}
     for c in b:
         counts[c] = counts.get(c, 0) + 1
     if len(counts) <= max_colors:
         return b
+    rgb = lambda c: (c & 31, (c >> 5) & 31, c >> 10)
     remap = {c: c for c in counts}
     while len(counts) > max_colors:
         cols = list(counts)
         best = None
         for i in range(len(cols)):
             for j in range(i + 1, len(cols)):
-                d = sum((cols[i][k] - cols[j][k]) ** 2 for k in range(3))
+                d = sum((rgb(cols[i])[k] - rgb(cols[j])[k]) ** 2 for k in range(3))
                 if best is None or d < best[0]:
                     best = (d, cols[i], cols[j])
         _, a, c2 = best
@@ -136,58 +148,101 @@ def reduce_block(b, max_colors=15):
                 remap[k] = keep
     return tuple(remap[c] for c in b)
 
-def flips(b):
-    rows = [b[y * 8:(y + 1) * 8] for y in range(8)]
-    h = tuple(p for r in rows for p in reversed(r))
-    v = tuple(p for r in reversed(rows) for p in r)
-    hv = tuple(p for r in reversed(rows) for p in reversed(r))
-    return [(b, 0), (h, 1), (v, 2), (hv, 3)]
-
-def tile_words(b, lut):
-    words = []
-    for y in range(8):
-        v = 0
-        for x in range(8):
-            v |= lut[b[y * 8 + x]] << (4 * x)
-        words.append('0x%08x' % v)
-    return '{' + ', '.join(words) + '}'
+FLIPS = [np.arange(64).reshape(8, 8)[::1, ::1].ravel(), np.arange(64).reshape(8, 8)[:, ::-1].ravel(),
+         np.arange(64).reshape(8, 8)[::-1, :].ravel(), np.arange(64).reshape(8, 8)[::-1, ::-1].ravel()]
 
 class Tileset:
-    def __init__(self, name):
+    def __init__(self, name, banks):
         self.name = name
-        self.uniq, self.index = [], {}
-        self.pictures = []       # (w, h, refs)
+        self.max_banks = banks
+        self.uniq, self.index = [], {}     # tiles: 128-tuples (frame A then frame B)
         self.metas, self.meta_index = [], {}
+        self.pending = []                  # pictures cut into tile refs, waiting for the palettes
 
-    def ref(self, b):
-        for fb, f in flips(b):
-            if fb in self.index:
-                return self.index[fb], f
-        self.index[b] = len(self.uniq)
-        self.uniq.append(b)
+    def ref(self, pair):
+        a, b = pair[:64], pair[64:]
+        for f, perm in enumerate(FLIPS):
+            key = tuple(a[i] for i in perm) + tuple(b[i] for i in perm)
+            if key in self.index:
+                return self.index[key], f
+        self.index[pair] = len(self.uniq)
+        self.uniq.append(pair)
         return len(self.uniq) - 1, 0
 
-    def add(self, img):
-        """Adds a picture (w and h multiples of 16); returns its index."""
-        w, h = img.size[0] // 8, img.size[1] // 8
-        refs = [[self.ref(reduce_block(cut(img, x, y))) for x in range(w)] for y in range(h)]
-        self.pictures.append(refs)
-        return len(self.pictures) - 1
+    def add(self, img_a, img_b=None):
+        """Adds a picture (w and h multiples of 16) in its two frames; returns a handle for metatiles_of."""
+        A = blocks(to555(img_a))
+        B = blocks(to555(img_b)) if img_b is not None else A
+        h, w = A.shape[:2]
+        refs = []
+        cache = {}
+        for y in range(h):
+            row = []
+            for x in range(w):
+                pair = tuple(A[y, x].tolist()) + tuple(B[y, x].tolist())
+                r = cache.get(pair)
+                if r is None:
+                    if len(set(pair)) > 15:
+                        pair = self.reduce_pair(pair)
+                    r = cache[pair] = self.ref(pair)
+                row.append(r)
+            refs.append(row)
+        self.pending.append(refs)
+        return len(self.pending) - 1
+
+    @staticmethod
+    def reduce_pair(pair):
+        merged = reduce_colors(pair[:64] + pair[64:])
+        return tuple(merged)
 
     def finish(self):
-        sets = [frozenset(b) for b in self.uniq]
-        banks, self.assign = pack_palettes(sets, MAP_BANKS, 'tileset ' + self.name)
+        if len(self.uniq) > 1020:
+            raise SystemExit('tileset %s needs %d tiles (max 1020)' % (self.name, len(self.uniq)))
+        # Too many colours for the banks: merge the closest pair of colours (the rarer one into the more
+        # common one), a few at a time, until they pack.
+        merged = 0
+        while True:
+            sets = [frozenset(t) for t in self.uniq]
+            try:
+                banks, self.assign = pack_palettes(sets, self.max_banks, 'tileset ' + self.name, 120 if not merged else 40)
+                break
+            except SystemExit:
+                if merged > 400:
+                    raise
+            counts = {}
+            for t in self.uniq:
+                for c in set(t):
+                    counts[c] = counts.get(c, 0) + 1
+            cols = np.array(list(counts), dtype=np.int32)
+            rgb = np.stack([cols & 31, (cols >> 5) & 31, cols >> 10], 1).astype(np.float64)
+            weight = np.array([counts[c] for c in counts], dtype=np.float64)
+            d = ((rgb[:, None, :] - rgb[None, :, :]) ** 2 * np.array([3, 4, 2])).sum(2)
+            np.fill_diagonal(d, 1e9)
+            remap = {}
+            step = max(1, len(cols) // 25)
+            for _ in range(step):
+                i, j = np.unravel_index(np.argmin(d), d.shape)
+                keep, drop = (i, j) if weight[i] >= weight[j] else (j, i)
+                remap[int(cols[drop])] = int(cols[keep])
+                d[drop, :] = 1e9
+                d[:, drop] = 1e9
+                weight[keep] += weight[drop]
+            def follow(c):
+                while c in remap:
+                    c = remap[c]
+                return c
+            self.uniq = [tuple(follow(c) for c in t) for t in self.uniq]
+            merged += step
+        if merged:
+            print('build_assets: tileset %s: merged %d colours to fit its palette banks' % (self.name, merged))
         self.bank_lists = [sorted(b) for b in banks]
-        assert all(len(b) <= 15 for b in self.bank_lists), 'a palette bank has more than 15 colours'
-        if len(self.uniq) > 1000:
-            raise SystemExit('tileset %s needs %d tiles (max 1000)' % (self.name, len(self.uniq)))
 
     def cell(self, r):
         t, f = r
         return t | (f << 10) | (self.assign[t] << 12)
 
     def metatiles_of(self, pic):
-        refs = self.pictures[pic]
+        refs = self.pending[pic]
         out = []
         for y in range(len(refs) // 2):
             for x in range(len(refs[0]) // 2):
@@ -198,59 +253,110 @@ class Tileset:
                 out.append(self.meta_index[key])
         return out
 
-    def emit(self, L, fill_meta, grass_meta):
+    def emit(self, L, fill_meta):
         p = 'ts_%s_' % self.name
+        def words(t, lut):
+            return tile_words(t, lut)
+        luts = [{c: i + 1 for i, c in enumerate(self.bank_lists[self.assign[i]])} for i in range(len(self.uniq))]
         L.append('alignas(int) constexpr bn::tile %stiles[] = {\n    %s\n};' % (p, ',\n    '.join(
-            tile_words(b, {c: i + 1 for i, c in enumerate(self.bank_lists[self.assign[i]])}) for i, b in enumerate(self.uniq))))
+            words(t[:64], luts[i]) for i, t in enumerate(self.uniq))))
+        anim = [i for i, t in enumerate(self.uniq) if t[:64] != t[64:]]
+        L.append('constexpr uint16_t %sanim_index[] = {%s};' % (p, ', '.join(map(str, anim)) or '0'))
+        L.append('alignas(int) constexpr bn::tile %sanim_tiles[] = {%s};' % (p, ',\n    '.join(
+            words(self.uniq[i][64:], luts[i]) for i in anim) or '{}'))
         colors = []
         for bl in self.bank_lists:
-            bank = [(0, 0, 0)] + bl
-            colors += bank + [(0, 0, 0)] * (16 - len(bank))
+            bank = [0] + bl
+            colors += bank + [0] * (16 - len(bank))
         L.append('constexpr bn::color %scolors[] = {\n    %s\n};' % (p, ',\n    '.join(
-            ', '.join(c_color(c) for c in colors[i:i + 8]) for i in range(0, len(colors), 8))))
+            ', '.join('bn::color(%d, %d, %d)' % (c & 31, (c >> 5) & 31, c >> 10) for c in colors[i:i + 8]) for i in range(0, len(colors), 8))))
         L.append('constexpr uint16_t %smetatiles[][4] = {\n    %s\n};\n' % (p, ',\n    '.join('{%d, %d, %d, %d}' % m for m in self.metas)))
-        return '{%stiles, %d, %scolors, %d, %smetatiles, %d, %d}' % (p, len(self.uniq), p, len(colors), p, fill_meta, grass_meta)
+        return '{%stiles, %d, %scolors, %d, %smetatiles, %d, %sanim_index, %sanim_tiles, %d}' % (
+            p, len(self.uniq), p, len(colors), p, fill_meta, p, p, len(anim))
 
-def picture(exp, name, w, h):
-    return Image.frombytes('RGB', (w * 16, h * 16), open(os.path.join(exp, name), 'rb').read())
+def tile_words(b, lut):
+    words = []
+    for y in range(8):
+        v = 0
+        for x in range(8):
+            v |= lut[b[y * 8 + x]] << (4 * x)
+        words.append('0x%08x' % v)
+    return '{' + ', '.join(words) + '}'
+
+def png(exp, name):
+    return Image.open(os.path.join(exp, name)).convert('RGB')
 
 def solid(color):
     return Image.new('RGB', (16, 16), color)
 
 def build_world(exp, data, out_inc):
     areas, rooms = data['areas'], data['rooms']
-    trainer_count = item_count = 0
+    by_index = {a['index']: ai for ai, a in enumerate(areas)}
+    tilesets = []
+    forest = art_image(data['art']['forest_fill'], (0x1e, 0x4a, 0x1c))
 
-    # Outdoors: every area, the forest past the edges and plain grass (drawn over picked-up items).
-    outdoor = Tileset('outdoor')
-    area_pics = [outdoor.add(picture(exp, 'map_%d.rgb' % a['index'], a['w'], a['h'])) for a in areas]
-    forest_pic = outdoor.add(art_image(data['art']['forest_fill'], (0x1e, 0x4a, 0x1c)))
-    grass_pic = outdoor.add(art_image(data['art']['grass_v0'], (0x48, 0xd8, 0x90)))
-    outdoor.finish()
-    tilesets = [outdoor]
-    fills = {}
-    area_meta = [outdoor.metatiles_of(p) for p in area_pics]
-    fills['outdoor'] = (outdoor.metatiles_of(forest_pic)[0], outdoor.metatiles_of(grass_pic)[0])
-
-    # Rooms: one tileset per kind; past the walls is black.
-    room_tileset = {}
-    room_meta = {}
-    for kind in sorted({r['kind'] for r in rooms}):
-        r = next(r for r in rooms if r['kind'] == kind)
-        ts = Tileset(kind)
-        pic = ts.add(picture(exp, 'room_%s.rgb' % kind, r['w'], r['h']))
-        black = ts.add(solid((0, 0, 0)))
-        ts.finish()
-        room_meta[kind] = ts.metatiles_of(pic)
-        fills[kind] = (ts.metatiles_of(black)[0],) * 2
-        room_tileset[kind] = len(tilesets)
+    # Every area: its picture, its neighbours' strips, the ground under its item balls (and theirs), and
+    # in the ash, the ground swept clean.
+    area_info = []
+    for a in areas:
+        i = a['index']
+        ts = Tileset('area%d' % i, MAP_BANKS)
+        info = {'ts': len(tilesets)}
+        info['map'] = ts.add(png(exp, 'map_%d.png' % i), png(exp, 'map_%d_b.png' % i))
+        if a['items']:
+            info['items'] = ts.add(png(exp, 'map_%d_items.png' % i))
+        if a['weather'] == 'ash':
+            info['clean'] = ts.add(png(exp, 'map_%d_clean.png' % i), png(exp, 'map_%d_b.png' % i))
+        info['strips'] = []
+        for k, ln in enumerate(a['links']):
+            st = {'pic': ts.add(png(exp, 'strip_%d_%d.png' % (i, k)), png(exp, 'strip_%d_%d_b.png' % (i, k)))}
+            if ln['strip']['items']:
+                st['items'] = ts.add(png(exp, 'strip_%d_%d_items.png' % (i, k)))
+            info['strips'].append(st)
+        info['fill'] = ts.add(forest)
         tilesets.append(ts)
+        area_info.append(info)
+    # Rooms: one tileset per look; past the walls is black.
+    room_ts = {}
+    for r in rooms:
+        art = r['art']
+        if art in room_ts:
+            continue
+        ts = Tileset('room_' + art, MAP_BANKS)
+        info = {'ts': len(tilesets), 'map': ts.add(png(exp, 'room_%s.png' % art), png(exp, 'room_%s_b.png' % art)),
+                'fill': ts.add(solid((0, 0, 0)))}
+        if r['kind'] == 'league':
+            info['gate'] = ts.add(png(exp, 'league_floor.png'))
+        tilesets.append(ts)
+        room_ts[art] = info
+    for ts in tilesets:
+        ts.finish()
 
     L = ['// Generated by tools/build_assets.py from the web game; do not edit.',
          '#ifndef PR_WORLD_DATA_H\n#define PR_WORLD_DATA_H\n',
          '#include "bn_tile.h"\n#include "bn_color.h"\n#include "pr_world_types.h"\n',
          'namespace pr::world_data\n{\n']
-    ts_rows = [ts.emit(L, *fills[ts.name]) for ts in tilesets]
+    # Metatiles first (they're numbered as pictures are described), then the tileset table.
+    for a, info in zip(areas, area_info):
+        ts = tilesets[info['ts']]
+        info['meta'] = ts.metatiles_of(info['map'])
+        info['fill_meta'] = ts.metatiles_of(info['fill'])[0]
+        info['item_meta'] = ts.metatiles_of(info['items']) if 'items' in info else []
+        info['clean_meta'] = ts.metatiles_of(info['clean']) if 'clean' in info else None
+        for st in info['strips']:
+            st['meta'] = ts.metatiles_of(st['pic'])
+            st['item_meta'] = ts.metatiles_of(st['items']) if 'items' in st else []
+    for art, info in room_ts.items():
+        ts = tilesets[info['ts']]
+        info['meta'] = ts.metatiles_of(info['map'])
+        info['fill_meta'] = ts.metatiles_of(info['fill'])[0]
+        info['gate_meta'] = ts.metatiles_of(info['gate'])[0] if 'gate' in info else -1
+    fills = {}
+    for info in area_info:
+        fills[info['ts']] = info['fill_meta']
+    for info in room_ts.values():
+        fills[info['ts']] = info['fill_meta']
+    ts_rows = [ts.emit(L, fills[i]) for i, ts in enumerate(tilesets)]
     L.append('constexpr tileset tilesets[] = {\n    %s\n};\n' % ',\n    '.join(ts_rows))
 
     def lines_array(name, lines):
@@ -273,8 +379,8 @@ def build_world(exp, data, out_inc):
     for i, r in enumerate(rooms):
         room_index[(r['area'], r['building'])] = len(areas) + i
 
-    # Trainer ids (bits in game_state::beaten), areas first then rooms; each area's gate keeper is its rival
-    # or its gym's leader.
+    # Trainer ids (bits in game_state::beaten), areas first then rooms; each area's gate keeper is its rival,
+    # its gym's leader or the Champion.
     ids = {}
     for ai, a in enumerate(areas):
         for ti in range(len(a['trainers'])):
@@ -282,21 +388,22 @@ def build_world(exp, data, out_inc):
     for ri, r in enumerate(rooms):
         for ti in range(len(r['trainers'])):
             ids[('room', ri, ti)] = len(ids)
-    if len(ids) > 64:
-        raise SystemExit('%d trainers (max 64)' % len(ids))
+    if len(ids) > MAX_TRAINERS:
+        raise SystemExit('%d trainers (max %d)' % (len(ids), MAX_TRAINERS))
     def leader_of(ai):
         a = areas[ai]
         for ti, t in enumerate(a['trainers']):
-            if t['role'] in ('rival', 'leader'):
+            if t['role'] in ('rival', 'leader', 'champion'):
                 return ids[('area', ai, ti)]
         for ri, r in enumerate(rooms):
             if r['area'] == a['index']:
                 for ti, t in enumerate(r['trainers']):
-                    if t['role'] == 'leader':
+                    if t['role'] in ('leader', 'champion'):
                         return ids[('room', ri, ti)]
         return -1
+    leaders = [leader_of(ai) for ai in range(len(areas))]
 
-    def trainer_rows(p, trainers, key):
+    def trainer_rows(p, trainers, key, area):
         rows = []
         for ti, t in enumerate(trainers):
             q = '%strainer%d_' % (p, ti)
@@ -308,78 +415,140 @@ def build_world(exp, data, out_inc):
             if not t['after']:
                 L.append('constexpr const char* %safter[] = {""};' % q)
             rows.append('{%d, %d, person_kind::%s, direction::%s, trainer_role::%s, %s, %steam, %d, %sfill, %d, %sintro, %d, '
-                        '%safter, %d, %s, %d}' % (
+                        '%safter, %d, %s, %d, %d, %d, %s}' % (
                 t['x'], t['y'], t['kind'], t['facing'].upper(), t['role'].upper(), c_text(t['title']), q, len(t['team']),
-                q, len(fill), q, intro, q, after, 'true' if t['vanish'] else 'false', ids[key + (ti,)]))
+                q, len(fill), q, intro, q, after, 'true' if t['vanish'] else 'false', ids[key + (ti,)], t.get('elite', -1), area,
+                'true' if t.get('scene') else 'false'))
         L.append('constexpr trainer %strainers[] = {%s};' % (p, nonempty(', '.join(rows),
-            '{0, 0, person_kind::player, direction::DOWN, trainer_role::ROUTE, "", nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, false, 0}')))
+            '{0, 0, person_kind::player, direction::DOWN, trainer_role::ROUTE, "", nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, false, 0, -1, 0, false}')))
 
-    for ai, (a, mm) in enumerate(zip(areas, area_meta)):
+    def species_array(name, names):
+        L.append('constexpr species_id %s[] = {%s};' % (name, ', '.join('species_id::%s' % enum_name(n) for n in names) or 'species_id::PIDGEY'))
+        return len(names)
+
+    def points(name, pts):
+        L.append('constexpr uint8_t %s[] = {%s};' % (name, ', '.join('%d, %d' % (x, y) for x, y in pts) or '0'))
+        return len(pts)
+
+    item_count = 0
+    item_ids = {}
+    for a in areas:
+        for it in a['items']:
+            item_ids[(a['index'], it['x'], it['y'])] = item_count
+            item_count += 1
+    if item_count > MAX_ITEM_BALLS:
+        raise SystemExit('%d item balls (max %d)' % (item_count, MAX_ITEM_BALLS))
+
+    for ai, (a, info) in enumerate(zip(areas, area_info)):
         p = 'map%d_' % ai
-        L.append('constexpr uint16_t %smap[] = {%s};' % (p, ', '.join(map(str, mm))))
+        L.append('constexpr uint16_t %smap[] = {%s};' % (p, ', '.join(map(str, info['meta']))))
         L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in a['behaviour'] for v in row)))
-        # Town signs read their name and then the place's description (owInteract); route signs just point.
+        if info['clean_meta'] is not None:
+            L.append('constexpr uint16_t %sclean[] = {%s};' % (p, ', '.join(map(str, info['clean_meta']))))
+        # Town signs read their name and then the place's description (owInteract); route signs just point;
+        # tablets have their own lines.
         desc = re.sub(r'\s*"[^"]*"\s*', ' ', a['desc']).strip()
         signs = []
         for si, sg in enumerate(a['signs']):
-            count = lines_array('%ssign%d_lines' % (p, si), [sg['text']] if sg['route'] else [sg['text'], desc])
+            text = sg['lines'] if sg['lines'] else [sg['text']] if sg['route'] else [sg['text'], desc]
+            count = lines_array('%ssign%d_lines' % (p, si), text)
             signs.append('{%d, %d, %ssign%d_lines, %d}' % (sg['x'], sg['y'], p, si, count))
         L.append('constexpr sign %ssigns[] = {%s};' % (p, nonempty(', '.join(signs), '{0, 0, nullptr, 0}')))
         L.append('constexpr door %sdoors[] = {%s};' % (p, nonempty(', '.join(
             '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
             for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
         people_rows(p, a['people'])
-        trainer_rows(p, a['trainers'], ('area', ai))
+        trainer_rows(p, a['trainers'], ('area', ai), ai)
         its = []
-        for it in a['items']:
-            its.append('{%d, %d, item_id::%s, %d}' % (it['x'], it['y'], it['id'].upper(), item_count))
-            item_count += 1
-        L.append('constexpr item_ball %sitems[] = {%s};' % (p, nonempty(', '.join(its), '{0, 0, item_id::POKEBALL, 0}')))
+        for k, it in enumerate(a['items']):
+            its.append('{%d, %d, item_id::%s, %d, %d}' % (it['x'], it['y'], it['id'].upper(), item_ids[(a['index'], it['x'], it['y'])],
+                                                        info['item_meta'][k]))
+        L.append('constexpr item_ball %sitems[] = {%s};' % (p, nonempty(', '.join(its), '{0, 0, item_id::POKEBALL, 0, 0}')))
         links = []
-        for ln in a['links']:
-            target = AREAS.index(ln['to']) if ln['to'] in AREAS else -1
-            links.append('{%d, %d, %d, %d, %d, %s, %s}' % (target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper()),
-                                                        'true' if ln['gate'] else 'false'))
-        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, "", false}')))
-        pool = ', '.join('species_id::%s' % enum_name(n) for n in a['pool'])
-        L.append('constexpr species_id %spool[] = {%s};\n' % (p, pool or 'species_id::PIDGEY'))
+        for k, ln in enumerate(a['links']):
+            st, sm = ln['strip'], info['strips'][k]
+            q = '%slink%d_' % (p, k)
+            L.append('constexpr uint16_t %sstrip[] = {%s};' % (q, ', '.join(map(str, sm['meta']))))
+            target = by_index.get(ln['to'], -1)
+            sits = []
+            for j, (x, y) in enumerate(st['items']):
+                sits.append('{%d, %d, %d}' % (x, y, sm['item_meta'][j]))
+            L.append('constexpr strip_item %sitems[] = {%s};' % (q, nonempty(', '.join(sits), '{0, 0, 0}')))
+            links.append('{%d, %d, %d, %d, %d, %s, %s, %d, %d, %d, %d, %d, %sstrip, %sitems, %d}' % (
+                target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper()), 'true' if ln['gate'] else 'false',
+                ln['badges'], st['x'], st['y'], st['w'], st['h'], q, q, len(st['items'])))
+        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, "", false, 0, 0, 0, 0, 0, nullptr, nullptr, 0}')))
+        np_ = species_array(p + 'pool', a['area_pool'])
+        nw = species_array(p + 'water', a['water'])
+        nf = species_array(p + 'fish', a['fish'])
+        nd = points(p + 'dive', a['dive_spots'])
+        ns = points(p + 'shafts', a['shafts'])
         gate = {'gym': 'GYM', 'rival': 'RIVAL'}.get(a['gate_kind'], 'NONE')
-        map_rows.append('{%s, 0, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
-                        'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0, %d, gate_kind::%s, %s, %s}' % (
-            c_text(a['name'].upper()), a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
-            p, len(a['trainers']), p, len(a['items']), p, len(a['links']), p, len(a['pool']),
-            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4), leader_of(ai), gate,
-            c_text(a['name'].upper()), c_text(a['leader_name'])))
+        if a['champion']:
+            gate = 'NONE'
+        theme = {'plain': 'PLAIN', 'forest': 'FOREST', 'lake': 'LAKE', 'rocky': 'ROCKY', 'sea': 'SEA', 'deep': 'DEEP', 'cave': 'CAVE'}[a['theme']]
+        weather = {'': 'NONE', 'rain': 'RAIN', 'snow': 'SNOW', 'ash': 'ASH', 'fog': 'FOG', 'deep': 'DEEP', 'cave': 'CAVE'}[a['weather']]
+        kind = {'town': 'TOWN', 'route': 'ROUTE', 'gym': 'GYM', 'trainer': 'TRAINER'}[a['type']]
+        flags = []
+        if a['center']: flags.append('area_flag::CENTER')
+        if a['league']: flags.append('area_flag::LEAGUE')
+        if a['champion']: flags.append('area_flag::CHAMPION')
+        if a['kind'] == 'boss': flags.append('area_flag::BOSS')
+        legend = a['legend']
+        if a['own_pool']:
+            flags.append('area_flag::OWN_POOL')
+        L.append('constexpr area_info %sarea = {area_kind::%s, area_theme::%s, area_weather::%s, %s, %d, %d, %d, %d, %d, %s, '
+                 '%sdive, %d, %sshafts, %d, %s, %d, %d, %d, %d, %s};' % (
+            p, kind, theme, weather, ' | '.join(flags) or '0', a['tier'], a['at'][0], a['at'][1],
+            by_index.get(a['dive'], -1) if a['dive'] >= 0 else -1, by_index.get(a['surface'], -1) if a['surface'] >= 0 else -1,
+            c_text(a['scene']), p, nd, p, ns,
+            'species_id::%s' % enum_name(legend['name']) if legend else 'species_id::PIDGEY', legend['x'] if legend else -1,
+            legend['y'] if legend else -1, nw, nf, '%sclean' % p if info['clean_meta'] is not None else 'nullptr'))
+        map_rows.append('{%s, %d, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
+                        'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0, %d, gate_kind::%s, %s, %s, &%sarea, %swater, %sfish, %s, nullptr}' % (
+            c_text(a['name'].upper()), info['ts'], a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
+            p, len(a['trainers']), p, len(a['items']), p, len(a['links']), p, np_,
+            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4), leaders[ai], gate,
+            c_text(a['name'].upper()), c_text(a['leader_name']), p, p, p, c_text(clean_text(a['desc']))))
 
     for ri, r in enumerate(rooms):
         p = 'room%d_' % ri
+        info = room_ts[r['art']]
         L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in r['behaviour'] for v in row)))
         people_rows(p, r['people'])
-        trainer_rows(p, r['trainers'], ('room', ri))
+        area = by_index[r['area']]
+        trainer_rows(p, r['trainers'], ('room', ri), area)
         things = []
         for ti, t in enumerate(r['things']):
             count = lines_array('%sthing%d_lines' % (p, ti), t['text'])
             things.append('{%d, %d, %sthing%d_lines, %d}' % (t['x'], t['y'], p, ti, count))
-        L.append('constexpr thing %sthings[] = {%s};\n' % (p, nonempty(', '.join(things), '{0, 0, nullptr, 0}')))
-        area = AREAS.index(r['area'])
-        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART', 'gym': 'POKéMON GYM'}.get(r['kind'], 'HOUSE')
+        L.append('constexpr thing %sthings[] = {%s};' % (p, nonempty(', '.join(things), '{0, 0, nullptr, 0}')))
+        gates = ['{%d, %d, %d, %d}' % (g['y'], g['x0'], g['x1'], g['elite']) for g in r['gates']]
+        L.append('constexpr league_gate %sgates[] = {%s};\n' % (p, nonempty(', '.join(gates), '{0, 0, 0, 0}')))
+        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART', 'gym': 'POKéMON GYM', 'league': 'POKéMON LEAGUE'}.get(r['kind'], 'HOUSE')
         gym = r.get('gym') or {}
-        map_rows.append('{%s, %d, %d, %d, ts_%s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
-                        '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d, %d, gate_kind::NONE, %s, %s}' % (
-            c_text(name), room_tileset[r['kind']], r['w'], r['h'], r['kind'], p, p, len(r['people']), p, len(r['trainers']),
+        kind = {'center': 'CENTER', 'mart': 'MART', 'gym': 'GYM', 'league': 'LEAGUE', 'house': 'HOUSE'}[r['kind']]
+        theme = (r.get('theme') or '').upper() or 'NONE'
+        L.append('constexpr room_info %sroom = {room_kind::%s, gym_theme::%s, %sgates, %d, %d, %s};' % (
+            p, kind, theme, p, len(r['gates']), info['gate_meta'], 'true' if r['home'] else 'false'))
+        map_rows.append('{%s, %d, %d, %d, %s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
+                        '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d, %d, gate_kind::NONE, %s, %s, nullptr, nullptr, nullptr, "", &%sroom}' % (
+            c_text(name), info['ts'], r['w'], r['h'], 'room_' + r['art'], p, p, len(r['people']), p, len(r['trainers']),
             p, len(r['things']), r['spawn']['x'], r['spawn']['y'], min(50, 8 + areas[area]['tier'] * 4), area,
-            r['door']['x'], r['door']['y'], leader_of(area) if r['kind'] == 'gym' else -1,
-            c_text(gym.get('name', '')), c_text(gym.get('leader', ''))))
-    # Room metatile maps go before the map table (shared by every room of a kind).
-    room_maps = ['constexpr uint16_t ts_%s_map[] = {%s};' % (k, ', '.join(map(str, v))) for k, v in sorted(room_meta.items())]
+            r['door']['x'], r['door']['y'], leaders[area] if r['kind'] in ('gym', 'league') else -1,
+            c_text(gym.get('name', '')), c_text(gym.get('leader', '')), p))
+    # Room metatile maps go before the map table (shared by every room of a look).
+    room_maps = ['constexpr uint16_t room_%s_map[] = {%s};' % (k, ', '.join(map(str, v['meta']))) for k, v in sorted(room_ts.items())]
     L += room_maps
     L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows))
     L.append('constexpr int areas_count = %d;' % len(areas))
+    L.append('constexpr int maps_count = %d;' % (len(areas) + len(rooms)))
     L.append('constexpr int trainers_count = %d;' % len(ids))
     L.append('constexpr int items_count = %d;\n' % item_count)
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_world_data.h'), '\n'.join(L))
-    print('build_assets: ' + ', '.join('%s %d tiles/%d banks' % (t.name, len(t.uniq), len(t.bank_lists)) for t in tilesets))
+    print('build_assets: %d tilesets, up to %d tiles and %d banks; %d trainers, %d item balls' % (
+        len(tilesets), max(len(t.uniq) for t in tilesets), max(len(t.bank_lists) for t in tilesets), len(ids), item_count))
 
 # ---------------------------------------------------------------------------------------------------
 def art_image(a, bg=None):
@@ -448,7 +617,16 @@ def save_indexed_bmp(path, palette555, idx, json_obj, transparent=(255, 0, 255))
     pal += [(0, 0, 0)] * (n - len(pal))
     img.putpalette([v for c in pal for v in c])
     img.putdata([v for row in idx for v in row])
-    img.save(path)
+    import io
+    buf = io.BytesIO()
+    img.save(buf, format='BMP')
+    data = buf.getvalue()
+    WRITTEN.add(os.path.basename(path))
+    WRITTEN.add(os.path.basename(path)[:-4] + '.json')
+    # Unchanged pictures keep their timestamps, so Butano doesn't convert them again.
+    if not (os.path.exists(path) and open(path, 'rb').read() == data):
+        with open(path, 'wb') as f:
+            f.write(data)
     write_if_changed(path[:-4] + '.json', json.dumps(json_obj))
 
 def save_sprite(gfx, name, frames, fw, fh):
@@ -485,6 +663,58 @@ def build_people(data, gfx):
     big = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
     big.alpha_composite(person_frame(data['people']['prof']['down'][0], 2), (16, 64 - 42))
     save_sprite(gfx, 'prof_big', [big], 64, 64)
+    # Surfing (and diving, the ride a little darker): the top 12 rows of the player sitting on the
+    # Pokémon (surfSvg), bobbing a pixel every half second. 32x32 with the tile's top left at (8, 15).
+    for name, dark in (('surf', False), ('dive', True)):
+        frames = []
+        for d in ('down', 'up', 'left'):
+            ride = data['surf'][d]
+            for bob in (0, 1):
+                img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+                px = img.load()
+                for y, row in enumerate(ride):
+                    for x, c in enumerate(row):
+                        if c:
+                            c = tuple(c)
+                            if dark:
+                                c = tuple(int(v * 0.8) for v in c)
+                                g = sum(c) / 3
+                                c = tuple(max(0, min(255, int(g + (v - g) * 1.2))) for v in c)
+                            px[5 + x, 18 + y + bob] = c + (255,)
+                body = person_frame(data['people']['player'][d][0]).crop((0, 0, 16, 12))
+                img.alpha_composite(body, (8, 4 + bob))
+                frames.append(img)
+        save_sprite(gfx, name, frames, 32, 32)
+
+def build_music(data, out_inc):
+    """Music (js/music.js): 8th-note steps on four channels. Notes are MIDI numbers + 2 (0 rest, 1 hold);
+    drums 0 none, 1 kick, 2 snare, 3 hi-hat."""
+    NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
+    def code(tok):
+        if tok == '.':
+            return 0
+        if tok == '~':
+            return 1
+        m = re.match(r'^([A-G])([#b]?)(\d)$', tok)
+        if not m:
+            return 0
+        semi = NOTE[m.group(1)] + (1 if m.group(2) == '#' else -1 if m.group(2) == 'b' else 0) + (int(m.group(3)) + 1) * 12
+        return semi + 2
+    L = ['// Generated by tools/build_assets.py from js/music.js; do not edit.', '#ifndef PR_MUSIC_DATA_H\n#define PR_MUSIC_DATA_H\n',
+         '#include <cstdint>\n', 'namespace pr::music_data\n{\n',
+         'struct track\n{\n    const char* name;\n    int bpm;\n    int length;\n    const uint8_t* lead;\n    const uint8_t* harm;\n'
+         '    const uint8_t* bass;\n    const uint8_t* drum;\n    int lead_n, harm_n, bass_n, drum_n;\n};\n']
+    rows = []
+    for name, t in data['music'].items():
+        for ch in ('lead', 'harm', 'bass'):
+            L.append('constexpr uint8_t %s_%s[] = {%s};' % (name, ch, ', '.join(str(code(x)) for x in t[ch])))
+        L.append('constexpr uint8_t %s_drum[] = {%s};' % (name, ', '.join(str({'k': 1, 's': 2, 'h': 3}.get(x, 0)) for x in t['drum'])))
+        rows.append('{"%s", %d, %d, %s_lead, %s_harm, %s_bass, %s_drum, %d, %d, %d, %d}' % (
+            name, t['bpm'], len(t['lead']), name, name, name, name, len(t['lead']), len(t['harm']), len(t['bass']), len(t['drum'])))
+    L.append('\nconstexpr track tracks[] = {\n    %s\n};' % ',\n    '.join(rows))
+    L.append('constexpr int tracks_count = %d;\n' % len(rows))
+    L.append('}\n\n#endif')
+    write_if_changed(os.path.join(out_inc, 'pr_music_data.h'), '\n'.join(L))
 
 def mon_sprite(path):
     """A 96x96 sprite cropped to the 64x64 GBA frame: centred on its content, feet at the bottom."""
@@ -506,9 +736,21 @@ def build_mons(data, gfx):
             path = os.path.join(ROOT, 'sprites', 'pokemon', sub + '%d.png' % s['num'])
             if not os.path.exists(path):
                 path = os.path.join(ROOT, 'sprites', 'pokemon', '%d.png' % s['num'])
-            pal, idx = quantize_rgba(mon_sprite(path), 15)
+            img = mon_sprite(path)
+            pal, idx = quantize_rgba(img, 15)
             save_indexed_bmp(os.path.join(gfx, 'mon_%s_%d.bmp' % (side, s['num'])), pal, idx,
                              {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+            if side == 'front':
+                # A 32x32 icon (the party screen, the PC's boxes): the front sprite at half size.
+                small = img.resize((32, 32), Image.LANCZOS)
+                a = small.split()[3].point(lambda v: 255 if v >= 110 else 0)
+                # Down to 15 colours with PIL's quantizer first (the smoothing makes hundreds).
+                rgb = small.convert('RGB').quantize(colors=15, method=Image.Quantize.MEDIANCUT).convert('RGB')
+                small = rgb.convert('RGBA')
+                small.putalpha(a)
+                pal, idx = quantize_rgba(small, 15)
+                save_indexed_bmp(os.path.join(gfx, 'mon_icon_%d.bmp' % s['num']), pal, idx,
+                                 {'type': 'sprite', 'bpp_mode': 'bpp_4'})
 
 # ---------------------------------------------------------------------------------------------------
 # UI: 9-slice window styles (8x8 corners, edges and fill), all in one 15-colour palette bank, after the
@@ -524,6 +766,9 @@ UI_STYLES = [
     ('SLOT_FNT', '#b46868', '#183050', None,      4, 2),
     ('BAG',      '#f8f8f8', '#806040', None,      3, 2),
     ('PAGE',     '#f8f8f8', '#a89878', None,      3, 2),
+    # The party screen's empty slots (.pb-empty, dimmed) and the ones past the party cap (.pb-locked).
+    ('EMPTY',    '#305870', '#1c3444', None,      4, 2),
+    ('LOCKED',   '#1c3444', '#183050', None,      4, 2),
 ]
 
 def style_box(fill, border, inner, radius, bw):
@@ -576,6 +821,7 @@ def build_ui_tiles(out_inc):
     write_if_changed(os.path.join(out_inc, 'pr_ui_data.h'), '\n'.join(L))
 
 BALL = []
+WRITTEN = set()      # graphics files this run produced
 
 def build_small_sprites(gfx):
     # Menu cursor: the web game's ▶ in ink (#383840) with its light shadow.
@@ -623,6 +869,355 @@ def build_small_sprites(gfx):
             frames.append(f)
     save_sprite(gfx, 'hpbar', frames, 8, 8)
 
+def build_plank(gfx):
+    # Emerald's area name plank (.ow-popup): wood stripes, a dark frame with no top, a light inner edge and
+    # a shadowed bottom, rounded at the bottom corners. Three 32x32 pieces: left, middle, right; 24 px tall.
+    H = 24
+    frames = []
+    for piece in ('l', 'm', 'r'):
+        img = Image.new('RGBA', (32, 32), (0, 0, 0, 0))
+        px = img.load()
+        for y in range(H):
+            for x in range(32):
+                c = (0xe8, 0xb0, 0x70) if y % 3 != 2 else (0xd8, 0x9c, 0x5c)
+                left, right = piece == 'l' and x < 2, piece == 'r' and x >= 30
+                inner_l, inner_r = piece == 'l' and x == 2, piece == 'r' and x == 29
+                if y >= H - 2 or left or right:
+                    c = (0x60, 0x38, 0x18)
+                elif y >= H - 4:
+                    c = (0xb8, 0x78, 0x38)
+                elif inner_l or inner_r or y == 0:
+                    c = (0xf8, 0xd0, 0x98)
+                # Rounded bottom corners.
+                cut = False
+                if piece == 'l' and y >= H - 5:
+                    dx, dy = 5 - x, y - (H - 6)
+                    cut = x < 5 and dx * dx + dy * dy > 26
+                if piece == 'r' and y >= H - 5:
+                    dx, dy = x - 26, y - (H - 6)
+                    cut = x > 26 and dx * dx + dy * dy > 26
+                if not cut:
+                    px[x, y] = c + (255,)
+        frames.append(img)
+    save_sprite(gfx, 'plank', frames, 32, 32)
+
+def build_screens(data, gfx):
+    W = 256
+    def hexc(h):
+        return (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), 255)
+    # POKéDEX list (pokeemerald, halved): green stripes, the big ball on the left, the viewer and the yellow list
+    # whose middle row (the selected one) is always the white one.
+    img = Image.new('RGBA', (W, W))
+    d = ImageDraw.Draw(img)
+    for y in range(0, W, 4):
+        d.rectangle((0, y, W - 1, y + 1), fill=hexc('#31d54a'))
+        d.rectangle((0, y + 2, W - 1, y + 3), fill=hexc('#188320'))
+    d.ellipse((-48, 32, 48, 128), fill=hexc('#101828'))
+    d.ellipse((-45, 35, 45, 125), fill=hexc('#3a4a80'))
+    d.ellipse((-40, 40, 40, 120), fill=hexc('#d8e0f0'))
+    d.pieslice((-40, 40, 40, 120), 180, 360, fill=hexc('#29396a'))
+    d.rectangle((-40, 76, 40, 83), fill=hexc('#101828'))
+    d.rounded_rectangle((62, 22, 131, 136), radius=4, fill=hexc('#293941'))
+    for x in range(64, 130):
+        t = (x - 64) / 66
+        c = tuple(int(0xf8 + (0xc8 - 0xf8) * t) for _ in range(2)) + (int(0xf8 + (0xd0 - 0xf8) * t),)
+        d.line((x, 24, x, 134), fill=c + (255,))
+    d.rectangle((134, 0, 237, 159), fill=hexc('#293941'))
+    d.rectangle((136, 0, 235, 159), fill=hexc('#eef639'))
+    for r in range(11):
+        y = -8 + r * 16
+        d.line((136, y + 15, 235, y + 15), fill=hexc('#d8e020'))
+    d.rectangle((136, -8 + 5 * 16, 235, -8 + 6 * 16 - 1), fill=hexc('#293941'))
+    d.rectangle((138, -8 + 5 * 16 + 2, 233, -8 + 6 * 16 - 3), fill=hexc('#ffffff'))
+    save_bg(img, gfx, 'dex_bg', 'bpp_8')
+    # An entry: stripes, the tab bar, the card and the description box with its yellow sides.
+    img = Image.new('RGBA', (W, W))
+    d = ImageDraw.Draw(img)
+    for y in range(0, W, 4):
+        d.rectangle((0, y, W - 1, y + 1), fill=hexc('#31d54a'))
+        d.rectangle((0, y + 2, W - 1, y + 3), fill=hexc('#188320'))
+    d.rectangle((0, 0, 239, 17), fill=hexc('#29396a'))
+    d.rounded_rectangle((6, 22, 233, 96), radius=4, fill=hexc('#293941'))
+    d.rounded_rectangle((8, 24, 231, 94), radius=3, fill=hexc('#f8f8f8'))
+    d.rounded_rectangle((6, 102, 233, 153), radius=4, fill=hexc('#293941'))
+    d.rectangle((8, 104, 231, 151), fill=hexc('#f8c030'))
+    d.rectangle((15, 104, 224, 151), fill=hexc('#f8f8f8'))
+    save_bg(img, gfx, 'dex_entry_bg', 'bpp_8')
+    # The PC's box screen: the left panel (blue gradient), the title bar and the box frame on the right, and the
+    # message line along the bottom.
+    img = Image.new('RGBA', (W, W), hexc('#c8d0e8'))
+    d = ImageDraw.Draw(img)
+    for y in range(160):
+        t = y / 159
+        c = tuple(int(a + (b - a) * t) for a, b in zip((0x88, 0x98, 0xc8), (0x68, 0x78, 0xa8)))
+        d.line((0, y, 85, y), fill=c + (255,))
+    d.rectangle((86, 0, 87, 159), fill=hexc('#404858'))
+    d.rectangle((88, 140, 239, 159), fill=hexc('#f8f8f8'))
+    d.rectangle((88, 139, 239, 140), fill=hexc('#404858'))
+    save_bg(img, gfx, 'pc_bg', 'bpp_8')
+    # TRAINER CARD: the green card on a dark ground, with the badge case.
+    img = Image.new('RGBA', (W, W), hexc('#303848'))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((10, 10, 229, 149), radius=7, fill=hexc('#285830'))
+    for y in range(12, 148):
+        t = (y - 12) / 136
+        c = tuple(int(a + (b - a) * t) for a, b in zip((0xa8, 0xe0, 0x90), (0x78, 0xc0, 0x60)))
+        d.line((12, y, 227, y), fill=c + (255,))
+    d.line((16, 26, 223, 26), fill=hexc('#285830'), width=2)
+    save_bg(img, gfx, 'card_bg', 'bpp_8')
+    # Badges: empty and shining.
+    frames = []
+    for on in (False, True):
+        b = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(b)
+        if on:
+            bd.ellipse((1, 1, 14, 14), fill=hexc('#a07010'))
+            bd.ellipse((1, 1, 12, 12), fill=hexc('#e8b020'))
+            bd.ellipse((3, 3, 7, 7), fill=hexc('#fff8c0'))
+        else:
+            bd.ellipse((1, 1, 14, 14), fill=hexc('#1c4020'))
+        frames.append(b)
+    save_sprite(gfx, 'badge', frames, 16, 16)
+    # The PC's hand: open (pointing) and closed (holding).
+    frames = []
+    for closed in (False, True):
+        h = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+        hd = ImageDraw.Draw(h)
+        if closed:
+            hd.rounded_rectangle((2, 4, 13, 13), radius=4, fill=hexc('#303038'))
+            hd.rounded_rectangle((3, 5, 12, 12), radius=3, fill=hexc('#f8f8f8'))
+        else:
+            hd.rounded_rectangle((2, 0, 13, 9), radius=3, fill=hexc('#303038'))
+            hd.rounded_rectangle((3, 1, 12, 8), radius=2, fill=hexc('#f8f8f8'))
+            hd.rectangle((5, 9, 10, 15), fill=hexc('#303038'))
+            hd.rectangle((6, 9, 9, 14), fill=hexc('#f8f8f8'))
+        frames.append(h)
+    save_sprite(gfx, 'hand', frames, 16, 16)
+    # Region map cells (.rm-cell): route, gym, town, trainer, unseen, and the blinking frame of where you are;
+    # then the POKéDEX AREA's cells (.da-cell): land, a town, and a habitat lit up.
+    frames = []
+    for fill, border, rnd in (('#e4f4dc', '#98a8b8', 4), ('#fff0d8', '#98a8b8', 4), ('#ffffff', '#98a8b8', 4), ('#f8f8f8', '#98a8b8', 4),
+                              ('#e0e4e8', '#98a8b8', 4), (None, '#f85838', 4), ('#98d070', '#285080', 2), ('#f0e8d0', '#285080', 7),
+                              ('#f8f070', '#e05030', 4)):
+        c = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+        cd = ImageDraw.Draw(c)
+        if fill:
+            cd.rounded_rectangle((1, 2, 14, 13), radius=rnd, fill=hexc(border))
+            cd.rounded_rectangle((2, 3, 13, 12), radius=max(0, rnd - 1), fill=hexc(fill))
+        else:
+            cd.rounded_rectangle((0, 1, 15, 14), radius=rnd, outline=hexc(border), width=2)
+        frames.append(c)
+    save_sprite(gfx, 'cell', frames, 16, 16)
+    # Links between cells: across and down, plain and locked (dashed), then the POKéDEX AREA's.
+    frames = []
+    for col, dashed, horiz in (('#b8a068', False, True), ('#b8a068', True, True), ('#b8a068', False, False), ('#b8a068', True, False),
+                               ('#285080', False, True), ('#285080', False, False)):
+        l = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
+        ld = ImageDraw.Draw(l)
+        for k in range(8):
+            if dashed and k % 4 >= 2:
+                continue
+            if horiz:
+                ld.rectangle((k, 3, k, 4), fill=hexc(col))
+            else:
+                ld.rectangle((3, k, 4, k), fill=hexc(col))
+        frames.append(l)
+    save_sprite(gfx, 'link', frames, 8, 8)
+    # The BAG (.bag-sprite), one colour per pocket: ITEMS orange, POKé BALLS red/white, TMs blue, BERRIES red,
+    # KEY ITEMS purple.
+    frames = []
+    for top, body in (('#f8a040', '#e87830'), ('#f85050', '#f8f8f8'), ('#58a0f0', '#3878d0'), ('#f86060', '#d84040'), ('#b890f0', '#9068d0')):
+        b = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(b)
+        bd.rounded_rectangle((8, 8, 55, 55), radius=13, fill=hexc('#503820'))
+        bd.rounded_rectangle((10, 10, 53, 53), radius=11, fill=hexc(body))
+        bd.rectangle((10, 10, 53, 22), fill=hexc(top))
+        bd.rectangle((10, 23, 53, 24), fill=hexc('#503820'))
+        frames.append(b)
+    save_sprite(gfx, 'bag', frames, 64, 64)
+    # Ledge dust (dust_1..3).
+    frames = [art_image(data['art']['dust_%d' % k]) for k in (1, 2, 3)]
+    sheet = []
+    for f in frames:
+        img = Image.new('RGBA', (16, 8), (0, 0, 0, 0))
+        img.alpha_composite(f.convert('RGBA'), (0, 0))
+        sheet.append(img)
+    save_sprite(gfx, 'dust', sheet, 16, 8)
+    # A box's wallpaper (boxWall): 45-degree stripes in two colours (palette entries 1 and 2), 6 px each; the
+    # game recolours it per box.
+    img = Image.new('RGBA', (W, W))
+    px = img.load()
+    for y in range(W):
+        for x in range(W):
+            px[x, y] = (0xf8, 0x00, 0x00, 255) if ((x + y) // 6) % 2 == 0 else (0x00, 0x00, 0xf8, 255)
+    save_bg(img, gfx, 'wallpaper_bg')
+
+# ---------------------------------------------------------------------------------------------------
+# Move animations (the web game's atkFx): every move's MOVE_FX script, parsed into steps, and the pixel
+# shapes (PIX) as 16x16 sprite frames in one palette: 1 outline, 2 white, 3 and 4 the step's two colours
+# (filled in at run time), plus a ring and a bar segment.
+FX_KINDS = ['rush', 'jaws', 'slash', 'impact', 'projectile', 'stream', 'beam', 'gather', 'rain', 'rise', 'burst', 'vortex',
+            'rings', 'ringin', 'notes', 'bind', 'whip', 'bolt', 'quake', 'drain', 'powder', 'thrash', 'flip', 'vanish', 'self',
+            'flash']
+
+def fx_color(h):
+    h = h.strip()
+    if len(h) == 4:
+        h = '#' + ''.join(c * 2 for c in h[1:])
+    return h
+
+def build_fx(data, gfx, out_inc):
+    pix = data['pix']
+    shapes = list(pix.keys()) + ['ring', 'dot', 'up', 'down', 'fade']
+    frames = []
+    for name in shapes:
+        idx = [[0] * 16 for _ in range(16)]
+        if name in pix:
+            P = pix[name]
+            h, w = len(P), len(P[0])
+            ox, oy = (16 - w) // 2, (16 - h) // 2
+            for y, row in enumerate(P):
+                for x, ch in enumerate(row):
+                    v = {'K': 1, 'W': 2, 'A': 3, 'B': 4}.get(ch, 0)
+                    if v:
+                        idx[oy + y][ox + x] = v
+        elif name == 'ring':
+            for y in range(16):
+                for x in range(16):
+                    d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5
+                    if 5.6 <= d <= 7.6:
+                        idx[y][x] = 3
+        elif name == 'dot':
+            for y in range(5, 11):
+                for x in range(5, 11):
+                    idx[y][x] = 4 if 6 < y < 9 else 3
+        frames.append(idx)
+    sheet = [row for f in frames for row in f]
+    placeholder = [rgb555((32, 32, 32)), rgb555((255, 255, 255)), rgb555((248, 0, 0)), rgb555((0, 248, 0))]
+    save_indexed_bmp(os.path.join(gfx, 'fx.bmp'), placeholder, sheet, {'type': 'sprite', 'height': 16, 'bpp_mode': 'bpp_4'})
+
+    type_col = data['type_col']
+    steps = []
+    firsts = []
+    pat = re.compile(r'^(\w+)(?::(\w+))?(?:\*(\d+))?([\^x!~@]*)$')
+    for m in data['moves']:
+        firsts.append((len(steps), 0))
+        n0 = len(steps)
+        for step in m['fx'].split('+'):
+            parts = step.strip().split()
+            if not parts:
+                continue
+            mm = pat.match(parts[0])
+            if not mm or mm.group(1) not in FX_KINDS:
+                continue
+            kind, shape, count, flags = mm.group(1), mm.group(2), int(mm.group(3) or 1), mm.group(4)
+            cols = parts[1].split('/') if len(parts) > 1 else type_col.get(m['t'], type_col['Normal'])
+            c1, c2 = fx_color(cols[0]), fx_color(cols[1] if len(cols) > 1 else cols[0])
+            sh = shapes.index(shape) if shape in shapes else -1
+            fl = ('1' if '^' in flags else '0', '1' if 'x' in flags else '0', '1' if '!' in flags else '0',
+                  '1' if '~' in flags else '0', '1' if '@' in flags else '0')
+            steps.append('{fx_kind::%s, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s}' % (
+                kind.upper(), sh, count, fl[0], fl[1], fl[2], fl[3], fl[4], 'true' if len(parts) > 1 else 'false',
+                c_color(tuple(v >> 3 for v in (int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)))),
+                c_color(tuple(v >> 3 for v in (int(c2[1:3], 16), int(c2[3:5], 16), int(c2[5:7], 16))))))
+        firsts[-1] = (n0, len(steps) - n0)
+    L = ['// Generated by tools/build_assets.py from the web game; do not edit.',
+         '#ifndef PR_FX_DATA_H\n#define PR_FX_DATA_H\n', '#include "bn_color.h"', '#include "bn_sprite_items_fx.h"\n',
+         'namespace pr::fx_data\n{\n',
+         'enum class fx_kind : uint8_t\n{\n' + ''.join('    %s,\n' % k.upper() for k in FX_KINDS) + '};\n',
+         'namespace fx_shape\n{\n' + ''.join('    constexpr int %s = %d;\n' % (n.upper(), i) for i, n in enumerate(shapes)) + '}\n',
+         'constexpr uint8_t shape_w[] = {%s};  // drawn width in px\n' % ', '.join(
+             str(len(pix[n][0]) if n in pix else 16 if n == 'ring' else 6) for n in shapes),
+         'struct fx_step\n{\n    fx_kind kind;\n    int8_t shape;       // -1: the kind\'s own\n    uint8_t n;\n'
+         '    bool above, cross, big, spin, arc, custom;\n    bn::color c1, c2;\n};\n',
+         'constexpr fx_step steps[] = {\n    ' + ',\n    '.join(steps) + '\n};\n',
+         '// Per move: its first step and how many.',
+         'constexpr uint16_t move_first[] = {%s};' % ', '.join(str(a) for a, _ in firsts),
+         'constexpr uint8_t move_count[] = {%s};\n' % ', '.join(str(b) for _, b in firsts),
+         '}\n\n#endif\n']
+    write_if_changed(os.path.join(out_inc, 'pr_fx_data.h'), '\n'.join(L))
+
+def build_weather(gfx):
+    """The weather overlays (the stylesheet's .wx-* layers): particles on a transparent 256x256 layer that the
+    game scrolls and blends over the field. Three densities for rain, snow, ash and bubbles (OPTION > WEATHER
+    LOW / MED / HIGH); the fog's drifting banks; the cave's darkness at the edges; the Ghost gym's circle of sight."""
+    import random
+    W = 256
+    def layer(seed, count, draw_one):
+        img = Image.new('RGBA', (W, W), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        r = random.Random(seed)
+        for _ in range(count):
+            draw_one(d, r.randrange(W), r.randrange(W), r)
+        return img
+    def wrap_draw(fn):
+        # Draw at the point and its wrapped copies so the layer tiles seamlessly.
+        def draw(d, x, y, r):
+            for ox in (0, -W, W):
+                for oy in (0, -W, W):
+                    fn(d, x + ox, y + oy, r)
+        return draw
+    def rain(d, x, y, r):
+        n = r.choice((3, 4, 5))
+        for k in range(n):
+            d.point((x - k // 3, y + k), fill=(0xd8, 0xe8, 0xff, 255))
+    def snow(d, x, y, r):
+        s = r.choice((0, 1, 1))
+        d.ellipse((x, y, x + s, y + s), fill=(0xff, 0xff, 0xff, 255))
+    def ash(d, x, y, r):
+        c = r.choice(((0x5a, 0x5a, 0x62), (0x70, 0x70, 0x78), (0x4a, 0x4a, 0x52), (0x60, 0x60, 0x68)))
+        s = r.choice((0, 1, 1))
+        d.rectangle((x, y, x + s, y + (1 if s else 0)), fill=c + (255,))
+    def bubble(d, x, y, r):
+        s = r.choice((1, 2, 2, 3))
+        if s >= 2:
+            d.ellipse((x, y, x + s, y + s), outline=(0xe8, 0xfb, 0xff, 255))
+        else:
+            d.point((x, y), fill=(0xe8, 0xfb, 0xff, 255))
+    for name, fn, base in (('rain', rain, 90), ('snow', snow, 70), ('ash', ash, 70), ('deep', bubble, 30)):
+        for level in (1, 2, 3):
+            img = layer(hash(name) % 1000 + level, base * level, wrap_draw(fn))
+            save_bg(img, gfx, 'wx_%s_%d' % (name, level))
+    # Fog: soft white banks, dithered so the layer has edges to blend.
+    img = Image.new('RGBA', (W, W), (0, 0, 0, 0))
+    px = img.load()
+    for y in range(W):
+        for x in range(W):
+            v = 0
+            for cx, cy, rx, ry in ((70, 80, 80, 30), (190, 170, 100, 35), (200, 40, 60, 22)):
+                for ox in (0, -W, W):
+                    u = ((x - cx - ox) / rx) ** 2 + ((y - cy) / ry) ** 2
+                    v = max(v, 1 - u)
+            bayer = ((x % 4) * 4 + (y % 4) * 7 + (x // 4 % 2) * 2) % 16 / 16
+            if v > bayer * 0.9 + 0.05:
+                px[x, y] = (0xff, 0xff, 0xff, 255)
+    save_bg(img, gfx, 'wx_fog')
+    # Cave: darkness creeping in from the edges (radial, dithered).
+    img = Image.new('RGBA', (W, W), (0, 0, 0, 0))
+    px = img.load()
+    for y in range(160):
+        for x in range(240):
+            dist = (((x - 120) / 120) ** 2 + ((y - 80) / 120) ** 2) ** 0.5 * 1.25
+            t = max(0, min(1, (dist - 0.38) / 0.52))
+            bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]][y % 4][x % 4] / 16
+            if t > bayer:
+                px[x, y] = (0, 0, 0, 255)
+    save_bg(img, gfx, 'wx_cave')
+    # Ghost gym: dark except a circle around you that grows with every junior beaten (70, 115, 160 css px).
+    for k, radius in ((1, 35), (2, 57), (3, 80)):
+        img = Image.new('RGBA', (W, W), (0x08, 0x00, 0x10, 255))
+        px = img.load()
+        for y in range(160):
+            for x in range(240):
+                dist = ((x - 120) ** 2 + (y - 75) ** 2) ** 0.5
+                if dist < radius - 10:
+                    px[x, y] = (0, 0, 0, 0)
+                elif dist < radius:
+                    bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]][y % 4][x % 4] / 16
+                    if (dist - (radius - 10)) / 10 < bayer:
+                        px[x, y] = (0, 0, 0, 0)
+        save_bg(img, gfx, 'wx_ghost_%d' % k)
+
 def build_grass_front(data, gfx):
     # The bottom half of a tall-grass tile, drawn over whoever stands in it (the web game's .tg-front).
     img = Image.new('RGBA', (16, 8), (0, 0, 0, 0))
@@ -667,8 +1262,7 @@ def build_backgrounds(data, gfx):
     save_bg(img, gfx, 'intro_bg', 'bpp_8')
 
     # Title: a slice of the home town.
-    t = data['areas'][0]
-    town = Image.frombytes('RGB', (t['w'] * 16, t['h'] * 16), open(os.path.join(EXP, 'map_%d.rgb' % t['index']), 'rb').read())
+    town = Image.open(os.path.join(EXP, 'map_0.png')).convert('RGB')
     save_bg(town.crop((96, 120, 96 + 256, 120 + 256)).convert('RGBA'), gfx, 'title_bg', 'bpp_8')
 
     # Party screen: the web game's diagonal blue stripes (.pty), at GBA scale.
@@ -693,12 +1287,16 @@ def build_backgrounds(data, gfx):
     save_bg(img, gfx, 'summary_bg')
 
 # ---------------------------------------------------------------------------------------------------
+ABILITY_KIND = {'flavor': 'FLAVOR', 'boost': 'BOOST', 'immune': 'IMMUNE', 'punch': 'PUNCH', 'merciless': 'MERCILESS',
+                'corrosion': 'CORROSION', 'disguise': 'DISGUISE'}
+HELD = ['none', 'leftovers', 'lifeorb', 'scarf', 'sash', 'sitrus']
+
 def build_game_data(data, out_inc):
     types = data['types']
     L = ['// Generated by tools/build_assets.py from the web game; do not edit.',
          '#ifndef PR_GAME_DATA_H\n#define PR_GAME_DATA_H\n', '#include "pr_game_types.h"']
     for s in data['species']:
-        L.append('#include "bn_sprite_items_mon_front_%d.h"\n#include "bn_sprite_items_mon_back_%d.h"' % (s['num'], s['num']))
+        L.append('#include "bn_sprite_items_mon_front_%d.h"\n#include "bn_sprite_items_mon_back_%d.h"\n#include "bn_sprite_items_mon_icon_%d.h"' % (s['num'], s['num'], s['num']))
     L.append('\nnamespace pr::game_data\n{\n')
     L.append('constexpr const char* type_names[] = {%s};' % ', '.join(c_string(t.upper()) for t in types))
     chart = data['chart']
@@ -711,23 +1309,39 @@ def build_game_data(data, out_inc):
     mv = []
     for m in data['moves']:
         sec = m.get('sec') or {}
-        mv.append('{%s, %d, %d, %s, %d, %s, %s, %d}' % (
+        mv.append('{%s, %d, %d, %s, %d, %s, %s, %d, %s}' % (
             c_text(m['n'].upper()), types.index(m['t']), m['p'], cat[m['c']], m['a'],
-            STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0)))
+            STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0), 'true' if m.get('punch') else 'false'))
     L.append('constexpr move moves[] = {\n    ' + ',\n    '.join(mv) + '\n};\n')
     names = [s['name'] for s in data['species']]
+    # Abilities, shared by name.
+    abil_index = {}
+    abil_rows = []
     for s in data['species']:
-        L.append('constexpr learn_entry learn_%d[] = {%s};' % (s['num'], ', '.join('{%d, %d}' % (lv, mi) for lv, mi in s['learn']) or '{1, 0}'))
+        a = s['ability']
+        key = (a['n'], a['desc'], a['type'], a['of'])
+        if key not in abil_index:
+            abil_index[key] = len(abil_rows)
+            desc = a['desc'].replace('(No battle effect yet.)', '').strip()
+            abil_rows.append('{%s, %s, ability_kind::%s, %d}' % (c_text(a['n'].upper()), c_text(desc), ABILITY_KIND.get(a['type'], 'FLAVOR'),
+                                                              types.index(a['of']) if a['of'] in types else -1))
+    L.append('constexpr ability abilities[] = {\n    %s\n};\n' % ',\n    '.join(abil_rows))
+    for i, s in enumerate(data['species']):
+        L.append('constexpr learn_entry learn_%d[] = {%s};' % (i, ', '.join('{%d, %d}' % (lv, mi) for lv, mi in s['learn']) or '{1, 0}'))
+        L.append('constexpr uint16_t fixed_%d[] = {%s};' % (i, ', '.join(map(str, s['moves'])) or '0'))
     L.append('\nconstexpr species species_list[] = {')
-    for s in data['species']:
+    for i, s in enumerate(data['species']):
         b = s['base']
         evo = s['evo']
         evo_to = names.index(evo['to']) if evo and evo['to'] in names else -1
         t2 = types.index(s['types'][1]) if len(s['types']) > 1 else -1
-        L.append('    {%s, %d, %d, %d, {%d, %d, %d, %d, %d, %d}, learn_%d, %d, %d, %d, %d, bn::sprite_items::mon_front_%d, bn::sprite_items::mon_back_%d},' % (
+        a = s['ability']
+        L.append('    {%s, %d, %d, %d, {%d, %d, %d, %d, %d, %d}, learn_%d, %d, fixed_%d, %d, %d, %d, %d, abilities[%d], %d, %d, %s, '
+                 'bn::sprite_items::mon_front_%d, bn::sprite_items::mon_back_%d, bn::sprite_items::mon_icon_%d},' % (
             c_text(s['name'].upper()), s['num'], types.index(s['types'][0]), t2,
-            b['hp'], b['atk'], b['def'], b['spa'], b['spd'], b['spe'], s['num'], max(1, len(s['learn'])),
-            evo_to, evo['level'] if evo_to >= 0 else 0, s['capture'], s['num'], s['num']))
+            b['hp'], b['atk'], b['def'], b['spa'], b['spd'], b['spe'], i, len(s['learn']), i, len(s['moves']),
+            evo_to, evo['level'] if evo_to >= 0 else 0, s['capture'], abil_index[(a['n'], a['desc'], a['type'], a['of'])],
+            s['height'] or 0, s['weight'] or 0, c_text(s['genus'] or ''), s['num'], s['num'], s['num']))
     L.append('};\n')
     # Items (ITEM_INFO): name, pocket, description, price, and what they do.
     its = []
@@ -737,21 +1351,49 @@ def build_game_data(data, out_inc):
             c_text(it['name']), it['pocket'], c_text(it['desc']), it.get('price', 0), it.get('heal', 0),
             STATUS[it.get('cure')], 'true' if it.get('revive') else 'false', 'true' if it.get('full') else 'false'))
     L.append('constexpr item_info items[] = {\n    %s\n};' % ',\n    '.join(its))
-    L.append('constexpr item_id mart_stock[] = {%s};\n' % ', '.join('item_id::%s' % i.upper() for i in MART_STOCK))
-    L.append('constexpr species_id starters[] = {%s};' % ', '.join('species_id::%s' % enum_name(n) for n in data['starters']))
+    held = data['held_items']
+    L.append('constexpr held_item_info held_items[] = {%s};' % ', '.join(
+        '{%s, %s}' % (c_text(held[h]['n'].upper()), c_text(held[h].get('desc', ''))) for h in HELD))
+    L.append('constexpr species_id starter_trios[][3] = {%s};' % ', '.join(
+        '{%s}' % ', '.join('species_id::%s' % enum_name(n) for n in trio) for trio in data['starter_trios']))
     L.append('constexpr const char* prof_name = %s;' % c_text(data['prof']))
     L.append('constexpr const char* intro_lines[] = {%s};' % ', '.join(c_text(l) for l in data['intro']))
-    call = data['prof_calls'][0]
-    L.append('// The professor\'s call after the first badge (PROF_CALLS).')
-    L.append('constexpr const char* first_badge_call[] = {%s};\n' % ', '.join(c_text(data['prof'] + ': ' + l) for l in call['lines']))
+    # The professor's calls (PROF_CALLS): after 1, 2 and 4 badges.
+    for k, call in enumerate(data['prof_calls']):
+        L.append('constexpr const char* prof_call%d[] = {%s};' % (k, ', '.join(c_text(data['prof'] + ': ' + l) for l in call['lines'])))
+    L.append('constexpr const char* const* prof_calls[] = {%s};' % ', '.join('prof_call%d' % k for k in range(len(data['prof_calls']))))
+    L.append('constexpr int prof_call_lines[] = {%s};' % ', '.join(str(len(c['lines'])) for c in data['prof_calls']))
+    L.append('constexpr int prof_call_badges[] = {%s};' % ', '.join(str(c['badges']) for c in data['prof_calls']))
+    # Day and night (TIME_TYPES, NIGHT_VISITORS).
+    tod = data['time_types']
+    for k in ('morning', 'day', 'evening', 'night'):
+        L.append('constexpr int8_t time_types_%s[] = {%s, -1};' % (k, ', '.join(str(types.index(t)) for t in tod[k])))
+    L.append('constexpr const int8_t* time_types[] = {time_types_morning, time_types_day, time_types_evening, time_types_night};')
+    L.append('constexpr species_id night_visitors[] = {%s};' % ', '.join('species_id::%s' % enum_name(n) for n in data['night_visitors']))
+    L.append('constexpr species_id tempest_pool[] = {%s};' % ', '.join('species_id::%s' % enum_name(n) for n in data['tempest_pool']))
+    # The POKéDEX's order (DEX_LIST): national numbers, the regional forms left out.
+    order = sorted([i for i, sp in enumerate(data['species']) if 0 < sp['num'] < 10000], key=lambda i: data['species'][i]['num'])
+    L.append('constexpr uint16_t dex_order[] = {%s};' % ', '.join(map(str, order)))
+    L.append('constexpr int dex_order_count = %d;' % len(order))
+    # The PC's wallpapers (WALLPAPERS, WALL_NAMES).
+    L.append('constexpr uint16_t wallpapers[][2] = {%s};' % ', '.join(
+        '{%d, %d}' % tuple((int(c[1:3], 16) >> 3) | ((int(c[3:5], 16) >> 3) << 5) | ((int(c[5:7], 16) >> 3) << 10) for c in w)
+        for w in data['wallpapers']))
+    L.append('constexpr const char* wall_groups[] = {%s};' % ', '.join(c_text(g[0]) for g in data['wall_names']))
+    L.append('constexpr const char* wall_names[] = {%s};' % ', '.join(c_text(n) for g in data['wall_names'] for n in g[1]))
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_game_data.h'), '\n'.join(L))
 
     # Enums shared by the data headers.
     kinds = list(data['people'])
     E = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_IDS_H\n#define PR_IDS_H\n',
-         '#include <cstdint>\n', 'namespace pr\n{\n', 'enum class species_id : uint8_t\n{']
-    E += ['    %s,' % enum_name(n) for n in names]
+         '#include <cstdint>\n', 'namespace pr\n{\n', 'enum class species_id : uint16_t\n{']
+    seen_names = set()
+    for n in names:
+        e = enum_name(n)
+        assert e not in seen_names, 'duplicate species enum ' + e
+        seen_names.add(e)
+        E.append('    %s,' % e)
     E += ['};\n', 'constexpr int species_count = %d;' % len(names), 'constexpr int types_count = %d;\n' % len(types)]
     E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
           'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
@@ -763,10 +1405,28 @@ def build_game_data(data, out_inc):
           ', '.join('&bn::sprite_items::person_%s' % k.lower() for k in kinds), '}\n', '#endif']
     write_if_changed(os.path.join(out_inc, 'pr_people_sprites.h'), '\n'.join(P))
 
+def build_news(out_inc):
+    """WHAT'S NEW (news.json): the message of the day and the changelog, as of the build."""
+    news = json.load(open(os.path.join(ROOT, 'news.json'), encoding='utf8'))
+    L = ['// Generated by tools/build_assets.py from news.json; do not edit.', '#ifndef PR_NEWS_DATA_H\n#define PR_NEWS_DATA_H\n',
+         'namespace pr::news_data\n{\n', 'constexpr const char* motd = %s;' % c_text(news.get('motd', ''))]
+    lines = []
+    for e in news.get('changelog', []):
+        lines.append('v%s  %s' % (e['version'], e['date']))
+        lines.append(e['title'])
+        for c in e.get('changes', []):
+            lines.append('- ' + c)
+        lines.append('')
+    L.append('constexpr const char* lines[] = {%s};' % ', '.join(c_text(l) for l in lines))
+    L.append('constexpr int lines_count = %d;' % len(lines))
+    L.append('}\n\n#endif')
+    write_if_changed(os.path.join(out_inc, 'pr_news_data.h'), '\n'.join(L))
+
 def inputs_hash():
     h = hashlib.sha256()
-    files = [os.path.join(ROOT, 'js', f) for f in ('app.js', 'dexdata.js', 'dexinfo.js', 'tileart.js')] + \
+    files = [os.path.join(ROOT, 'js', f) for f in ('app.js', 'dexdata.js', 'dexinfo.js', 'tileart.js', 'music.js')] + \
             [os.path.join(HERE, f) for f in ('export.js', 'build_assets.py')]
+    files.append(os.path.join(ROOT, 'news.json'))
     for f in files:
         h.update(open(f, 'rb').read())
     return h.hexdigest()
@@ -785,23 +1445,32 @@ def main():
     digest = inputs_hash()
     if os.path.exists(stamp) and open(stamp).read() == digest:
         return
-    # Graphics from older builds would still be picked up by Butano, so start clean.
-    for f in os.listdir(gfx):
-        os.remove(os.path.join(gfx, f))
+    # Graphics from older builds would still be picked up by Butano: whatever this run doesn't write goes.
+    before = set(os.listdir(gfx))
     for f in ('pr_species_id.h',):
         if os.path.exists(os.path.join(inc, f)):
             os.remove(os.path.join(inc, f))
-    subprocess.run(['node', os.path.join(HERE, 'export.js'), EXP] + [str(a) for a in AREAS], check=True)
+    subprocess.run(['node', os.path.join(HERE, 'export.js'), EXP], check=True)
     data = json.load(open(os.path.join(EXP, 'data.json'), encoding='utf8'))
     build_world(EXP, data, inc)
     build_game_data(data, inc)
+    build_music(data, inc)
+    build_news(inc)
     build_ui_tiles(inc)
     build_people(data, gfx)
     build_mons(data, gfx)
     BALL.extend(data['ball'])
     build_small_sprites(gfx)
+    build_plank(gfx)
+    build_screens(data, gfx)
+    build_weather(gfx)
+    build_fx(data, gfx, inc)
     build_grass_front(data, gfx)
     build_backgrounds(data, gfx)
+    written = set(WRITTEN)
+    for f in before:
+        if f not in written:
+            os.remove(os.path.join(gfx, f))
     open(stamp, 'w').write(digest)
 
 if __name__ == '__main__':

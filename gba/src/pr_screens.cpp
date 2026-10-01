@@ -1,23 +1,84 @@
+// The full-screen menus, after the web game's Emerald-style screens (partyOpen, summaryDraw, bagOpen,
+// boxOpen, dexOpen, optionOpen, cardOpen, renderMap, playCredits), at half the web game's 480x320.
 #include "pr_screens.h"
 
+#include "bn_bg_palette_ptr.h"
 #include "bn_bg_palettes.h"
 #include "bn_keypad.h"
 #include "bn_optional.h"
+#include "bn_rect_window.h"
 #include "bn_regular_bg_ptr.h"
+#include "bn_sprite_palette_ptr.h"
 #include "bn_string.h"
+#include "bn_window.h"
 
 #include "bn_regular_bg_items_bag_bg.h"
+#include "bn_regular_bg_items_card_bg.h"
+#include "bn_regular_bg_items_dex_bg.h"
+#include "bn_regular_bg_items_dex_entry_bg.h"
 #include "bn_regular_bg_items_party_bg.h"
+#include "bn_regular_bg_items_pc_bg.h"
 #include "bn_regular_bg_items_summary_bg.h"
+#include "bn_regular_bg_items_wallpaper_bg.h"
+#include "bn_sprite_items_badge.h"
+#include "bn_sprite_items_bag.h"
+#include "bn_sprite_items_cell.h"
 #include "bn_sprite_items_cursor.h"
+#include "bn_sprite_items_hand.h"
 #include "bn_sprite_items_hpbar.h"
+#include "bn_sprite_items_link.h"
+#include "bn_sprite_items_person_player.h"
 
+#include "pr_audio.h"
 #include "pr_game_data.h"
+#include "pr_icons.h"
 #include "pr_state.h"
 #include "pr_ui.h"
+#include "pr_world_data.h"
 
 namespace pr
 {
+
+namespace
+{
+    void upper(bn::istring& out, const char* text)
+    {
+        for(const char* c = text; *c; ++c)
+        {
+            out.push_back(*c >= 'a' && *c <= 'z' ? char(*c - 32) : *c);
+        }
+    }
+
+    int hp_colour(const mon& m)
+    {
+        return m.hp * 2 > m.max_hp ? 0 : m.hp * 5 > m.max_hp ? 1 : 2;
+    }
+
+    // Two lines of text, wrapped by words, at (x, y).
+    void print_wrapped(ui& u, int x, int y, int width, const bn::string_view& text, text_color color,
+                       bn::ivector<bn::sprite_ptr>& out, int max_lines = 2, int line_height = 15, bool small = false)
+    {
+        const char* data = text.data();
+        int start = 0, last_space = -1, line = 0;
+        for(int i = 0; i <= text.size() && line < max_lines; ++i)
+        {
+            if(i == text.size() || data[i] == ' ')
+            {
+                if(u.width(bn::string_view(data + start, i - start), small) > width && last_space > start)
+                {
+                    u.print(x, y + line * line_height, bn::string_view(data + start, last_space - start), color, out, small);
+                    ++line;
+                    start = last_space + 1;
+                }
+                last_space = i;
+            }
+        }
+        if(line < max_lines && start < text.size())
+        {
+            u.print(x, y + line * line_height, bn::string_view(data + start, text.size() - start), color, out, small);
+        }
+    }
+}
 
 void draw_hp_bar(bn::ivector<bn::sprite_ptr>& bar, int x, int y, int segments, int hp, int max_hp)
 {
@@ -45,11 +106,11 @@ void draw_hp_bar(bn::ivector<bn::sprite_ptr>& bar, int x, int y, int segments, i
     }
 }
 
-bool use_item(item_id id, int party_index, bn::string<80>& message)
+// useItem(): medicine on one Pokémon. Returns false (nothing used up) if it would do nothing.
+bool use_item_on(item_id id, mon& m, bn::string<80>& message)
 {
     game_state& g = state();
     const item_info& it = game_data::items[int(id)];
-    mon& m = g.party[party_index];
     if(! g.item_count(id))
     {
         return false;
@@ -110,9 +171,14 @@ bool use_item(item_id id, int party_index, bn::string<80>& message)
     return true;
 }
 
+bool use_item(item_id id, int party_index, bn::string<80>& message)
+{
+    return use_item_on(id, state().party[party_index], message);
+}
+
 // ---------------------------------------------------------------------------------------------------
-// Party screen (the web game's .pty, at GBA scale): the lead in a big box on the left, the rest in a column
-// on the right, a message box and CANCEL along the bottom.
+// Party screen (.pty, Emerald's party_menu): the lead in a big box on the left, the rest in two columns of
+// five on the right, the message box and CANCEL along the bottom. The chosen one's icon hops.
 namespace
 {
     constexpr int cancel_index = max_party;
@@ -126,13 +192,13 @@ namespace
     {
         if(k == 0)
         {
-            return { 1, 3, 10, 8 };
+            return { 1, 3, 11, 8 };
         }
         if(k == cancel_index)
         {
-            return { 23, 17, 7, 3 };
+            return { 24, 17, 6, 3 };
         }
-        return { 12, 1 + (k - 1) * 3, 18, 3 };
+        return { 12 + ((k - 1) / 5) * 9, 1 + ((k - 1) % 5) * 3, 9, 3 };
     }
 
     class party_view
@@ -156,59 +222,95 @@ namespace
             {
                 _bars[k].clear();
             }
-            for(int k = 0; k < g.party_count; ++k)
+            _selected = selected;
+            for(int k = 0; k < max_party; ++k)
             {
-                const mon& m = g.party[k];
                 slot_rect r = slot_of(k);
+                if(k >= g.party_count)
+                {
+                    // Empty slots (and the ones the party can't use yet: partyCap) stay dark.
+                    if(k)
+                    {
+                        u.win().box(k >= g.party_cap() ? window_style::LOCKED : window_style::EMPTY, r.tx, r.ty, r.tw, r.th);
+                    }
+                    continue;
+                }
+                const mon& m = g.party[k];
                 window_style style = k == selected || k == swapping ? window_style::SLOT_ON :
                                      m.fainted() ? window_style::SLOT_FNT : window_style::SLOT;
                 u.win().box(style, r.tx, r.ty, r.tw, r.th);
                 int x = r.tx * 8, y = r.ty * 8;
-                // Icon: the front sprite at half size.
-                // The web game's party icons: half-size front sprites, top left of each box.
-                bn::sprite_ptr icon = m.data().front.create_sprite(sx(x + (k ? 14 : 16)), sy(y + (k ? 10 : 14)));
-                icon.set_scale(bn::fixed(0.5));
+                bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(x + (k ? 10 : 14)), sy(y + (k ? 8 : 12)));
                 icon.set_bg_priority(0);
                 _icons.push_back(icon);
+                _icon_y[_icons.size() - 1] = y + (k ? 8 : 12);
+                _icon_slot[_icons.size() - 1] = k;
                 bn::string<16> lv("Lv");
                 lv.append(bn::to_string<4>(m.level));
-                bn::string<16> hp(bn::to_string<4>(m.hp));
-                hp.append("/");
-                hp.append(bn::to_string<4>(m.max_hp));
                 if(k == 0)
                 {
-                    u.print(x + 31, y + 5, m.name(), text_color::WHITE, _texts);
-                    u.print(x + 37, y + 22, lv, text_color::WHITE, _texts, true);
+                    u.print(x + 30, y + 5, m.name(), text_color::WHITE, _texts);
+                    u.print(x + 36, y + 22, lv, text_color::WHITE, _texts, true);
                     draw_hp_bar(_bars[k], x + 8, y + 36, 8, m.hp, m.max_hp);
-                    u.print(x + 74 - u.width(hp, true), y + 46, hp, text_color::WHITE, _texts, true);
+                    bn::string<16> hp(bn::to_string<4>(m.hp));
+                    hp.append("/");
+                    hp.append(bn::to_string<4>(m.max_hp));
+                    u.print(x + 80 - u.width(hp, true), y + 46, hp, text_color::WHITE, _texts, true);
                 }
                 else
                 {
-                    u.print(x + 30, y + 1, m.name(), text_color::WHITE, _texts);
-                    u.print(x + 34, y + 14, lv, text_color::WHITE, _texts, true);
-                    draw_hp_bar(_bars[k], x + 88, y + 6, 6, m.hp, m.max_hp);
-                    u.print(x + 136 - u.width(hp, true), y + 13, hp, text_color::WHITE, _texts, true);
+                    bn::string<16> name(m.name());
+                    while(name.size() > 3 && u.width(name, true) > 44)
+                    {
+                        name.pop_back();
+                    }
+                    u.print(x + 22, y + 2, name, text_color::WHITE, _texts, true);
+                    u.print(x + 22, y + 12, lv, text_color::WHITE, _texts, true);
+                    draw_hp_bar(_bars[k], x + 44, y + 14, 3, m.hp, m.max_hp);
                 }
             }
             slot_rect c = slot_of(cancel_index);
             u.win().box(selected == cancel_index ? window_style::SLOT_ON : window_style::SLOT, c.tx, c.ty, c.tw, c.th);
-            u.print(c.tx * 8 + 8, c.ty * 8 + 4, "CANCEL", text_color::WHITE, _texts);
+            u.print(c.tx * 8 + 4, c.ty * 8 + 4, "CANCEL", text_color::WHITE, _texts, true);
         }
 
         void message(const bn::string_view& text)
         {
             ui& u = gui();
             _message.clear();
-            u.win().box(window_style::WINDOW, 0, 17, 23, 3);
+            u.win().box(window_style::WINDOW, 0, 17, 24, 3);
             u.print(8, 140, text, text_color::INK, _message);
+        }
+
+        // The chosen one's icon hops (faster when healthier: 6/8/14/22 frames).
+        void tick()
+        {
+            ++_timer;
+            game_state& g = state();
+            for(int i = 0; i < _icons.size(); ++i)
+            {
+                int k = _icon_slot[i];
+                int dy = 0;
+                if(k == _selected)
+                {
+                    const mon& m = g.party[k];
+                    int speed = m.fainted() ? 0 : hp_colour(m) == 0 ? (m.hp >= m.max_hp ? 6 : 8) : hp_colour(m) == 1 ? 14 : 22;
+                    dy = speed && (_timer / speed) % 2 ? -3 : 0;
+                }
+                _icons[i].set_y(sy(_icon_y[i] + dy));
+            }
         }
 
     private:
         bn::regular_bg_ptr _bg;
         bn::vector<bn::sprite_ptr, max_party> _icons;
-        bn::vector<bn::sprite_ptr, 48> _texts;
+        int _icon_y[max_party] = {};
+        int _icon_slot[max_party] = {};
+        bn::vector<bn::sprite_ptr, 64> _texts;
         bn::vector<bn::sprite_ptr, 12> _message;
         bn::vector<bn::sprite_ptr, 8> _bars[max_party];
+        int _selected = 0;
+        int _timer = 0;
     };
 }
 
@@ -226,7 +328,7 @@ int party_screen(party_mode mode, const char* prompt)
         int swapping = -1;
         bool redraw = true;
         const char* base_prompt = prompt ? prompt : "Choose a POKéMON.";
-        ui::fade_in(8);
+        bool faded = true;
         while(true)
         {
             if(redraw)
@@ -234,29 +336,41 @@ int party_screen(party_mode mode, const char* prompt)
                 view->draw(selected, swapping);
                 view->message(swapping >= 0 ? "Move to where?" : base_prompt);
                 redraw = false;
+                if(faded)
+                {
+                    ui::fade_in(8);
+                    faded = false;
+                }
             }
+            view->tick();
             frame();
             int n = g.party_count;
+            int before = selected;
             if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
             {
                 // Up/Down step through the Pokémon and CANCEL.
                 int order_pos = selected == cancel_index ? n : selected;
                 order_pos = (order_pos + (bn::keypad::up_pressed() ? n : 1)) % (n + 1);
                 selected = order_pos == n ? cancel_index : order_pos;
-                redraw = true;
             }
-            else if(bn::keypad::left_pressed() && selected != 0 && selected != cancel_index)
+            else if(bn::keypad::left_pressed())
             {
-                selected = 0;
-                redraw = true;
+                // Left/Right move between the lead and the two columns.
+                selected = selected >= 6 && selected < cancel_index ? selected - 5 : selected == cancel_index ? selected : 0;
             }
-            else if(bn::keypad::right_pressed() && selected == 0 && n > 1)
+            else if(bn::keypad::right_pressed())
             {
-                selected = 1;
-                redraw = true;
+                selected = selected == 0 ? (n > 1 ? 1 : 0) : selected >= 1 && selected <= 5 && selected + 5 < n ? selected + 5 : selected;
             }
-            else if(bn::keypad::b_pressed())
+            if(selected != before)
             {
+                audio::play(audio::sfx::SELECT);
+                redraw = true;
+                continue;
+            }
+            if(bn::keypad::b_pressed())
+            {
+                audio::play(audio::sfx::SELECT);
                 if(swapping >= 0)
                 {
                     swapping = -1;
@@ -265,8 +379,9 @@ int party_screen(party_mode mode, const char* prompt)
                 }
                 break;
             }
-            else if(bn::keypad::a_pressed())
+            if(bn::keypad::a_pressed())
             {
+                audio::play(audio::sfx::SELECT);
                 if(selected == cancel_index)
                 {
                     if(swapping >= 0)
@@ -308,11 +423,9 @@ int party_screen(party_mode mode, const char* prompt)
                 if(pick == 0)
                 {
                     view.reset();
-                    summary_screen(selected);
+                    summary_screen(g.party.data(), g.party_count, selected);
                     view.emplace();
-                    view->draw(selected, swapping);
-                    view->message(base_prompt);
-                    ui::fade_in(8);
+                    faded = true;
                 }
                 else if(pick == 1 && mode == party_mode::FIELD && n > 1)
                 {
@@ -328,8 +441,8 @@ int party_screen(party_mode mode, const char* prompt)
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Summary (the web game's .sm): three pages, Left/Right to turn, Up/Down to change Pokémon.
-void summary_screen(int index)
+// Summary (.sm): POKéMON INFO / POKéMON SKILLS / BATTLE MOVES. Left/Right change page, Up/Down Pokémon.
+void summary_screen(const mon* mons, int count, int index)
 {
     game_state& g = state();
     ui& u = gui();
@@ -341,7 +454,7 @@ void summary_screen(int index)
         int page = 0;
         bool redraw = true;
         bn::optional<bn::sprite_ptr> mon_sprite;
-        bn::vector<bn::sprite_ptr, 64> texts;
+        bn::vector<bn::sprite_ptr, 72> texts;
         bn::vector<bn::sprite_ptr, 8> bar;
         constexpr const char* titles[] = { "POKéMON INFO", "POKéMON SKILLS", "BATTLE MOVES" };
         bool faded = true;
@@ -349,24 +462,24 @@ void summary_screen(int index)
         {
             if(redraw)
             {
-                const mon& m = g.party[index];
+                const mon& m = mons[index];
                 texts.clear();
                 u.win().clear_all();
-                u.win().box(window_style::PAGE, 12, 3, 18, 17);
+                u.win().box(window_style::PAGE, 11, 3, 19, 17);
                 u.print(8, 1, titles[page], text_color::WHITE, texts);
-                u.print(180, 4, "< PAGE >", text_color::WHITE, texts, true);
+                u.print(196, 4, "< PAGE >", text_color::WHITE, texts, true);
                 mon_sprite = m.data().front.create_sprite(sx(44), sy(56));
                 mon_sprite->set_bg_priority(1);
-                u.print(6, 90, m.name(), text_color::INK, texts);
+                u.print(6, 92, m.name(), text_color::INK, texts);
                 bn::string<16> lv("Lv");
                 lv.append(bn::to_string<4>(m.level));
                 u.print(6, 108, lv, text_color::INK, texts);
                 draw_hp_bar(bar, 14, 128, 8, m.hp, m.max_hp);
-                bn::string<24> row;
+                bn::string<32> row;
                 auto line = [&](int i, const char* label, const bn::string_view& value)
                 {
-                    u.print(106, 30 + i * 18, label, text_color::INK, texts);
-                    u.print(230 - u.width(value), 30 + i * 18, value, text_color::INK, texts);
+                    u.print(98, 30 + i * 17, label, text_color::INK, texts);
+                    u.print(232 - u.width(value), 30 + i * 17, value, text_color::INK, texts);
                 };
                 if(page == 0)
                 {
@@ -377,12 +490,16 @@ void summary_screen(int index)
                         row.append(type_name(m.data().type2));
                     }
                     line(0, "TYPE", row);
-                    line(1, "OT", g.name);
-                    line(2, "EXP. POINTS", bn::to_string<8>(m.xp));
-                    line(3, "NEXT LV.", bn::to_string<8>(bn::max(0, m.xp_next() - m.xp)));
-                    line(4, "STATUS", m.fainted() ? "FAINTED" : m.st == status::NONE ? "OK" :
-                         m.st == status::POISON ? "PSN" : m.st == status::BURN ? "BRN" :
-                         m.st == status::PARALYSIS ? "PAR" : m.st == status::SLEEP ? "SLP" : "FRZ");
+                    row.clear();
+                    upper(row, m.abil().name[0] ? m.abil().name : "-");
+                    line(1, "ABILITY", row);
+                    line(2, "OT", g.name);
+                    line(3, "EXP. POINTS", bn::to_string<8>(m.xp));
+                    line(4, "NEXT LV.", bn::to_string<8>(bn::max(0, m.xp_next() - m.xp)));
+                    if(m.item != held_item::NONE)
+                    {
+                        line(5, "ITEM", game_data::held_items[int(m.item)].name);
+                    }
                 }
                 else if(page == 1)
                 {
@@ -401,9 +518,8 @@ void summary_screen(int index)
                     for(int i = 0; i < m.move_count; ++i)
                     {
                         const move& mv = move_data(m.moves[i]);
-                        u.print(106, 28 + i * 30, mv.name, text_color::INK, texts);
-                        row = type_name(mv.type);
-                        u.print(110, 43 + i * 30, row, text_color::INK, texts, true);
+                        u.print(98, 28 + i * 30, mv.name, text_color::INK, texts);
+                        u.print(100, 43 + i * 30, type_name(mv.type), text_color::BLUE, texts, true);
                         if(mv.power)
                         {
                             row = "PWR ";
@@ -413,7 +529,7 @@ void summary_screen(int index)
                         {
                             row = "-";
                         }
-                        u.print(230 - u.width(row, true), 43 + i * 30, row, text_color::INK, texts, true);
+                        u.print(232 - u.width(row, true), 43 + i * 30, row, text_color::INK, texts, true);
                     }
                 }
                 redraw = false;
@@ -426,6 +542,7 @@ void summary_screen(int index)
             frame();
             if(bn::keypad::a_pressed() || bn::keypad::b_pressed())
             {
+                audio::play(audio::sfx::SELECT);
                 break;
             }
             if(bn::keypad::left_pressed() && page > 0)
@@ -438,10 +555,14 @@ void summary_screen(int index)
                 ++page;
                 redraw = true;
             }
-            else if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
+            else if((bn::keypad::up_pressed() || bn::keypad::down_pressed()) && count > 1)
             {
-                index = (index + (bn::keypad::up_pressed() ? g.party_count - 1 : 1)) % g.party_count;
+                index = (index + (bn::keypad::up_pressed() ? count - 1 : 1)) % count;
                 redraw = true;
+            }
+            if(redraw)
+            {
+                audio::play(audio::sfx::SELECT);
             }
         }
         ui::fade_out(8);
@@ -450,10 +571,12 @@ void summary_screen(int index)
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Bag (the web game's .bag): pocket name top left, the list on the right, the description bottom left.
+// Bag (.bag): five pockets; Left/Right change pocket (the bag hops), Up/Down move the cursor (it shakes).
+// From the field only medicine can be used, on a Pokémon picked from a list.
 namespace
 {
-    constexpr const char* pocket_names[] = { "ITEMS", "POKé BALLS" };
+    constexpr const char* pocket_names[] = { "ITEMS", "POKé BALLS", "TMs & HMs", "BERRIES", "KEY ITEMS" };
+    int bag_pocket = 1;
 }
 
 int bag_screen(bag_mode mode)
@@ -466,13 +589,16 @@ int bag_screen(bag_mode mode)
     {
         bn::regular_bg_ptr bg = bn::regular_bg_items::bag_bg.create_bg(8, 48);
         bg.set_priority(3);
-        static int pocket = 1;
         int index = 0;
         bool redraw = true;
         bool faded = true;
         bn::vector<bn::sprite_ptr, 64> texts;
         bn::vector<bn::sprite_ptr, 16> desc;
         bn::optional<bn::sprite_ptr> cursor;
+        bn::sprite_ptr bag = bn::sprite_items::bag.create_sprite(sx(60), sy(68), bag_pocket);
+        bag.set_bg_priority(2);
+        bn::vector<bn::sprite_ptr, 5> dots;
+        int anim = 0, anim_kind = 0;
         bn::string<96> said;
         while(true)
         {
@@ -480,7 +606,7 @@ int bag_screen(bag_mode mode)
             int count = 0;
             for(int i = 0; i < items_count; ++i)
             {
-                if(g.items[i] && game_data::items[i].pocket == pocket)
+                if(g.items[i] && game_data::items[i].pocket == bag_pocket)
                 {
                     ids[count++] = i;
                 }
@@ -490,62 +616,47 @@ int bag_screen(bag_mode mode)
             {
                 texts.clear();
                 u.win().clear_all();
-                u.win().box(window_style::BAG, 1, 1, 12, 3);
-                u.win().box(window_style::BAG, 13, 1, 17, 14);
-                u.win().box(window_style::BAG, 1, 15, 29, 5);
+                u.win().box(window_style::BAG, 0, 0, 13, 3);
+                u.win().box(window_style::BAG, 14, 1, 16, 16);
+                u.win().box(window_style::BAG, 0, 17, 14, 3);
                 bn::string<24> title("< ");
-                title.append(pocket_names[pocket]);
+                title.append(pocket_names[bag_pocket]);
                 title.append(" >");
-                u.print(52 - u.width(title) / 2, 12, title, text_color::INK, texts);
-                for(int i = 0; i <= count && i < 6; ++i)
+                u.print(52 - u.width(title) / 2, 4, title, text_color::INK, texts);
+                for(int i = 0; i <= count && i < 7; ++i)
                 {
-                    int y = 14 + i * 16;
+                    int y = 13 + i * 15;
                     if(i == count)
                     {
-                        u.print(122, y, "CLOSE BAG", text_color::INK, texts);
+                        u.print(126, y, "CLOSE BAG", text_color::INK, texts);
                         break;
                     }
                     const item_info& it = game_data::items[ids[i]];
-                    u.print(122, y, it.name, text_color::INK, texts);
+                    u.print(126, y, it.name, text_color::INK, texts, true);
                     bn::string<8> n("x");
                     n.append(bn::to_string<4>(g.items[ids[i]]));
-                    u.print(230 - u.width(n), y, n, text_color::INK, texts);
+                    u.print(232 - u.width(n, true), y, n, text_color::INK, texts, true);
                 }
-                cursor = bn::sprite_items::cursor.create_sprite(sx(112 + 4), sy(14 + index * 16 + 8));
+                cursor = bn::sprite_items::cursor.create_sprite(sx(118 + 4), sy(13 + index * 15 + 6));
                 cursor->set_bg_priority(0);
+                dots.clear();
+                for(int k = 0; k < 5; ++k)
+                {
+                    // The pocket dots: the current one lit.
+                    bn::sprite_ptr d = bn::sprite_items::badge.create_sprite(sx(24 + k * 10), sy(30), k == bag_pocket ? 1 : 0);
+                    d.set_scale(bn::fixed(0.5));
+                    d.set_bg_priority(1);
+                    dots.push_back(d);
+                }
+                bag.set_tiles(bn::sprite_items::bag.tiles_item(), bag_pocket);
                 desc.clear();
-                bn::string_view lines[3];
-                bn::string_view text = said.empty() ? (index < count ? game_data::items[ids[index]].desc : "Close the BAG.")
+                bn::string_view text = said.empty() ? (index < count ? game_data::items[ids[index]].desc : "CLOSE BAG")
                                                     : bn::string_view(said);
-                // In battle the web game's tip shows for POKé BALLS (renderCmd's bag view).
                 if(said.empty() && mode == bag_mode::BATTLE && index < count && ids[index] == int(item_id::POKEBALL))
                 {
                     text = "Weaken it first for a better catch rate!";
                 }
-                // Two lines of description, wrapped by words.
-                int line = 0;
-                const char* data = text.data();
-                int start = 0, last_space = -1;
-                for(int i = 0; i <= text.size() && line < 2; ++i)
-                {
-                    if(i == text.size() || data[i] == ' ')
-                    {
-                        if(u.width(bn::string_view(data + start, i - start)) > 216 && last_space > start)
-                        {
-                            lines[line++] = bn::string_view(data + start, last_space - start);
-                            start = last_space + 1;
-                        }
-                        last_space = i;
-                    }
-                }
-                if(line < 2 && start < text.size())
-                {
-                    lines[line++] = bn::string_view(data + start, text.size() - start);
-                }
-                for(int i = 0; i < line; ++i)
-                {
-                    u.print(14, 126 + i * 15, lines[i], text_color::INK, desc);
-                }
+                print_wrapped(u, 4, 139, 104, text, text_color::INK, desc, 2, 9, true);
                 said.clear();
                 redraw = false;
                 if(faded)
@@ -554,29 +665,52 @@ int bag_screen(bag_mode mode)
                     faded = false;
                 }
             }
+            // The bag hops when the pocket changes, and shakes when the cursor moves.
+            if(anim > 0)
+            {
+                --anim;
+                int t = anim;
+                if(anim_kind == 0)
+                {
+                    bag.set_y(sy(68 - (t > 5 ? 10 - t : t)));
+                }
+                else
+                {
+                    int a = t % 12 < 3 ? -6 : t % 12 < 6 ? 0 : t % 12 < 9 ? 6 : 0;
+                    bag.set_rotation_angle(a < 0 ? 360 + a : a);
+                }
+                if(! anim)
+                {
+                    bag.set_y(sy(68));
+                    bag.set_rotation_angle(0);
+                }
+            }
             frame();
             if(bn::keypad::left_pressed() || bn::keypad::right_pressed())
             {
-                pocket ^= 1;
+                bag_pocket = (bag_pocket + (bn::keypad::left_pressed() ? 4 : 1)) % 5;
                 index = 0;
                 redraw = true;
+                anim = 10;
+                anim_kind = 0;
+                audio::play(audio::sfx::SELECT);
             }
-            else if(bn::keypad::up_pressed() && index > 0)
+            else if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
             {
-                --index;
+                index = (index + (bn::keypad::up_pressed() ? count : 1)) % (count + 1);
                 redraw = true;
-            }
-            else if(bn::keypad::down_pressed() && index < bn::min(count, 5))
-            {
-                ++index;
-                redraw = true;
+                anim = 12;
+                anim_kind = 1;
+                audio::play(audio::sfx::SELECT);
             }
             else if(bn::keypad::b_pressed() || (bn::keypad::a_pressed() && index == count))
             {
+                audio::play(audio::sfx::SELECT);
                 break;
             }
             else if(bn::keypad::a_pressed())
             {
+                audio::play(audio::sfx::SELECT);
                 item_id id = item_id(ids[index]);
                 const item_info& it = game_data::items[int(id)];
                 if(mode == bag_mode::BATTLE)
@@ -584,30 +718,34 @@ int bag_screen(bag_mode mode)
                     result = int(id);
                     break;
                 }
-                if(it.pocket != 0)
+                bool medicine = it.heal || it.cure != status::NONE || it.revive || it.full;
+                if(! medicine)
                 {
-                    said = "This can't be used here.";
-                    redraw = true;
-                    continue;
+                    continue;   // only medicine works from the field
                 }
-                // Medicine from the field: choose who (bagOpen).
-                ui::fade_out(8);
-                cursor.reset();
-                texts.clear();
-                desc.clear();
-                bg.set_visible(false);
-                int who = party_screen(party_mode::CHOOSE, "Use on which POKéMON?");
-                bg.set_visible(true);
-                bn::string<80> message;
-                if(who >= 0)
+                // Who on (bagOpen's list: "NAME hp/max", CANCEL).
+                bn::string<32> labels[max_party + 1];
+                bn::string_view views[max_party + 1];
+                for(int i = 0; i < g.party_count; ++i)
                 {
+                    labels[i] = g.party[i].name();
+                    labels[i].append(" ");
+                    labels[i].append(bn::to_string<4>(g.party[i].hp));
+                    labels[i].append("/");
+                    labels[i].append(bn::to_string<4>(g.party[i].max_hp));
+                    views[i] = labels[i];
+                }
+                views[g.party_count] = "CANCEL";
+                int who = u.list(views, g.party_count + 1);
+                if(who >= 0 && who < g.party_count)
+                {
+                    bn::string<80> message;
                     if(! use_item(id, who, message))
                     {
                         message = "It won't have any effect.";
                     }
                     said = message;
                 }
-                faded = true;
                 redraw = true;
             }
         }
@@ -618,104 +756,1711 @@ int bag_screen(bag_mode mode)
 }
 
 // ---------------------------------------------------------------------------------------------------
-// The PC: Emerald's storage, in one box.
-void pc_screen()
+// The PC's boxes (boxOpen): 14 boxes of 30 (6 to a row). WITHDRAW and MOVE show the box; DEPOSIT shows the
+// party. A on a Pokémon: WITHDRAW / STORE / MOVE, RELEASE, CANCEL; A on the box's name: WALLPAPER / NAME.
+namespace
 {
-    game_state& g = state();
-    ui& u = gui();
-    u.say("Booted up the PC.");
-    while(true)
+    struct box_cursor
     {
-        u.show_text("Which would you like to do?");
-        constexpr bn::string_view options[] = { "WITHDRAW POKéMON", "DEPOSIT POKéMON", "LOG OFF" };
-        int pick = u.list(options, 3);
-        u.clear_text();
-        if(pick == 0)
+        int box = 0;
+        int r = 0, c = 0;      // r = -1: the box title; c = -1: the party (MOVE)
+        int p = 0;              // party row
+    };
+
+    class box_screen
+    {
+
+    public:
+        explicit box_screen(pc_mode mode) :
+            _mode(mode),
+            _bg(bn::regular_bg_items::pc_bg.create_bg(8, 48)),
+            _wall(bn::regular_bg_items::wallpaper_bg.create_bg(8, 48)),
+            _hand(bn::sprite_items::hand.create_sprite(0, 0, 0))
         {
-            if(! g.box_count)
-            {
-                u.say("There are no POKéMON in the BOX.");
-                continue;
-            }
-            if(g.party_count >= max_party)
-            {
-                u.say("Your party is full!");
-                continue;
-            }
-            bn::string<24> labels[box_size];
-            bn::string_view views[box_size];
-            int shown = bn::min(int(g.box_count), 6);
-            for(int i = 0; i < shown; ++i)
-            {
-                labels[i] = g.box[i].name();
-                labels[i].append(" Lv");
-                labels[i].append(bn::to_string<4>(g.box[i].level));
-                views[i] = labels[i];
-            }
-            u.show_text("Withdraw which POKéMON?");
-            int which = u.list(views, shown);
-            u.clear_text();
-            if(which >= 0)
-            {
-                g.party[g.party_count++] = g.box[which];
-                for(int i = which; i < g.box_count - 1; ++i)
-                {
-                    g.box[i] = g.box[i + 1];
-                }
-                --g.box_count;
-                bn::string<48> text(g.party[g.party_count - 1].name());
-                text.append(" was taken out of the BOX.");
-                u.say(text);
-            }
+            _bg.set_priority(3);
+            _wall.set_priority(3);
+            _wall.set_z_order(-1);
+            _hand.set_bg_priority(0);
+            _hand.set_z_order(-10);
+            // The wallpaper shows only inside the box's frame.
+            bn::rect_window inside = bn::rect_window::internal();
+            inside.set_boundaries(sy(25), sx(90), sy(137), sx(236));
+            bn::window::outside().set_show_bg(_wall, false);
+            inside.set_show_bg(_wall, true);
+            _wall.set_visible(_mode != pc_mode::DEPOSIT);
         }
-        else if(pick == 1)
+
+        ~box_screen()
         {
-            if(g.party_count <= 1)
+            bn::window::outside().restore();
+            bn::rect_window::internal().restore();
+        }
+
+        void run();
+
+    private:
+        pc_mode _mode;
+        bn::regular_bg_ptr _bg;
+        bn::regular_bg_ptr _wall;
+        bn::sprite_ptr _hand;
+        box_cursor _k;
+        bn::optional<mon> _held;
+        bn::vector<bn::sprite_ptr, 30> _icons;
+        bn::vector<bn::sprite_ptr, max_party> _party_icons;
+        bn::optional<bn::sprite_ptr> _big;
+        bn::optional<bn::sprite_ptr> _held_icon;
+        bn::vector<bn::sprite_ptr, 80> _texts;
+        bn::vector<bn::sprite_ptr, 24> _info;
+        bn::string<64> _msg;
+        int _timer = 0;
+        int _shown_box = -1;
+
+        [[nodiscard]] bool in_party() const
+        {
+            return _mode == pc_mode::DEPOSIT || _k.c < 0;
+        }
+        [[nodiscard]] mon* selected()
+        {
+            game_state& g = state();
+            if(in_party())
             {
-                u.say("You can't deposit your last POKéMON!");
-                continue;
+                return _k.p < g.party_count ? &g.party[_k.p] : nullptr;
             }
-            if(g.box_count >= box_size)
+            if(_k.r < 0)
             {
-                u.say("The BOX is full.");
-                continue;
+                return nullptr;
             }
-            bn::string<24> labels[max_party];
-            bn::string_view views[max_party];
-            for(int i = 0; i < g.party_count; ++i)
+            mon& m = g.box[_k.box * box_size + _k.r * 6 + _k.c];
+            return m.empty() ? nullptr : &m;
+        }
+        void draw_box();
+        void draw_info();
+        void place_hand();
+        void say(const bn::string_view& text);
+        bool ask_yes_no(const bn::string_view& text);
+        void action();
+        void title_menu();
+        void store(mon& m);
+        void withdraw(int slot);
+        void release(mon& m);
+        void grab();
+        void place();
+        void compact_party_after_remove(int index);
+    };
+
+    const char* box_name_of(int b)
+    {
+        game_state& g = state();
+        static bn::string<16> name;
+        if(g.box_names[b][0])
+        {
+            name = g.box_names[b];
+        }
+        else
+        {
+            name = "BOX";
+            name.append(bn::to_string<4>(b + 1));
+        }
+        return name.c_str();
+    }
+
+    void box_screen::draw_box()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        _texts.clear();
+        _icons.clear();
+        _party_icons.clear();
+        u.win().clear_all();
+        // Wallpaper colours (boxWall: the box's default is its number's).
+        int wall = g.box_wall[_k.box] ? g.box_wall[_k.box] - 1 : _k.box % 16;
+        bn::bg_palette_ptr pal = _wall.palette();
+        bn::color c1(game_data::wallpapers[wall][0] & 31, (game_data::wallpapers[wall][0] >> 5) & 31, game_data::wallpapers[wall][0] >> 10);
+        bn::color c2(game_data::wallpapers[wall][1] & 31, (game_data::wallpapers[wall][1] >> 5) & 31, game_data::wallpapers[wall][1] >> 10);
+        pal.set_color(1, c1);
+        pal.set_color(2, c2);
+        if(_mode == pc_mode::DEPOSIT)
+        {
+            // The party in two columns of five, CANCEL along the bottom.
+            for(int i = 0; i <= max_party; ++i)
             {
-                labels[i] = g.party[i].name();
-                labels[i].append(" Lv");
-                labels[i].append(bn::to_string<4>(g.party[i].level));
-                views[i] = labels[i];
-            }
-            u.show_text("Deposit which POKéMON?");
-            int which = u.list(views, g.party_count);
-            u.clear_text();
-            if(which >= 0)
-            {
-                mon m = g.party[which];
-                if(g.able_count() - (m.fainted() ? 0 : 1) <= 0)
+                int tx = i == max_party ? 15 : 11 + (i / 5) * 10, ty = i == max_party ? 15 : 1 + (i % 5) * 3;
+                int tw = i == max_party ? 8 : 9;
+                u.win().box(i == _k.p ? window_style::SLOT_ON : window_style::PAGE, tx, ty, tw, 3);
+                if(i == max_party)
                 {
-                    u.say("That's your last POKéMON that can battle!");
-                    continue;
+                    u.print(tx * 8 + 10, ty * 8 + 4, "CANCEL", text_color::INK, _texts, true);
                 }
-                for(int i = which; i < g.party_count - 1; ++i)
+                else if(i < g.party_count)
                 {
-                    g.party[i] = g.party[i + 1];
+                    const mon& m = g.party[i];
+                    bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(tx * 8 + 10), sy(ty * 8 + 10));
+                    icon.set_scale(bn::fixed(0.75));
+                    icon.set_bg_priority(0);
+                    _party_icons.push_back(icon);
+                    bn::string<16> name(m.name());
+                    while(name.size() > 3 && u.width(name, true) > 44)
+                    {
+                        name.pop_back();
+                    }
+                    u.print(tx * 8 + 22, ty * 8 + 3, name, text_color::INK, _texts, true);
+                    bn::string<8> lv("Lv");
+                    lv.append(bn::to_string<4>(m.level));
+                    u.print(tx * 8 + 22, ty * 8 + 12, lv, text_color::INK, _texts, true);
                 }
-                --g.party_count;
-                g.box[g.box_count++] = m;
-                bn::string<48> text(m.name());
-                text.append(" was stored in the BOX.");
-                u.say(text);
             }
         }
         else
         {
-            return;
+            // The title bar: < BOX1 >, and the box's 30 slots.
+            u.win().box(window_style::PAGE, 11, 0, 19, 3);
+            bn::string<24> title(box_name_of(_k.box));
+            u.print(163 - u.width(title) / 2, 4, title, text_color::INK, _texts);
+            u.print(96, 4, "<", text_color::INK, _texts);
+            u.print(226, 4, ">", text_color::INK, _texts);
+            for(int s = 0; s < box_size; ++s)
+            {
+                const mon& m = g.box[_k.box * box_size + s];
+                if(m.empty())
+                {
+                    continue;
+                }
+                int x = 92 + (s % 6) * 24 + 12, y = 26 + (s / 6) * 22 + 11;
+                bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(x), sy(y));
+                icon.set_bg_priority(1);
+                _icons.push_back(icon);
+            }
+            if(_mode == pc_mode::MOVE)
+            {
+                // MOVE: the party as a grid in the left panel.
+                for(int i = 0; i < max_party; ++i)
+                {
+                    int x = 4 + (i % 2) * 40, y = 84 + (i / 2) * 15;
+                    window_style st = _k.c < 0 && _k.p == i ? window_style::SLOT_ON : window_style::PAGE;
+                    u.win().box(st, x / 8, y / 8, 5, 2);
+                    if(i < g.party_count)
+                    {
+                        bn::sprite_ptr icon = icon_item(g.party[i].species_index).create_sprite(sx(x + 20), sy(y + 7));
+                        icon.set_scale(bn::fixed(0.5));
+                        icon.set_bg_priority(0);
+                        _party_icons.push_back(icon);
+                    }
+                }
+            }
+        }
+        _shown_box = _k.box;
+        draw_info();
+    }
+
+    void box_screen::draw_info()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        _info.clear();
+        mon* m = selected();
+        const mon* shown = m ? m : (_held ? &*_held : nullptr);
+        u.win().box(shown ? window_style::SLOT_ON : window_style::DARK, 0, 0, 11, 2);
+        u.print(6, 4, "POKéMON DATA", shown ? text_color::INK : text_color::WHITE, _info, true);
+        if(shown)
+        {
+            _big = shown->data().front.create_sprite(sx(43), sy(48));
+            _big->set_bg_priority(1);
+        }
+        else
+        {
+            _big.reset();
+        }
+        if(_mode != pc_mode::MOVE)
+        {
+            u.win().box(window_style::WINDOW, 0, 11, 11, 6);
+            if(shown)
+            {
+                u.print(6, 92, shown->name(), text_color::INK, _info, true);
+                bn::string<24> sp("/");
+                upper(sp, shown->species_name());
+                u.print(6, 104, sp, text_color::INK, _info, true);
+                bn::string<8> lv("Lv");
+                lv.append(bn::to_string<4>(shown->level));
+                u.print(6, 116, lv, text_color::INK, _info, true);
+            }
+        }
+        // The message line.
+        bn::string<64> msg = _msg;
+        if(msg.empty())
+        {
+            if(_mode == pc_mode::DEPOSIT)
+            {
+                msg = "Which POKéMON will you deposit?";
+            }
+            else if(_held)
+            {
+                msg = "Holding ";
+                msg.append(_held->name());
+                msg.append(". Where to?");
+            }
+            else
+            {
+                int used = 0;
+                for(int s = 0; s < box_size; ++s)
+                {
+                    used += ! g.box[_k.box * box_size + s].empty();
+                }
+                msg = bn::to_string<4>(used);
+                msg.append("/30");
+            }
+        }
+        u.print(92, 145, msg, text_color::INK, _info, true);
+        place_hand();
+    }
+
+    void box_screen::place_hand()
+    {
+        int x, y;
+        if(_mode == pc_mode::DEPOSIT)
+        {
+            x = _k.p == max_party ? 128 : 96 + (_k.p / 5) * 80;
+            y = _k.p == max_party ? 116 : 6 + (_k.p % 5) * 24;
+        }
+        else if(_k.c < 0)
+        {
+            x = 18 + (_k.p % 2) * 40;
+            y = 72 + (_k.p / 2) * 15;
+        }
+        else if(_k.r < 0)
+        {
+            x = 155;
+            y = -2;
+        }
+        else
+        {
+            x = 96 + _k.c * 24 + 4;
+            y = 14 + _k.r * 22;
+        }
+        int bob = _held ? 0 : (_timer / 30) % 2;
+        _hand.set_position(sx(x + 8), sy(y + 8 + bob));
+        _hand.set_tiles(bn::sprite_items::hand.tiles_item(), _held ? 1 : 0);
+        if(_held)
+        {
+            if(! _held_icon)
+            {
+                _held_icon = icon_item(_held->species_index).create_sprite(0, 0);
+                _held_icon->set_bg_priority(0);
+                _held_icon->set_z_order(-5);
+            }
+            _held_icon->set_position(sx(x + 8), sy(y + 22));
+        }
+        else
+        {
+            _held_icon.reset();
         }
     }
+
+    void box_screen::say(const bn::string_view& text)
+    {
+        _msg = text;
+        draw_info();
+        frame();
+        while(! bn::keypad::a_pressed() && ! bn::keypad::b_pressed())
+        {
+            ++_timer;
+            place_hand();
+            frame();
+        }
+        audio::play(audio::sfx::SELECT);
+        _msg.clear();
+        draw_info();
+    }
+
+    bool box_screen::ask_yes_no(const bn::string_view& text)
+    {
+        _msg = text;
+        draw_info();
+        bool yes = gui().yes_no(false);
+        _msg.clear();
+        draw_info();
+        return yes;
+    }
+
+    void box_screen::compact_party_after_remove(int index)
+    {
+        game_state& g = state();
+        for(int i = index; i < g.party_count - 1; ++i)
+        {
+            g.party[i] = g.party[i + 1];
+        }
+        g.party[g.party_count - 1] = mon();
+        --g.party_count;
+    }
+
+    void box_screen::store(mon& m)
+    {
+        game_state& g = state();
+        if(g.party_count <= 1)
+        {
+            say("That's your last POKéMON!");
+            return;
+        }
+        int slot = -1;
+        for(int i = 0; i < box_slots; ++i)
+        {
+            if(g.box[i].empty())
+            {
+                slot = i;
+                break;
+            }
+        }
+        if(slot < 0)
+        {
+            say("The BOXES are full.");
+            return;
+        }
+        int index = int(&m - g.party.data());
+        g.box[slot] = m;
+        g.box[slot].heal();
+        bn::string<64> text(m.name());
+        compact_party_after_remove(index);
+        _k.p = bn::min(_k.p, g.party_count - 1);
+        text.append(" was deposited in BOX");
+        text.append(bn::to_string<4>(slot / box_size + 1));
+        text.append(".");
+        draw_box();
+        say(text);
+    }
+
+    void box_screen::withdraw(int slot)
+    {
+        game_state& g = state();
+        if(g.party_count >= g.party_cap())
+        {
+            say("Your party's full!");
+            return;
+        }
+        g.party[g.party_count++] = g.box[slot];
+        bn::string<64> text(g.box[slot].name());
+        g.box[slot] = mon();
+        text.append(" was withdrawn.");
+        draw_box();
+        say(text);
+    }
+
+    void box_screen::release(mon& m)
+    {
+        game_state& g = state();
+        bool from_party = in_party();
+        if(from_party && g.party_count <= 1)
+        {
+            say("That's your last POKéMON!");
+            return;
+        }
+        if(! ask_yes_no("Release this POKéMON?"))
+        {
+            return;
+        }
+        // The icon shrinks away over 120 frames, then the goodbyes.
+        if(_big)
+        {
+            for(int f = 120; f > 0; f -= 2)
+            {
+                _big->set_scale(bn::fixed(f) / 120 + bn::fixed(0.01));
+                frame();
+            }
+        }
+        bn::string<32> name(m.name());
+        if(from_party)
+        {
+            compact_party_after_remove(int(&m - g.party.data()));
+            _k.p = bn::min(_k.p, g.party_count - 1);
+        }
+        else
+        {
+            m = mon();
+        }
+        draw_box();
+        bn::string<48> text(name);
+        text.append(" was released.");
+        say(text);
+        text = "Bye-bye, ";
+        text.append(name);
+        text.append("!");
+        say(text);
+    }
+
+    // MOVE: the hand takes the Pokémon out of its slot (the party closes up behind it)...
+    void box_screen::grab()
+    {
+        game_state& g = state();
+        mon* m = selected();
+        if(! m)
+        {
+            return;
+        }
+        if(in_party())
+        {
+            if(g.party_count <= 1)
+            {
+                say("That's your last POKéMON!");
+                return;
+            }
+            _held = *m;
+            compact_party_after_remove(_k.p);
+        }
+        else
+        {
+            _held = *m;
+            *m = mon();
+        }
+        draw_box();
+    }
+
+    // ...and puts it down: an empty spot takes it, an occupied one swaps (you then hold the other).
+    void box_screen::place()
+    {
+        game_state& g = state();
+        mon m = *_held;
+        if(in_party())
+        {
+            if(_k.p < g.party_count)
+            {
+                mon other = g.party[_k.p];
+                g.party[_k.p] = m;
+                _held = other;
+            }
+            else
+            {
+                if(g.party_count >= g.party_cap())
+                {
+                    say("Your party's full!");
+                    return;
+                }
+                g.party[g.party_count++] = m;
+                _held.reset();
+            }
+        }
+        else
+        {
+            mon& slot = g.box[_k.box * box_size + _k.r * 6 + _k.c];
+            mon other = slot;
+            slot = m;
+            slot.heal();
+            if(other.empty())
+            {
+                _held.reset();
+            }
+            else
+            {
+                _held = other;
+            }
+        }
+        _held_icon.reset();
+        draw_box();
+    }
+
+    // A on the box title: WALLPAPER (four theme groups) / NAME / CANCEL.
+    void box_screen::title_menu()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        _msg = "What do you want to do?";
+        draw_info();
+        constexpr bn::string_view options[] = { "WALLPAPER", "NAME", "CANCEL" };
+        int k = u.list(options, 3);
+        _msg.clear();
+        draw_info();
+        if(k == 0)
+        {
+            _msg = "Pick a theme.";
+            draw_info();
+            bn::string_view groups[5];
+            for(int i = 0; i < 4; ++i)
+            {
+                groups[i] = game_data::wall_groups[i];
+            }
+            groups[4] = "CANCEL";
+            int grp = u.list(groups, 5);
+            if(grp >= 0 && grp < 4)
+            {
+                _msg = "Pick the wallpaper.";
+                draw_info();
+                bn::string_view names[4];
+                for(int i = 0; i < 4; ++i)
+                {
+                    names[i] = game_data::wall_names[grp * 4 + i];
+                }
+                int w = u.list(names, 4);
+                if(w >= 0)
+                {
+                    g.box_wall[_k.box] = uint8_t(grp * 4 + w + 1);
+                    // Fades through white.
+                    bn::bg_palette_ptr pal = _wall.palette();
+                    for(int f = 16; f >= 0; --f)
+                    {
+                        pal.set_fade(bn::color(31, 31, 31), bn::fixed(f) / 16);
+                        draw_box();
+                        frame();
+                    }
+                }
+            }
+            _msg.clear();
+            draw_box();
+        }
+        else if(k == 1)
+        {
+            bn::string<32> title(box_name_of(_k.box));
+            title.append("'s name?");
+            char name[box_name_length + 1];
+            _texts.clear();
+            _info.clear();
+            _icons.clear();
+            _party_icons.clear();
+            _big.reset();
+            _hand.set_visible(false);
+            _wall.set_visible(false);
+            _bg.set_visible(false);
+            if(u.keyboard(title, name, box_name_length, box_name_of(_k.box)))
+            {
+                for(int i = 0; i <= box_name_length; ++i)
+                {
+                    g.box_names[_k.box][i] = name[i];
+                }
+            }
+            _hand.set_visible(true);
+            _wall.set_visible(true);
+            _bg.set_visible(true);
+            draw_box();
+            ui::fade_in(8);
+        }
+    }
+
+    void box_screen::action()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        if(_mode == pc_mode::DEPOSIT && _k.p == max_party)
+        {
+            return;
+        }
+        if(_mode != pc_mode::DEPOSIT && _k.r < 0 && _k.c >= 0)
+        {
+            title_menu();
+            return;
+        }
+        if(_held)
+        {
+            place();
+            return;
+        }
+        mon* m = selected();
+        if(! m)
+        {
+            return;
+        }
+        bn::string<48> text(m->name());
+        text.append(" is selected.");
+        _msg = text;
+        draw_info();
+        bn::string_view options[] = { _mode == pc_mode::DEPOSIT ? "STORE" : _mode == pc_mode::WITHDRAW ? "WITHDRAW" : "MOVE",
+                                      "RELEASE", "CANCEL" };
+        int k = u.list(options, 3);
+        _msg.clear();
+        draw_info();
+        if(k == 0)
+        {
+            if(_mode == pc_mode::DEPOSIT)
+            {
+                store(*m);
+            }
+            else if(_mode == pc_mode::WITHDRAW)
+            {
+                withdraw(_k.box * box_size + _k.r * 6 + _k.c);
+            }
+            else
+            {
+                grab();
+            }
+        }
+        else if(k == 1)
+        {
+            release(*m);
+        }
+        (void) g;
+    }
+
+    void box_screen::run()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        draw_box();
+        ui::fade_in(8);
+        while(true)
+        {
+            ++_timer;
+            place_hand();
+            frame();
+            bool moved = false;
+            if(bn::keypad::b_pressed())
+            {
+                audio::play(audio::sfx::SELECT);
+                if(_held)
+                {
+                    say("You're holding a POKéMON!");
+                    continue;
+                }
+                if(ask_yes_no("Exit from the BOX?"))
+                {
+                    break;
+                }
+                continue;
+            }
+            if(bn::keypad::a_pressed())
+            {
+                audio::play(audio::sfx::SELECT);
+                if(_mode == pc_mode::DEPOSIT && _k.p == max_party)
+                {
+                    break;
+                }
+                action();
+                continue;
+            }
+            if(_mode == pc_mode::DEPOSIT)
+            {
+                if(bn::keypad::up_pressed()) { _k.p = (_k.p + max_party) % (max_party + 1); moved = true; }
+                if(bn::keypad::down_pressed()) { _k.p = (_k.p + 1) % (max_party + 1); moved = true; }
+                if((bn::keypad::left_pressed() || bn::keypad::right_pressed()) && _k.p < max_party) { _k.p = (_k.p + 5) % max_party; moved = true; }
+            }
+            else if(_k.c < 0)
+            {
+                // MOVE, the party grid (two columns); right from its right column goes back to the box.
+                if(bn::keypad::up_pressed()) { _k.p = (_k.p + max_party - 2) % max_party; moved = true; }
+                if(bn::keypad::down_pressed()) { _k.p = (_k.p + 2) % max_party; moved = true; }
+                if(bn::keypad::left_pressed()) { _k.p -= _k.p % 2; moved = true; }
+                if(bn::keypad::right_pressed())
+                {
+                    if(_k.p % 2)
+                    {
+                        _k.c = 0;
+                        _k.r = bn::clamp((_k.p / 2) * 2, 0, 4);
+                    }
+                    else
+                    {
+                        ++_k.p;
+                    }
+                    moved = true;
+                }
+            }
+            else
+            {
+                if(_k.r < 0 && (bn::keypad::left_pressed() || bn::keypad::right_pressed()))
+                {
+                    _k.box = (_k.box + (bn::keypad::left_pressed() ? box_count - 1 : 1)) % box_count;
+                    audio::play(audio::sfx::SELECT);
+                    draw_box();
+                    continue;
+                }
+                if(bn::keypad::left_pressed())
+                {
+                    if(_k.c == 0 && _mode == pc_mode::MOVE)
+                    {
+                        _k.c = -1;
+                        _k.p = bn::clamp(_k.r * 2 + 1, 0, max_party - 1);
+                    }
+                    else
+                    {
+                        _k.c = (_k.c + 5) % 6;
+                    }
+                    moved = true;
+                }
+                if(bn::keypad::right_pressed()) { _k.c = (_k.c + 1) % 6; moved = true; }
+                if(bn::keypad::up_pressed()) { _k.r = _k.r < 0 ? 4 : _k.r - 1; moved = true; }
+                if(bn::keypad::down_pressed()) { _k.r = _k.r >= 4 ? -1 : _k.r + 1; moved = true; }
+            }
+            if(moved)
+            {
+                audio::play(audio::sfx::SELECT);
+                if(_mode == pc_mode::DEPOSIT || _mode == pc_mode::MOVE)
+                {
+                    draw_box();
+                }
+                else
+                {
+                    draw_info();
+                }
+            }
+        }
+        ui::fade_out(8);
+        _texts.clear();
+        _info.clear();
+        u.win().clear_all();
+        (void) g;
+    }
+}
+
+void pc_box_screen(pc_mode mode)
+{
+    ui::fade_out(8);
+    gui().win().clear_all();
+    bn::bg_palettes::set_transparent_color(bn::color(25, 26, 29));
+    {
+        box_screen screen(mode);
+        screen.run();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// POKéDEX (dexOpen, pokedex.c): the list (No. 1 to the highest seen) with the selected row always 6th,
+// three sprites in the viewer, SEEN / OWN; an entry has INFO / AREA / SIZE / CANCEL.
+namespace
+{
+    int dex_index = -1;
+
+    int seen_count()
+    {
+        game_state& g = state();
+        int n = 0;
+        for(int i = 0; i < game_data::dex_order_count; ++i)
+        {
+            n += g.seen.test(game_data::dex_order[i]);
+        }
+        return n;
+    }
+
+    // An entry page. Returns when B (or A on CANCEL) is pressed; Up/Down move to other seen species.
+    void dex_entry(int& index, int list_count, bool registering)
+    {
+        game_state& g = state();
+        ui& u = gui();
+        int tab = 0;
+        int page = 0;          // 0 INFO, 1 AREA, 2 SIZE
+        constexpr const char* tabs[] = { "INFO", "AREA", "SIZE", "CANCEL" };
+        bn::regular_bg_ptr bg = bn::regular_bg_items::dex_entry_bg.create_bg(8, 48);
+        bg.set_priority(3);
+        bn::vector<bn::sprite_ptr, 64> texts;
+        bn::vector<bn::sprite_ptr, 40> cells;
+        bn::vector<bn::sprite_ptr, 48> links;
+        bn::vector<int, 40> habitats;      // indexes into cells
+        bn::vector<int, 40> habitat_base;  // their unlit frame
+        bn::optional<bn::sprite_ptr> sprite, you;
+        bool redraw = true;
+        int timer = 0;
+        while(true)
+        {
+            int s = game_data::dex_order[index];
+            const species& sp = game_data::species_list[s];
+            bool owned = g.owned.test(s);
+            if(redraw)
+            {
+                texts.clear();
+                cells.clear();
+                links.clear();
+                habitats.clear();
+                habitat_base.clear();
+                sprite.reset();
+                you.reset();
+                u.win().clear_all();
+                if(registering)
+                {
+                    u.print(12, 2, "POKéDEX registration completed.", text_color::WHITE, texts);
+                }
+                else
+                {
+                    for(int t = 0; t < 4; ++t)
+                    {
+                        u.print(12 + t * 58, 2, tabs[t], t == tab ? text_color::RED : text_color::WHITE, texts);
+                    }
+                }
+                if(page == 0)
+                {
+                    sprite = sp.front.create_sprite(sx(44), sy(60));
+                    sprite->set_bg_priority(2);
+                    bn::string<32> line("No");
+                    if(sp.dex_number < 100) line.append("0");
+                    if(sp.dex_number < 10) line.append("0");
+                    line.append(bn::to_string<4>(sp.dex_number));
+                    line.append(" ");
+                    line.append(sp.name);
+                    u.print(88, 30, line, text_color::INK, texts);
+                    bn::string<32> genus;
+                    if(owned && sp.genus[0])
+                    {
+                        upper(genus, sp.genus);
+                    }
+                    else
+                    {
+                        genus = "?????";
+                    }
+                    genus.append(" POKéMON");
+                    u.print(88, 46, genus, text_color::INK, texts);
+                    bn::string<24> ht("HT  ");
+                    bn::string<24> wt("WT  ");
+                    if(owned && sp.height)
+                    {
+                        int inches = (sp.height * 3937 + 500) / 1000;
+                        ht.append(bn::to_string<4>(inches / 12));
+                        ht.append("'");
+                        if(inches % 12 < 10) ht.append("0");
+                        ht.append(bn::to_string<4>(inches % 12));
+                        ht.append("\"");
+                    }
+                    else
+                    {
+                        ht.append("??'??\"");
+                    }
+                    if(owned && sp.weight)
+                    {
+                        int tenths = (sp.weight * 220462 + 50000) / 100000;     // hg -> lbs x10
+                        wt.append(bn::to_string<6>(tenths / 10));
+                        wt.append(".");
+                        wt.append(bn::to_string<2>(tenths % 10));
+                        wt.append(" lbs.");
+                    }
+                    else
+                    {
+                        wt.append("????.? lbs.");
+                    }
+                    u.print(88, 62, ht, text_color::INK, texts);
+                    u.print(88, 76, wt, text_color::INK, texts);
+                    if(owned)
+                    {
+                        print_wrapped(u, 18, 108, 204, sp.abil.desc, text_color::INK, texts, 3, 14);
+                    }
+                }
+                else if(page == 1)
+                {
+                    // AREA: the region's grid, every area where it lives wild lit up; or AREA UNKNOWN.
+                    u.win().box(window_style::WINDOW, 1, 3, 28, 16);
+                    bn::string<24> cap;
+                    upper(cap, sp.name);
+                    u.print(120 - u.width(cap) / 2, 28, cap, text_color::INK, texts);
+                    bool any = false;
+                    for(int i = 0; i < world_data::areas_count; ++i)
+                    {
+                        const map_def& m = world_data::maps[i];
+                        const area_info& a = *m.area;
+                        if(a.at_x >= 100)
+                        {
+                            continue;
+                        }
+                        bool hab = false;
+                        if(a.flags & area_flag::OWN_POOL)
+                        {
+                            for(int k = 0; k < m.pool_count; ++k)
+                            {
+                                hab |= int(m.pool[k]) == s;
+                            }
+                        }
+                        any |= hab;
+                    }
+                    // With nowhere to show, AREA UNKNOWN sits in a box over the middle of the map.
+                    constexpr int box_x0 = 64, box_x1 = 176, box_y0 = 104, box_y1 = 136;
+                    auto covered = [&](int x, int y, int w, int h)
+                    {
+                        return ! any && x + w > box_x0 && x < box_x1 && y + h > box_y0 && y < box_y1;
+                    };
+                    for(int i = 0; i < world_data::areas_count; ++i)
+                    {
+                        const map_def& m = world_data::maps[i];
+                        const area_info& a = *m.area;
+                        if(a.at_x >= 100)
+                        {
+                            continue;
+                        }
+                        bool hab = false;
+                        if(a.flags & area_flag::OWN_POOL)
+                        {
+                            for(int k = 0; k < m.pool_count; ++k)
+                            {
+                                hab |= int(m.pool[k]) == s;
+                            }
+                        }
+                        int x = 36 + a.at_x * 24, y = 84 + a.at_y * 20;
+                        bool town = a.kind == area_kind::TOWN || a.kind == area_kind::GYM;
+                        if(! covered(x, y, 16, 16) && ! cells.full())
+                        {
+                            bn::sprite_ptr c = bn::sprite_items::cell.create_sprite(sx(x + 8), sy(y + 8), hab ? 8 : town ? 7 : 6);
+                            c.set_bg_priority(0);
+                            if(hab)
+                            {
+                                habitats.push_back(cells.size());
+                                habitat_base.push_back(town ? 7 : 6);
+                            }
+                            cells.push_back(c);
+                        }
+                        // Its connections (each once: to the right and down).
+                        for(int k = 0; k < m.links_count && ! links.full(); ++k)
+                        {
+                            const link& l = m.links[k];
+                            if(l.target < 0)
+                            {
+                                continue;
+                            }
+                            const area_info& b = *world_data::maps[l.target].area;
+                            bool right = b.at_x > a.at_x, down = b.at_y > a.at_y;
+                            if(b.at_x >= 100 || (! right && ! down))
+                            {
+                                continue;
+                            }
+                            int lx = right ? x + 17 : x + 4, ly = right ? y + 4 : y + 14;
+                            if(! covered(lx, ly, 8, 8))
+                            {
+                                bn::sprite_ptr ln = bn::sprite_items::link.create_sprite(sx(lx + 4), sy(ly + 4), right ? 0 : 2);
+                                ln.set_bg_priority(0);
+                                ln.set_z_order(2);
+                                links.push_back(ln);
+                            }
+                        }
+                    }
+                    if(! any)
+                    {
+                        u.win().box(window_style::WINDOW, box_x0 / 8, box_y0 / 8, (box_x1 - box_x0) / 8, (box_y1 - box_y0) / 8);
+                        u.print(120 - u.width("AREA UNKNOWN") / 2, 113, "AREA UNKNOWN", text_color::INK, texts);
+                    }
+                }
+                else
+                {
+                    // SIZE: its silhouette beside yours (1.6 m), the taller one filling the box.
+                    u.win().box(window_style::WINDOW, 1, 3, 28, 16);
+                    bn::string<40> cap("SIZE COMPARED TO ");
+                    upper(cap, g.name);
+                    u.print(120 - u.width(cap) / 2, 28, cap, text_color::INK, texts);
+                    int mh = bn::max(int(sp.height), 1), ph = 16, big = bn::max(mh, ph);
+                    sprite = sp.front.create_sprite(sx(76), sy(140 - 32 * mh / big));
+                    sprite->set_scale(bn::max(bn::fixed(0.1), bn::fixed(mh) / big * bn::fixed(1.4)));
+                    sprite->set_bg_priority(0);
+                    bn::sprite_palette_ptr sp_pal = sprite->palette();
+                    sp_pal.set_fade(bn::color(0, 0, 0), 1);
+                    you = bn::sprite_items::person_player.create_sprite(sx(168), sy(140 - 32 * ph / big));
+                    you->set_scale(bn::max(bn::fixed(0.2), bn::fixed(ph) / big * 3));
+                    you->set_bg_priority(0);
+                    bn::sprite_palette_ptr you_pal = you->palette();
+                    you_pal.set_fade(bn::color(0, 0, 0), 1);
+                }
+                redraw = false;
+            }
+            // Habitats pulse (the web's 1.07 s daPulse): lit, then dim, every 32 frames.
+            if(page == 1)
+            {
+                ++timer;
+                for(int h = 0; h < habitats.size(); ++h)
+                {
+                    cells[habitats[h]].set_tiles(bn::sprite_items::cell.tiles_item(), (timer / 32) % 2 ? habitat_base[h] : 8);
+                }
+            }
+            frame();
+            if(registering)
+            {
+                if(bn::keypad::a_pressed() || bn::keypad::b_pressed())
+                {
+                    audio::play(audio::sfx::SELECT);
+                    break;
+                }
+                continue;
+            }
+            if(bn::keypad::b_pressed())
+            {
+                audio::play(audio::sfx::SELECT);
+                break;
+            }
+            if(bn::keypad::left_pressed() || bn::keypad::right_pressed())
+            {
+                tab = (tab + (bn::keypad::left_pressed() ? 3 : 1)) % 4;
+                audio::play(audio::sfx::SELECT);
+                redraw = true;
+            }
+            else if(bn::keypad::a_pressed())
+            {
+                if(tab == 3)
+                {
+                    audio::play(audio::sfx::SELECT);
+                    break;
+                }
+                // SIZE needs the Pokémon to be caught; otherwise the failure buzz.
+                if(tab == 2 && ! owned)
+                {
+                    audio::play(audio::sfx::BUMP);
+                    continue;
+                }
+                audio::play(audio::sfx::SELECT);
+                page = tab;
+                redraw = true;
+            }
+            else if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
+            {
+                // Up/Down jump to the previous / next species seen.
+                int step = bn::keypad::up_pressed() ? -1 : 1;
+                for(int i = index + step; i >= 0 && i < list_count; i += step)
+                {
+                    if(g.seen.test(game_data::dex_order[i]))
+                    {
+                        index = i;
+                        redraw = true;
+                        audio::play(audio::sfx::SELECT);
+                        break;
+                    }
+                }
+            }
+        }
+        texts.clear();
+        cells.clear();
+        u.win().clear_all();
+    }
+}
+
+void dex_screen(int register_species)
+{
+    game_state& g = state();
+    ui& u = gui();
+    ui::fade_out(8);
+    u.win().clear_all();
+    // The list runs from No. 1 to the highest species seen.
+    int list_count = 0;
+    for(int i = 0; i < game_data::dex_order_count; ++i)
+    {
+        if(g.seen.test(game_data::dex_order[i]))
+        {
+            list_count = i + 1;
+        }
+    }
+    if(! list_count)
+    {
+        return;
+    }
+    if(register_species >= 0)
+    {
+        for(int i = 0; i < list_count; ++i)
+        {
+            if(game_data::dex_order[i] == register_species)
+            {
+                ui::fade_in(8);
+                int index = i;
+                dex_entry(index, list_count, true);
+                ui::fade_out(8);
+                return;
+            }
+        }
+        return;
+    }
+    if(dex_index < 0 || dex_index >= list_count)
+    {
+        for(int i = 0; i < list_count; ++i)
+        {
+            if(g.seen.test(game_data::dex_order[i]))
+            {
+                dex_index = i;
+                break;
+            }
+        }
+    }
+    bool faded = true;
+    while(true)
+    {
+        bool leave = false;
+        {
+            bn::regular_bg_ptr bg = bn::regular_bg_items::dex_bg.create_bg(8, 48);
+            bg.set_priority(3);
+            bn::vector<bn::sprite_ptr, 80> texts;
+            bn::vector<bn::sprite_ptr, 12> balls;
+            bn::optional<bn::sprite_ptr> prev, cur, next;
+            bool redraw = true;
+            while(true)
+            {
+                if(redraw)
+                {
+                    texts.clear();
+                    balls.clear();
+                    for(int r = 0; r < 11; ++r)
+                    {
+                        int i = dex_index - 5 + r;
+                        if(i < 0 || i >= list_count)
+                        {
+                            continue;
+                        }
+                        int s = game_data::dex_order[i];
+                        const species& sp = game_data::species_list[s];
+                        int y = -8 + r * 16 + 4;
+                        bn::string<32> line("No");
+                        if(sp.dex_number < 100) line.append("0");
+                        if(sp.dex_number < 10) line.append("0");
+                        line.append(bn::to_string<4>(sp.dex_number));
+                        line.append(" ");
+                        if(g.seen.test(s))
+                        {
+                            line.append(sp.name);
+                        }
+                        else
+                        {
+                            line.append("----------");
+                        }
+                        // Cut a long name short at the screen's edge.
+                        while(u.width(line, true) > 91)
+                        {
+                            line.pop_back();
+                        }
+                        u.print(148, y, line, text_color::INK, texts, true);
+                        if(g.owned.test(s) && ! balls.full())
+                        {
+                            bn::sprite_ptr b = bn::sprite_items::badge.create_sprite(sx(143), sy(y + 4), 1);
+                            b.set_scale(bn::fixed(0.5));
+                            b.set_bg_priority(0);
+                            balls.push_back(b);
+                        }
+                    }
+                    bn::string<16> seen("SEEN ");
+                    seen.append(bn::to_string<4>(seen_count()));
+                    bn::string<16> own("OWN ");
+                    own.append(bn::to_string<4>(g.owned.count()));
+                    u.print(4, 132, seen, text_color::WHITE, texts, true);
+                    u.print(4, 144, own, text_color::WHITE, texts, true);
+                    auto viewer = [&](bn::optional<bn::sprite_ptr>& spr, int i, int y, bool small)
+                    {
+                        spr.reset();
+                        if(i < 0 || i >= list_count)
+                        {
+                            return;
+                        }
+                        if(! g.seen.test(game_data::dex_order[i]))
+                        {
+                            // Not seen yet: a question mark (.dex-unk).
+                            u.print(94, y - 8, "?", text_color::INK, texts);
+                            return;
+                        }
+                        spr = game_data::species_list[game_data::dex_order[i]].front.create_sprite(sx(97), sy(y));
+                        spr->set_bg_priority(2);
+                        if(small)
+                        {
+                            spr->set_vertical_scale(bn::fixed(0.5));
+                        }
+                    };
+                    viewer(prev, dex_index - 1, 30, true);
+                    viewer(cur, dex_index, 80, false);
+                    viewer(next, dex_index + 1, 130, true);
+                    redraw = false;
+                    if(faded)
+                    {
+                        ui::fade_in(8);
+                        faded = false;
+                    }
+                }
+                frame();
+                int step = bn::keypad::up_pressed() ? -1 : bn::keypad::down_pressed() ? 1 : bn::keypad::left_pressed() ? -7 :
+                           bn::keypad::right_pressed() ? 7 : 0;
+                if(step)
+                {
+                    int to = bn::clamp(dex_index + step, 0, list_count - 1);
+                    if(to != dex_index)
+                    {
+                        dex_index = to;
+                        redraw = true;
+                        audio::play(audio::sfx::SELECT);
+                    }
+                }
+                else if(bn::keypad::b_pressed())
+                {
+                    audio::play(audio::sfx::SELECT);
+                    leave = true;
+                    break;
+                }
+                else if(bn::keypad::a_pressed() && g.seen.test(game_data::dex_order[dex_index]))
+                {
+                    audio::play(audio::sfx::SELECT);
+                    break;
+                }
+            }
+            ui::fade_out(6);
+        }
+        if(leave)
+        {
+            break;
+        }
+        ui::fade_in(6);
+        dex_entry(dex_index, list_count, false);
+        ui::fade_out(6);
+        faded = true;
+    }
+    u.win().clear_all();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// OPTION: TEXT SPEED, SOUND, MUSIC, EXP SHARE, WEATHER; Left/Right change the value (the chosen one in red);
+// B or CANCEL closes. Emerald plays no sounds on this page.
+void option_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    ui::fade_out(8);
+    u.win().clear_all();
+    bn::bg_palettes::set_transparent_color(bn::color(31, 31, 31));
+    bn::vector<bn::sprite_ptr, 64> texts;
+    bn::optional<bn::sprite_ptr> cursor;
+    int row = 0;
+    constexpr int rows = 5;
+    constexpr const char* labels[] = { "TEXT SPEED", "SOUND", "MUSIC", "EXP SHARE", "WEATHER" };
+    bool faded = true;
+    while(true)
+    {
+        texts.clear();
+        u.win().box(window_style::PAGE, 1, 1, 28, 4);
+        u.print(16, 13, "OPTION", text_color::INK, texts);
+        u.win().box(window_style::PAGE, 1, 6, 28, 13);
+        auto values = [&](int r, const char* const* names, int count, int chosen)
+        {
+            int y = 56 + r * 16;
+            if(count > 3)
+            {
+                bn::string<16> v("< ");
+                v.append(names[chosen]);
+                v.append(" >");
+                u.print(220 - u.width(v), y, v, text_color::RED, texts);
+                return;
+            }
+            int x = 220;
+            for(int i = count - 1; i >= 0; --i)
+            {
+                x -= u.width(names[i]) + 8;
+                u.print(x, y, names[i], i == chosen ? text_color::RED : text_color::INK, texts);
+            }
+        };
+        constexpr const char* speeds[] = { "SLOW", "MID", "FAST" };
+        constexpr const char* on_off[] = { "ON", "OFF" };
+        constexpr const char* music[] = { "OFF", "LOW", "MID", "HIGH" };
+        constexpr const char* weather[] = { "OFF", "LOW", "MED", "HIGH" };
+        for(int r = 0; r < rows; ++r)
+        {
+            u.print(24, 56 + r * 16, labels[r], text_color::INK, texts);
+        }
+        values(0, speeds, 3, int(g.opt.speed));
+        values(1, on_off, 2, g.opt.sound ? 0 : 1);
+        values(2, music, 4, int(g.opt.music));
+        values(3, on_off, 2, g.opt.exp_share ? 0 : 1);
+        values(4, weather, 4, int(g.opt.weather));
+        u.print(24, 56 + rows * 16, "CANCEL", text_color::INK, texts);
+        cursor = bn::sprite_items::cursor.create_sprite(sx(14 + 4), sy(56 + row * 16 + 8));
+        cursor->set_bg_priority(0);
+        if(faded)
+        {
+            ui::fade_in(8);
+            faded = false;
+        }
+        frame();
+        while(! bn::keypad::any_pressed())
+        {
+            frame();
+        }
+        if(bn::keypad::b_pressed() || (bn::keypad::a_pressed() && row == rows))
+        {
+            break;
+        }
+        if(bn::keypad::up_pressed())
+        {
+            row = (row + rows) % (rows + 1);
+        }
+        else if(bn::keypad::down_pressed())
+        {
+            row = (row + 1) % (rows + 1);
+        }
+        else if(bn::keypad::left_pressed() || bn::keypad::right_pressed())
+        {
+            int d = bn::keypad::left_pressed() ? -1 : 1;
+            switch(row)
+            {
+            case 0: g.opt.speed = text_speed((int(g.opt.speed) + 3 + d) % 3); break;
+            case 1: g.opt.sound = ! g.opt.sound; break;
+            case 2: g.opt.music = level4((int(g.opt.music) + 4 + d) % 4); break;
+            case 3: g.opt.exp_share = ! g.opt.exp_share; break;
+            case 4: g.opt.weather = level4((int(g.opt.weather) + 4 + d) % 4); break;
+            default: break;
+            }
+        }
+    }
+    ui::fade_out(8);
+    texts.clear();
+    u.win().clear_all();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// TRAINER CARD (cardOpen): name, IDNo., money, POKéDEX, play time with a blinking colon, you, and the eight
+// badges; A flips it over (areas visited, rival battles won, Pokémon in the boxes); B closes.
+void card_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    if(! g.trainer_id)
+    {
+        g.trainer_id = uint16_t(1 + rng().get_int(65535));
+    }
+    audio::play(audio::sfx::PC_LOGIN);
+    ui::fade_out(8);
+    u.win().clear_all();
+    bn::regular_bg_ptr bg = bn::regular_bg_items::card_bg.create_bg(8, 48);
+    bg.set_priority(3);
+    bn::vector<bn::sprite_ptr, 48> texts;
+    bn::vector<bn::sprite_ptr, 8> badges;
+    bn::optional<bn::sprite_ptr> you;
+    bool back = false;
+    bool redraw = true;
+    bool faded = true;
+    int last_second = -1;
+    while(true)
+    {
+        int seconds = int(g.play_frames / 60);
+        if(redraw || (! back && seconds != last_second))
+        {
+            last_second = seconds;
+            texts.clear();
+            badges.clear();
+            you.reset();
+            u.print(18, 12, back ? g.name : "TRAINER CARD", text_color::INK, texts);
+            auto row = [&](int i, const char* label, const bn::string_view& value)
+            {
+                int y = 34 + i * 18;
+                u.print(22, y, label, text_color::INK, texts);
+                u.print((back ? 214 : 138) - u.width(value), y, value, text_color::INK, texts);
+            };
+            if(! back)
+            {
+                bn::string<16> id("IDNo.");
+                bn::string<8> digits = bn::to_string<6>(g.trainer_id);
+                for(int pad = digits.size(); pad < 5; ++pad)
+                {
+                    id.append("0");
+                }
+                id.append(digits);
+                u.print(214 - u.width(id, true), 14, id, text_color::INK, texts, true);
+                row(0, "NAME", g.name);
+                bn::string<16> money("$");
+                money.append(bn::to_string<8>(g.money));
+                row(1, "MONEY", money);
+                row(2, "POKéDEX", bn::to_string<4>(g.owned.count()));
+                bn::string<16> time(bn::to_string<6>(seconds / 3600));
+                time.append(seconds % 2 ? " " : ":");
+                int m = (seconds / 60) % 60;
+                if(m < 10)
+                {
+                    time.append("0");
+                }
+                time.append(bn::to_string<4>(m));
+                row(3, "TIME", time);
+                you = bn::sprite_items::person_player.create_sprite(sx(186), sy(70));
+                you->set_scale(2);
+                you->set_bg_priority(1);
+                // The eight gyms' badges.
+                int k = 0;
+                for(int i = 0; i < world_data::areas_count; ++i)
+                {
+                    const map_def& a = world_data::maps[i];
+                    if(a.gate != gate_kind::GYM)
+                    {
+                        continue;
+                    }
+                    bool on = a.leader_id >= 0 && g.beaten.test(a.leader_id);
+                    bn::sprite_ptr b = bn::sprite_items::badge.create_sprite(sx(48 + k * 20), sy(134), on ? 1 : 0);
+                    b.set_bg_priority(1);
+                    badges.push_back(b);
+                    ++k;
+                }
+            }
+            else
+            {
+                int rivals = 0;
+                for(int i = 0; i < world_data::areas_count; ++i)
+                {
+                    const map_def& a = world_data::maps[i];
+                    if(a.gate == gate_kind::RIVAL && a.leader_id >= 0 && g.beaten.test(a.leader_id))
+                    {
+                        ++rivals;
+                    }
+                    else if(a.area && (a.area->flags & area_flag::BOSS) && a.leader_id >= 0 && g.beaten.test(a.leader_id))
+                    {
+                        ++rivals;
+                    }
+                }
+                row(0, "AREAS VISITED", bn::to_string<4>(g.visited.count()));
+                row(1, "RIVAL BATTLES WON", bn::to_string<4>(rivals));
+                row(2, "POKéMON IN BOXES", bn::to_string<4>(g.box_used()));
+            }
+            redraw = false;
+            if(faded)
+            {
+                ui::fade_in(8);
+                faded = false;
+            }
+        }
+        frame();
+        if(bn::keypad::b_pressed())
+        {
+            break;
+        }
+        if(bn::keypad::a_pressed())
+        {
+            // A vertical squash, the other side, and back.
+            for(int f = 8; f >= 0; --f)
+            {
+                bg.set_y(48 + (8 - f));
+                frame();
+            }
+            back = ! back;
+            redraw = true;
+            bg.set_y(48);
+        }
+    }
+    ui::fade_out(8);
+    texts.clear();
+    u.win().clear_all();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The region map (renderMap, POKéNAV): every area on its grid cell with its connections; places you haven't
+// been to show as unseen; where you are blinks. Move over the cells to read their names.
+void region_map_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    ui::fade_out(8);
+    u.win().clear_all();
+    bn::bg_palettes::set_transparent_color(bn::color(26, 28, 31));
+    bn::vector<bn::sprite_ptr, 64> cells;
+    bn::vector<bn::sprite_ptr, 60> links;
+    bn::vector<bn::sprite_ptr, 24> texts;
+    // The grid: x 0..7, y -2..2.
+    constexpr int ox = 30, oy = 22, cw = 24, ch = 22;
+    int here = g.map;
+    if(world_data::maps[here].is_room())
+    {
+        here = world_data::maps[here].exit_map;
+    }
+    int cursor = here;
+    auto cell_xy = [&](const area_info& a, int& x, int& y)
+    {
+        x = ox + a.at_x * cw;
+        y = oy + (a.at_y + 2) * ch;
+    };
+    for(int i = 0; i < world_data::areas_count; ++i)
+    {
+        const map_def& m = world_data::maps[i];
+        const area_info& a = *m.area;
+        if(a.at_x >= 100)
+        {
+            continue;       // under the sea
+        }
+        int x, y;
+        cell_xy(a, x, y);
+        bool seen = g.visited.test(i) || i == here;
+        int frame_index = ! seen ? 4 : a.kind == area_kind::ROUTE ? 0 : a.kind == area_kind::GYM ? 1 : a.kind == area_kind::TOWN ? 2 : 3;
+        bn::sprite_ptr c = bn::sprite_items::cell.create_sprite(sx(x + 8), sy(y + 8), frame_index);
+        c.set_bg_priority(1);
+        cells.push_back(c);
+        // Each link once (to the right and down), dashed while shut.
+        for(int k = 0; k < m.links_count && ! links.full(); ++k)
+        {
+            const link& l = m.links[k];
+            if(l.target < 0)
+            {
+                continue;
+            }
+            const area_info& b = *world_data::maps[l.target].area;
+            if(b.at_x >= 100)
+            {
+                continue;
+            }
+            bool right = b.at_x > a.at_x, down = b.at_y > a.at_y;
+            if(! right && ! down)
+            {
+                continue;
+            }
+            bool locked = l.gate && m.leader_id >= 0 && ! g.beaten.test(m.leader_id);
+            int lx = right ? x + 17 : x + 4, ly = right ? y + 4 : y + 14;
+            bn::sprite_ptr ln = bn::sprite_items::link.create_sprite(sx(lx + 4), sy(ly + 4), (right ? 0 : 2) + (locked ? 1 : 0));
+            ln.set_bg_priority(2);
+            links.push_back(ln);
+        }
+    }
+    bn::sprite_ptr mark = bn::sprite_items::cell.create_sprite(0, 0, 5);
+    mark.set_bg_priority(0);
+    bn::sprite_ptr pick = bn::sprite_items::cursor.create_sprite(0, 0);
+    pick.set_bg_priority(0);
+    int timer = 0;
+    bool redraw = true;
+    ui::fade_in(8);
+    while(true)
+    {
+        const area_info& ha = *world_data::maps[here].area;
+        int hx, hy;
+        cell_xy(ha, hx, hy);
+        mark.set_position(sx(hx + 8), sy(hy + 8));
+        mark.set_visible((timer / 30) % 2 == 0);
+        const area_info& ca = *world_data::maps[cursor].area;
+        int cx, cy;
+        cell_xy(ca, cx, cy);
+        pick.set_position(sx(cx - 4), sy(cy + 8));
+        if(redraw)
+        {
+            texts.clear();
+            u.win().box(window_style::WINDOW, 0, 17, 30, 3);
+            const map_def& m = world_data::maps[cursor];
+            bool seen = g.visited.test(cursor) || cursor == here;
+            bn::string<64> name(seen ? bn::string_view(m.name) : bn::string_view("???"));
+            bool cleared = (m.gate == gate_kind::GYM || m.gate == gate_kind::RIVAL) && m.leader_id >= 0 && g.beaten.test(m.leader_id);
+            if(seen && cleared)
+            {
+                name.append("  (cleared)");
+            }
+            u.print(8, 140, name, text_color::INK, texts);
+            redraw = false;
+        }
+        ++timer;
+        frame();
+        if(bn::keypad::b_pressed() || bn::keypad::start_pressed() || bn::keypad::select_pressed() || bn::keypad::a_pressed())
+        {
+            break;
+        }
+        int dx = bn::keypad::left_pressed() ? -1 : bn::keypad::right_pressed() ? 1 : 0;
+        int dy = bn::keypad::up_pressed() ? -1 : bn::keypad::down_pressed() ? 1 : 0;
+        if(dx || dy)
+        {
+            // The nearest area in that direction.
+            int best = -1, best_d = 1 << 30;
+            for(int i = 0; i < world_data::areas_count; ++i)
+            {
+                const area_info& a = *world_data::maps[i].area;
+                if(a.at_x >= 100 || i == cursor)
+                {
+                    continue;
+                }
+                int ddx = a.at_x - ca.at_x, ddy = a.at_y - ca.at_y;
+                if((dx && ddx * dx <= 0) || (dy && ddy * dy <= 0))
+                {
+                    continue;
+                }
+                int d = (dx ? bn::abs(ddx) * 2 + bn::abs(ddy) * 5 : bn::abs(ddy) * 2 + bn::abs(ddx) * 5);
+                if(d < best_d)
+                {
+                    best_d = d;
+                    best = i;
+                }
+            }
+            if(best >= 0)
+            {
+                cursor = best;
+                redraw = true;
+                audio::play(audio::sfx::SELECT);
+            }
+        }
+    }
+    ui::fade_out(8);
+    texts.clear();
+    u.win().clear_all();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The Hall of Fame, then the credits roll (A continues at THE END).
+void credits_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    audio::play_music("credits");
+    ui::fade_out(8);
+    u.win().clear_all();
+    bn::bg_palettes::set_transparent_color(bn::color(1, 2, 3));
+    {
+        bn::vector<bn::sprite_ptr, 6> hof;
+        bn::vector<bn::sprite_ptr, 64> texts;
+        u.text().set_center_alignment();
+        u.print(120, 10, "HALL OF FAME", text_color::RED, texts);
+        int n = bn::min(int(g.party_count), 6);
+        for(int i = 0; i < n; ++i)
+        {
+            const mon& m = g.party[i];
+            int x = 120 + (2 * i - (n - 1)) * 19;
+            bn::sprite_ptr s = m.data().front.create_sprite(sx(x), sy(62));
+            s.set_scale(bn::fixed(0.6));
+            s.set_bg_priority(1);
+            hof.push_back(s);
+            // (The small font is always drawn from the left: centre it by hand.)
+            u.print(x - u.width(m.name(), true) / 2, 86, m.name(), text_color::WHITE, texts, true);
+            bn::string<8> lv("Lv");
+            lv.append(bn::to_string<4>(m.level));
+            u.print(x - u.width(lv, true) / 2, 96, lv, text_color::WHITE, texts, true);
+        }
+        bn::string<64> line;
+        upper(line, g.name);
+        line.append(" became the CHAMPION of VELLORIN!");
+        u.print(120 - u.width(line, true) / 2, 120, line, text_color::WHITE, texts, true);
+        u.text().set_left_alignment();
+        ui::fade_in(16);
+        wait(300);
+        ui::fade_out(24);
+    }
+    {
+        // The roll: up from the bottom, over 30 seconds.
+        bn::string<64> champion;
+        upper(champion, g.name);
+        champion.append(", the new CHAMPION");
+        bn::string<48> prof(game_data::prof_name);
+        const char* roll[] = { "PARTY ROYALE", "Vellorin Version", "", "STARRING", champion.c_str(), "WREN, rival and friend", prof.c_str(), "",
+                               "THE GYM LEADERS", "RELL - SABLE - ORIN - ISKA", "JUNO - BRYN - HALE - CORVIN", "", "THE ELITE FOUR",
+                               "MORROW - BRAKK - FERRIN - AURELLE", "", "ADMIN VESPER and TEAM TEMPEST", "and LUGIA, guardian of the sea and sky",
+                               "", "Made by the Party Royale team", "", "Thank you to every playtester", "who pressed FEEDBACK." };
+        constexpr int lines = int(sizeof(roll) / sizeof(roll[0]));
+        constexpr int spacing = 18;
+        bn::vector<bn::sprite_ptr, 96> texts;
+        bn::vector<int, lines> line_first;
+        for(int i = 0; i < lines; ++i)
+        {
+            line_first.push_back(texts.size());
+            if(roll[i][0])
+            {
+                u.print(120 - u.width(roll[i], true) / 2, 0, roll[i], i == 0 ? text_color::RED : text_color::WHITE, texts, true);
+            }
+        }
+        // Each line's sprites start at y 0; move them all with the roll.
+        bn::vector<int, 96> line_of;
+        for(int i = 0; i < lines; ++i)
+        {
+            int end = i + 1 < lines ? line_first[i + 1] : texts.size();
+            for(int k = line_first[i]; k < end; ++k)
+            {
+                line_of.push_back(i);
+            }
+        }
+        bn::vector<bn::fixed, 96> base_y;
+        for(bn::sprite_ptr& t : texts)
+        {
+            base_y.push_back(t.y());
+        }
+        ui::fade_in(8);
+        int total = 160 + lines * spacing;
+        for(int f = 0; f <= 1800; ++f)
+        {
+            int offset = 160 - total * f / 1800;
+            for(int k = 0; k < texts.size(); ++k)
+            {
+                int y = offset + line_of[k] * spacing;
+                texts[k].set_y(base_y[k] + y);
+                texts[k].set_visible(y > -16 && y < 170);
+            }
+            frame();
+            if(bn::keypad::a_pressed() && f > 120)
+            {
+                break;
+            }
+        }
+        texts.clear();
+        u.text().set_center_alignment();
+        u.print(120, 66, "THE END", text_color::RED, texts);
+        bn::vector<bn::sprite_ptr, 8> press;
+        u.print(120 - u.width("Press A", true) / 2, 92, "Press A", text_color::WHITE, press, true);
+        u.text().set_left_alignment();
+        int t = 0;
+        while(! bn::keypad::a_pressed() && ! bn::keypad::b_pressed() && ! bn::keypad::start_pressed())
+        {
+            ++t;
+            for(bn::sprite_ptr& p : press)
+            {
+                p.set_visible((t / 30) % 2 == 0);
+            }
+            frame();
+        }
+        ui::fade_out(16);
+    }
+    u.win().clear_all();
 }
 
 }

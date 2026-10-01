@@ -1,20 +1,30 @@
 #ifndef PR_SCENES_H
 #define PR_SCENES_H
 
+#include "bn_vector.h"
 #include "pr_ids.h"
 
 namespace pr
 {
 
-// What the overworld hands to a battle: a wild pack, or a route trainer.
+enum class encounter_kind : uint8_t
+{
+    WILD,           // a pack from the tall grass, a cave floor or the water (startWildBattle)
+    FIXED,          // a scripted wild Pokémon: the professor's ZIGZAGOON, a bite on the line, the guardian
+    TRAINER         // a trainer, rival, Gym Leader, Elite Four or Champion (startTrainerBattle)
+};
+
+// What the overworld hands to a battle.
 struct encounter
 {
-    bool trainer = false;
-    int map = 0;                    // trainer: where they stand, and which one
+    encounter_kind kind = encounter_kind::WILD;
+    int map = 0;                    // trainer: the map they're on, and which of its trainers
     int trainer_index = 0;
-    species_id species[4] = {};     // wild: the pack (startWildBattle)
+    species_id species[4] = {};     // wild: the pack
     int count = 0;
     int level = 2;
+    bool legendary = false;         // the guardian: tougher, harder to catch (state.legendary)
+    bool water = false;
 };
 
 enum class battle_outcome
@@ -25,14 +35,31 @@ enum class battle_outcome
     WHITED_OUT
 };
 
-// Title screen and new game; returns once a game is loaded or started.
-void title_scene();
+// What happened, for afterStory: who was caught (nickname and POKéDEX registration).
+struct battle_report
+{
+    battle_outcome outcome = battle_outcome::WON;
+    bn::vector<int16_t, 4> caught_party;      // party index, or 100 + box slot
+    bn::vector<uint16_t, 4> dex_new;          // species index
+    bool trainer_beaten = false;
+};
+
+// Title screen and new game; returns once a game is loaded or started (true), or after FREE BATTLE (false).
+bool title_scene();
 
 // Walks the overworld until a battle starts (returns true and fills `battle`) or the player quits to the
 // title (returns false).
-bool overworld_scene(encounter& battle);
+bool overworld_scene(encounter& battle, const battle_report* last);
 
-battle_outcome battle_scene(const encounter& battle);
+battle_report battle_scene(const encounter& battle);
+
+// FREE BATTLE: draft a side from the whole dex and fight a random one.
+void free_battle_scene();
+
+// The next overworld scene starts a CONTINUEd game (startAdventure: the starter event or the area's story).
+void set_just_loaded();
+// The next overworld scene starts a new game (introFinish's directions).
+void set_new_game_started();
 
 }
 
