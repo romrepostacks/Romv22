@@ -13,11 +13,11 @@ int main()
 
     while(true)
     {
-        pr::title_scene(ui);
-        pr::encounter wild;
-        while(pr::overworld_scene(ui, wild))
+        pr::title_scene();
+        pr::encounter battle;
+        while(pr::overworld_scene(battle))
         {
-            pr::battle_scene(ui, wild);
+            pr::battle_scene(battle);
         }
     }
 }

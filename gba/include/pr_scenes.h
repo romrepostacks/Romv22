@@ -1,17 +1,20 @@
 #ifndef PR_SCENES_H
 #define PR_SCENES_H
 
-#include "pr_species_id.h"
+#include "pr_ids.h"
 
 namespace pr
 {
 
-class ui;
-
+// What the overworld hands to a battle: a wild pack, or a route trainer.
 struct encounter
 {
-    species_id species;
-    int level;
+    bool trainer = false;
+    int map = 0;                    // trainer: where they stand, and which one
+    int trainer_index = 0;
+    species_id species[4] = {};     // wild: the pack (startWildBattle)
+    int count = 0;
+    int level = 2;
 };
 
 enum class battle_outcome
@@ -22,14 +25,14 @@ enum class battle_outcome
     WHITED_OUT
 };
 
-// Title screen; returns once a game is loaded or started.
-void title_scene(ui& ui);
+// Title screen and new game; returns once a game is loaded or started.
+void title_scene();
 
-// Walks the overworld until a wild Pokémon appears (returns true and fills `wild`) or the player
-// quits to the title (returns false).
-bool overworld_scene(ui& ui, encounter& wild);
+// Walks the overworld until a battle starts (returns true and fills `battle`) or the player quits to the
+// title (returns false).
+bool overworld_scene(encounter& battle);
 
-battle_outcome battle_scene(ui& ui, const encounter& wild);
+battle_outcome battle_scene(const encounter& battle);
 
 }
 

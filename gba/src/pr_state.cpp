@@ -1,5 +1,6 @@
 #include "pr_state.h"
 
+#include "bn_common.h"
 #include "bn_sram.h"
 
 namespace pr
@@ -8,7 +9,7 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 1;
+    constexpr int save_version = 2;
 
     struct save_block
     {
@@ -31,6 +32,9 @@ namespace
         return sum;
     }
 
+    // The save block is ~1.5 KB, so it lives in EWRAM rather than on the stack.
+    BN_DATA_EWRAM_BSS save_block block_buffer;
+
     bool read_block(save_block& block)
     {
         bn::sram::read(block);
@@ -44,7 +48,7 @@ namespace
         return block.version == save_version && block.size == int(sizeof(game_state)) && block.checksum == checksum_of(block);
     }
 
-    game_state current;
+    BN_DATA_EWRAM_BSS game_state current;
     bn::random random_generator;
 }
 
@@ -58,28 +62,14 @@ bn::random& rng()
     return random_generator;
 }
 
-bool game_state::item_picked(int area_index, int tx, int ty) const
+int game_state::able_count() const
 {
-    for(const picked_item& p : picked)
+    int n = 0;
+    for(int i = 0; i < party_count; ++i)
     {
-        if(p.used && p.area == area_index && p.x == tx && p.y == ty)
-        {
-            return true;
-        }
+        n += ! party[i].fainted();
     }
-    return false;
-}
-
-void game_state::pick_item(int area_index, int tx, int ty)
-{
-    for(picked_item& p : picked)
-    {
-        if(! p.used)
-        {
-            p = { int8_t(area_index), int8_t(tx), int8_t(ty), 1 };
-            return;
-        }
-    }
+    return n;
 }
 
 int game_state::first_able() const
@@ -102,36 +92,70 @@ void game_state::heal_party()
     }
 }
 
-bool game_state::add_to_party(const mon& m)
+bool game_state::add_mon(const mon& m, bool& to_box)
 {
-    if(party_count >= max_party)
+    to_box = false;
+    if(party_count < max_party)
     {
-        return false;
+        party[party_count++] = m;
+        return true;
     }
-    party[party_count++] = m;
-    return true;
+    if(box_count < box_size)
+    {
+        box[box_count++] = m;
+        to_box = true;
+        return true;
+    }
+    return false;
+}
+
+void game_state::add_item(item_id id, int count)
+{
+    items[int(id)] = uint8_t(bn::min(99, items[int(id)] + count));
+}
+
+int game_state::average_level() const
+{
+    if(! party_count)
+    {
+        return 5;
+    }
+    int sum = 0;
+    for(int i = 0; i < party_count; ++i)
+    {
+        sum += party[i].level;
+    }
+    return (sum + party_count / 2) / party_count;
 }
 
 bool save_exists()
 {
-    save_block block;
-    return read_block(block);
+    return read_block(block_buffer);
+}
+
+bool peek_save(game_state& out)
+{
+    if(! read_block(block_buffer))
+    {
+        return false;
+    }
+    out = block_buffer.game;
+    return true;
 }
 
 bool load_game()
 {
-    save_block block;
-    if(! read_block(block))
+    if(! read_block(block_buffer))
     {
         return false;
     }
-    current = block.game;
+    current = block_buffer.game;
     return true;
 }
 
 void save_game()
 {
-    save_block block;
+    save_block& block = block_buffer;
     for(int i = 0; i < 8; ++i)
     {
         block.tag[i] = save_tag[i];

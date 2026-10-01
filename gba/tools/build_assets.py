@@ -1,28 +1,39 @@
 #!/usr/bin/env python3
 """Builds Party Royale's GBA data from the web game.
 
-1. tools/export.js loads the web game's js/*.js and writes the areas (drawn as pictures), people art,
-   species and moves.
+1. tools/export.js loads the web game's js/*.js and writes the areas and rooms (drawn as pictures), people
+   art, species, moves and items.
 2. This script turns that into GBA data in <out>/:
-   - include/pr_world_data.h  overworld tiles, palettes, 16x16 metatiles, per-area maps, behaviours,
-                              signs, people and connections
-   - include/pr_game_data.h   species, moves, the type chart
+   - include/pr_world_data.h  tilesets (outdoors, and one per kind of room): 8x8 tiles, 4bpp palette banks
+                              and 16x16 metatiles; every map's metatiles, behaviours, signs, doors, people,
+                              trainers, item balls and connections
+   - include/pr_game_data.h   species, moves, items, the type chart, intro text
+   - include/pr_ids.h         species, item and people enums
+   - include/pr_ui_data.h     the window frame tiles (9-slice styles sharing one palette bank)
    - graphics/*.bmp + .json   sprites and full-screen backgrounds for Butano's asset tool
 Needs Node.js and Pillow. Called by the Makefile (EXTTOOL) before every build; it skips work when its
 inputs haven't changed.
 """
-import argparse, hashlib, json, os, re, subprocess, sys
+import argparse, hashlib, json, os, re, subprocess
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GBA = os.path.dirname(HERE)
 ROOT = os.path.dirname(GBA)
-AREAS = [0, 1]          # Duskmere Hollow, Route 1 (the proof-of-concept slice)
-MAP_BANKS = 13          # BG palette banks the overworld may use; the rest are for text boxes
+AREAS = [0, 1]          # Duskmere Hollow, Route 1
+MAP_BANKS = 15          # BG palette banks a map tileset may use; the 16th is the UI's
+ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'hyperpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal',
+            'revive', 'fullrestore']
+MART_STOCK = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening']    # martOpen() before 2 badges
+STATUS = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
+          'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
 
 # ---------------------------------------------------------------------------------------------------
 def rgb555(c):
     return (c[0] >> 3, c[1] >> 3, c[2] >> 3)
+
+def hex555(h):
+    return rgb555((int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)))
 
 def c_color(c):
     return 'bn::color(%d, %d, %d)' % c
@@ -37,6 +48,9 @@ def nonempty(body, dummy):
 def c_string(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') + '"'
 
+def c_text(s):
+    return c_string(clean_text(s))
+
 # The Butano font has ASCII plus a few accented letters (é among them, for POKéMON).
 TEXT_SWAP = {'→': '>', '←': '<', '↑': '^', '↓': 'v', '…': '...', '“': '"', '”': '"', '‘': "'", '’': "'", '—': '-', '–': '-',
              '₽': '$', '♂': 'M', '♀': 'F', '×': 'x'}
@@ -49,161 +63,283 @@ def clean_text(s):
         out += ''.join(c if (32 <= ord(c) < 127 or c in FONT_EXTRA or c == '\n') else '?' for c in ch)
     return out
 
-# ---------------------------------------------------------------------------------------------------
-# Overworld: cut every area picture into 8x8 tiles, share them (with flips) across areas, pack their
-# colours into 4bpp palette banks, then describe each area as 16x16 metatiles of four cells.
+def write_if_changed(path, text):
+    if os.path.exists(path) and open(path, encoding='utf8').read() == text:
+        return
+    with open(path, 'w', encoding='utf8') as f:
+        f.write(text)
 
-def pack_palettes(color_sets, max_banks):
-    """Greedy bin packing of tile colour sets into banks of 15 colours (index 0 is transparent)."""
-    banks = []
-    order = sorted(range(len(color_sets)), key=lambda i: -len(color_sets[i]))
-    assign = [None] * len(color_sets)
-    for i in order:
-        cs = color_sets[i]
-        best, best_add = None, None
-        for b, bank in enumerate(banks):
-            add = len(cs - bank)
-            if len(bank) + add <= 15 and (best is None or add < best_add):
-                best, best_add = b, add
-        if best is None:
-            banks.append(set(cs))
-            best = len(banks) - 1
-        else:
-            banks[best] |= cs
-        assign[i] = best
-    if len(banks) > max_banks:
-        raise SystemExit('overworld needs %d palette banks (max %d)' % (len(banks), max_banks))
-    return banks, assign
+# ---------------------------------------------------------------------------------------------------
+# Tilesets: cut pictures into 8x8 tiles, share them (with flips), pack their colours into 4bpp banks,
+# then describe each picture as 16x16 metatiles of four cells.
+
+def pack_palettes(color_sets, max_banks, what):
+    """Packs tile colour sets into banks of 15 colours (index 0 is transparent). Only the sets that aren't
+    contained in another need packing; it tries many seeded orders and keeps the fewest banks."""
+    import random
+    uniq = sorted(set(color_sets), key=lambda s: (-len(s), sorted(s)))
+    maximal = [s for s in uniq if not any(s < t for t in uniq)]
+    def pack(order, by_overlap):
+        banks = []
+        for cs in order:
+            best = None
+            for i, b in enumerate(banks):
+                if len(b | cs) <= 15:
+                    score = -len(cs & b) if by_overlap else len(cs - b)
+                    if best is None or score < best[0]:
+                        best = (score, i)
+            if best is None:
+                banks.append(set(cs))
+            else:
+                banks[best[1]] |= cs
+        return banks
+    rnd = random.Random(1234)
+    best = None
+    for trial in range(400):
+        order = list(maximal)
+        if trial:
+            rnd.shuffle(order)
+        for by_overlap in (False, True):
+            banks = pack(order, by_overlap)
+            if best is None or len(banks) < len(best):
+                best = banks
+    if len(best) > max_banks:
+        raise SystemExit('%s needs %d palette banks (max %d)' % (what, len(best), max_banks))
+    assign = [next(i for i, b in enumerate(best) if cs <= b) for cs in color_sets]
+    return best, assign
+
+def cut(img, cx, cy):
+    px = img.load()
+    return tuple(rgb555(px[cx * 8 + x, cy * 8 + y]) for y in range(8) for x in range(8))
+
+def reduce_block(b, max_colors=15):
+    """A 4bpp tile has 15 colours: merge the closest pair (keeping the more common) until it fits."""
+    counts = {}
+    for c in b:
+        counts[c] = counts.get(c, 0) + 1
+    if len(counts) <= max_colors:
+        return b
+    remap = {c: c for c in counts}
+    while len(counts) > max_colors:
+        cols = list(counts)
+        best = None
+        for i in range(len(cols)):
+            for j in range(i + 1, len(cols)):
+                d = sum((cols[i][k] - cols[j][k]) ** 2 for k in range(3))
+                if best is None or d < best[0]:
+                    best = (d, cols[i], cols[j])
+        _, a, c2 = best
+        keep, drop = (a, c2) if counts[a] >= counts[c2] else (c2, a)
+        counts[keep] += counts.pop(drop)
+        for k, v in remap.items():
+            if v == drop:
+                remap[k] = keep
+    return tuple(remap[c] for c in b)
+
+def flips(b):
+    rows = [b[y * 8:(y + 1) * 8] for y in range(8)]
+    h = tuple(p for r in rows for p in reversed(r))
+    v = tuple(p for r in reversed(rows) for p in r)
+    hv = tuple(p for r in reversed(rows) for p in reversed(r))
+    return [(b, 0), (h, 1), (v, 2), (hv, 3)]
+
+def tile_words(b, lut):
+    words = []
+    for y in range(8):
+        v = 0
+        for x in range(8):
+            v |= lut[b[y * 8 + x]] << (4 * x)
+        words.append('0x%08x' % v)
+    return '{' + ', '.join(words) + '}'
+
+class Tileset:
+    def __init__(self, name):
+        self.name = name
+        self.uniq, self.index = [], {}
+        self.pictures = []       # (w, h, refs)
+        self.metas, self.meta_index = [], {}
+
+    def ref(self, b):
+        for fb, f in flips(b):
+            if fb in self.index:
+                return self.index[fb], f
+        self.index[b] = len(self.uniq)
+        self.uniq.append(b)
+        return len(self.uniq) - 1, 0
+
+    def add(self, img):
+        """Adds a picture (w and h multiples of 16); returns its index."""
+        w, h = img.size[0] // 8, img.size[1] // 8
+        refs = [[self.ref(reduce_block(cut(img, x, y))) for x in range(w)] for y in range(h)]
+        self.pictures.append(refs)
+        return len(self.pictures) - 1
+
+    def finish(self):
+        sets = [frozenset(b) for b in self.uniq]
+        banks, self.assign = pack_palettes(sets, MAP_BANKS, 'tileset ' + self.name)
+        self.bank_lists = [sorted(b) for b in banks]
+        assert all(len(b) <= 15 for b in self.bank_lists), 'a palette bank has more than 15 colours'
+        if len(self.uniq) > 1000:
+            raise SystemExit('tileset %s needs %d tiles (max 1000)' % (self.name, len(self.uniq)))
+
+    def cell(self, r):
+        t, f = r
+        return t | (f << 10) | (self.assign[t] << 12)
+
+    def metatiles_of(self, pic):
+        refs = self.pictures[pic]
+        out = []
+        for y in range(len(refs) // 2):
+            for x in range(len(refs[0]) // 2):
+                key = tuple(self.cell(r) for r in (refs[2 * y][2 * x], refs[2 * y][2 * x + 1], refs[2 * y + 1][2 * x], refs[2 * y + 1][2 * x + 1]))
+                if key not in self.meta_index:
+                    self.meta_index[key] = len(self.metas)
+                    self.metas.append(key)
+                out.append(self.meta_index[key])
+        return out
+
+    def emit(self, L, fill_meta, grass_meta):
+        p = 'ts_%s_' % self.name
+        L.append('alignas(int) constexpr bn::tile %stiles[] = {\n    %s\n};' % (p, ',\n    '.join(
+            tile_words(b, {c: i + 1 for i, c in enumerate(self.bank_lists[self.assign[i]])}) for i, b in enumerate(self.uniq))))
+        colors = []
+        for bl in self.bank_lists:
+            bank = [(0, 0, 0)] + bl
+            colors += bank + [(0, 0, 0)] * (16 - len(bank))
+        L.append('constexpr bn::color %scolors[] = {\n    %s\n};' % (p, ',\n    '.join(
+            ', '.join(c_color(c) for c in colors[i:i + 8]) for i in range(0, len(colors), 8))))
+        L.append('constexpr uint16_t %smetatiles[][4] = {\n    %s\n};\n' % (p, ',\n    '.join('{%d, %d, %d, %d}' % m for m in self.metas)))
+        return '{%stiles, %d, %scolors, %d, %smetatiles, %d, %d}' % (p, len(self.uniq), p, len(colors), p, fill_meta, grass_meta)
+
+def picture(exp, name, w, h):
+    return Image.frombytes('RGB', (w * 16, h * 16), open(os.path.join(exp, name), 'rb').read())
+
+def solid(color):
+    return Image.new('RGB', (16, 16), color)
 
 def build_world(exp, data, out_inc):
-    areas = data['areas']
-    # Every 8x8 block of every area (plus the forest that fills the world past the maps' edges).
-    pics = []
-    for a in areas:
-        raw = open(os.path.join(exp, 'map_%d.rgb' % a['index']), 'rb').read()
-        pics.append(Image.frombytes('RGB', (a['w'] * 16, a['h'] * 16), raw))
-    forest = art_image(data['art']['forest_fill'], (0x1e, 0x4a, 0x1c))
-    blocks = []      # list of 64-tuples of rgb555
-    def cut(img, cx, cy):
-        px = img.load()
-        return tuple(rgb555(px[cx * 8 + x, cy * 8 + y]) for y in range(8) for x in range(8))
-    area_blocks = []
-    for img in pics:
-        w, h = img.size[0] // 8, img.size[1] // 8
-        area_blocks.append([[cut(img, x, y) for x in range(w)] for y in range(h)])
-    forest_blocks = [[cut(forest, x, y) for x in range(2)] for y in range(2)]
-    grass = art_image(data['art']['grass_v0'], (0x48, 0xd8, 0x90))      # drawn over picked-up items
-    grass_blocks = [[cut(grass, x, y) for x in range(2)] for y in range(2)]
+    areas, rooms = data['areas'], data['rooms']
+    trainer_count = item_count = 0
 
-    # Unique blocks up to flips.
-    def flips(b):
-        rows = [b[y * 8:(y + 1) * 8] for y in range(8)]
-        h = tuple(p for r in rows for p in reversed(r))
-        v = tuple(p for r in reversed(rows) for p in r)
-        hv = tuple(p for r in reversed(rows) for p in reversed(r))
-        return [(b, 0), (h, 1), (v, 2), (hv, 3)]
-    uniq, index = [], {}
-    def ref(b):
-        for fb, f in flips(b):
-            if fb in index:
-                return index[fb], f
-        index[b] = len(uniq)
-        uniq.append(b)
-        return len(uniq) - 1, 0
-    area_refs = [[[ref(b) for b in row] for row in ab] for ab in area_blocks]
-    forest_refs = [[ref(b) for b in row] for row in forest_blocks]
-    grass_refs = [[ref(b) for b in row] for row in grass_blocks]
+    # Outdoors: every area, the forest past the edges and plain grass (drawn over picked-up items).
+    outdoor = Tileset('outdoor')
+    area_pics = [outdoor.add(picture(exp, 'map_%d.rgb' % a['index'], a['w'], a['h'])) for a in areas]
+    forest_pic = outdoor.add(art_image(data['art']['forest_fill'], (0x1e, 0x4a, 0x1c)))
+    grass_pic = outdoor.add(art_image(data['art']['grass_v0'], (0x48, 0xd8, 0x90)))
+    outdoor.finish()
+    tilesets = [outdoor]
+    fills = {}
+    area_meta = [outdoor.metatiles_of(p) for p in area_pics]
+    fills['outdoor'] = (outdoor.metatiles_of(forest_pic)[0], outdoor.metatiles_of(grass_pic)[0])
 
-    sets = [frozenset(b) for b in uniq]
-    banks, assign = pack_palettes(sets, MAP_BANKS)
-    bank_lists = [sorted(b) for b in banks]
-    if len(uniq) > 1008:
-        raise SystemExit('overworld needs %d tiles (max 1008)' % len(uniq))
+    # Rooms: one tileset per kind; past the walls is black.
+    room_tileset = {}
+    room_meta = {}
+    for kind in sorted({r['kind'] for r in rooms}):
+        r = next(r for r in rooms if r['kind'] == kind)
+        ts = Tileset(kind)
+        pic = ts.add(picture(exp, 'room_%s.rgb' % kind, r['w'], r['h']))
+        black = ts.add(solid((0, 0, 0)))
+        ts.finish()
+        room_meta[kind] = ts.metatiles_of(pic)
+        fills[kind] = (ts.metatiles_of(black)[0],) * 2
+        room_tileset[kind] = len(tilesets)
+        tilesets.append(ts)
 
-    def tile_words(b, bank):
-        lut = {c: i + 1 for i, c in enumerate(bank_lists[bank])}
-        words = []
-        for y in range(8):
-            v = 0
-            for x in range(8):
-                v |= lut[b[y * 8 + x]] << (4 * x)
-            words.append('0x%08x' % v)
-        return '{' + ', '.join(words) + '}'
+    L = ['// Generated by tools/build_assets.py from the web game; do not edit.',
+         '#ifndef PR_WORLD_DATA_H\n#define PR_WORLD_DATA_H\n',
+         '#include "bn_tile.h"\n#include "bn_color.h"\n#include "pr_world_types.h"\n',
+         'namespace pr::world_data\n{\n']
+    ts_rows = [ts.emit(L, *fills[ts.name]) for ts in tilesets]
+    L.append('constexpr tileset tilesets[] = {\n    %s\n};\n' % ',\n    '.join(ts_rows))
 
-    def cell(r):
-        t, f = r
-        return t | (f << 10) | (assign[t] << 12)
+    def lines_array(name, lines):
+        lines = [clean_text(l) for l in lines] or ['...']
+        L.append('constexpr const char* %s[] = {%s};' % (name, ', '.join(c_string(l) for l in lines)))
+        return len(lines)
 
-    # Metatiles: four cells (TL, TR, BL, BR), shared by every area.
-    metas, meta_index = [], {}
-    def meta(refs4):
-        key = tuple(cell(r) for r in refs4)
-        if key not in meta_index:
-            meta_index[key] = len(metas)
-            metas.append(key)
-        return meta_index[key]
-    forest_meta = meta([forest_refs[0][0], forest_refs[0][1], forest_refs[1][0], forest_refs[1][1]])
-    grass_meta = meta([grass_refs[0][0], grass_refs[0][1], grass_refs[1][0], grass_refs[1][1]])
-    area_meta = []
-    for a, refs in zip(areas, area_refs):
-        area_meta.append([meta([refs[2 * y][2 * x], refs[2 * y][2 * x + 1], refs[2 * y + 1][2 * x], refs[2 * y + 1][2 * x + 1]])
-                          for y in range(a['h']) for x in range(a['w'])])
+    def people_rows(p, people):
+        rows = []
+        for i, n in enumerate(people):
+            count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
+            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM'}.get(n.get('role', ''), 'NONE')
+            rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
+                n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
+        L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
+            '{0, 0, person_kind::player, direction::DOWN, person_role::NONE, false, nullptr, 0}')))
 
-    L = []
-    L.append('// Generated by tools/build_assets.py from the web game; do not edit.')
-    L.append('#ifndef PR_WORLD_DATA_H\n#define PR_WORLD_DATA_H\n')
-    L.append('#include "bn_tile.h"\n#include "bn_color.h"\n#include "pr_world_types.h"\n')
-    L.append('namespace pr::world_data\n{\n')
-    L.append('constexpr int tiles_count = %d;' % len(uniq))
-    L.append('constexpr int palette_banks = %d;' % len(banks))
-    L.append('constexpr int forest_metatile = %d;' % forest_meta)
-    L.append('constexpr int grass_metatile = %d;\n' % grass_meta)
-    L.append('alignas(int) constexpr bn::tile tiles[] = {\n    ' +
-             ',\n    '.join(tile_words(b, assign[i]) for i, b in enumerate(uniq)) + '\n};\n')
-    colors = []
-    for bl in bank_lists:
-        bank = [(0, 0, 0)] + bl
-        bank += [(0, 0, 0)] * (16 - len(bank))
-        colors += bank
-    L.append('constexpr bn::color colors[] = {\n    ' + ',\n    '.join(', '.join(c_color(c) for c in colors[i:i + 8])
-                                                     for i in range(0, len(colors), 8)) + '\n};\n')
-    L.append('constexpr uint16_t metatiles[][4] = {\n    ' +
-             ',\n    '.join('{%d, %d, %d, %d}' % m for m in metas) + '\n};\n')
+    map_rows = []
+    room_index = {}       # (area, building) -> map index
+    for i, r in enumerate(rooms):
+        room_index[(r['area'], r['building'])] = len(areas) + i
 
     for ai, (a, mm) in enumerate(zip(areas, area_meta)):
-        p = 'area%d_' % ai
+        p = 'map%d_' % ai
         L.append('constexpr uint16_t %smap[] = {%s};' % (p, ', '.join(map(str, mm))))
         L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in a['behaviour'] for v in row)))
-        L.append('constexpr sign %ssigns[] = {%s};' % (p, nonempty(', '.join(
-            '{%d, %d, %s}' % (s['x'], s['y'], c_string(clean_text(s['text']))) for s in a['signs']), '{0, 0, ""}')))
+        # Town signs read their name and then the place's description (owInteract); route signs just point.
+        desc = re.sub(r'\s*"[^"]*"\s*', ' ', a['desc']).strip()
+        signs = []
+        for si, s in enumerate(a['signs']):
+            count = lines_array('%ssign%d_lines' % (p, si), [s['text']] if s['route'] else [s['text'], desc])
+            signs.append('{%d, %d, %ssign%d_lines, %d}' % (s['x'], s['y'], p, si, count))
+        L.append('constexpr sign %ssigns[] = {%s};' % (p, nonempty(', '.join(signs), '{0, 0, nullptr, 0}')))
         L.append('constexpr door %sdoors[] = {%s};' % (p, nonempty(', '.join(
-            '{%d, %d, door_kind::%s}' % (d['x'], d['y'], d['kind'].upper()) for d in a['doors']), '{0, 0, door_kind::HOUSE}')))
-        ppl = []
-        for pi, n in enumerate(a['people']):
-            lines = [clean_text(l) for l in n['lines']] or ['...']
-            L.append('constexpr const char* %sperson%d_lines[] = {%s};' % (p, pi, ', '.join(c_string(l) for l in lines)))
-            ppl.append('{%d, %d, person_kind::%s, direction::%s, %sperson%d_lines, %d}' % (
-                n['x'], n['y'], n['kind'], n['facing'].upper(), p, pi, len(lines)))
-        L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(ppl), '{0, 0, person_kind::player, direction::DOWN, nullptr, 0}')))
+            '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
+            for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
+        people_rows(p, a['people'])
+        trs = []
+        for ti, t in enumerate(a['trainers']):
+            L.append('constexpr species_id %strainer%d_team[] = {%s};' % (p, ti, ', '.join('species_id::%s' % enum_name(s) for s in t['team'])))
+            trs.append('{%d, %d, person_kind::%s, direction::%s, %s, %strainer%d_team, %d, %s, %s, %d}' % (
+                t['x'], t['y'], t['kind'], t['facing'].upper(), c_text(t['title']), p, ti, len(t['team']),
+                c_text(t['intro']), c_text(t['after']), trainer_count))
+            trainer_count += 1
+        L.append('constexpr trainer %strainers[] = {%s};' % (p, nonempty(', '.join(trs),
+            '{0, 0, person_kind::player, direction::DOWN, "", nullptr, 0, "", "", 0}')))
+        its = []
+        for it in a['items']:
+            its.append('{%d, %d, item_id::%s, %d}' % (it['x'], it['y'], it['id'].upper(), item_count))
+            item_count += 1
+        L.append('constexpr item_ball %sitems[] = {%s};' % (p, nonempty(', '.join(its), '{0, 0, item_id::POKEBALL, 0}')))
         links = []
         for ln in a['links']:
             target = AREAS.index(ln['to']) if ln['to'] in AREAS else -1
-            links.append('{%d, %d, %d, %d, %d, %s}' % (target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_string(clean_text(ln['name'].upper()))))
+            links.append('{%d, %d, %d, %d, %d, %s}' % (target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper())))
         L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, ""}')))
         pool = ', '.join('species_id::%s' % enum_name(s) for s in a['pool'])
-        L.append('constexpr species_id %spool[] = {%s};' % (p, pool or 'species_id::PIDGEY'))
-        L.append('')
-    L.append('constexpr area areas[] = {')
-    for ai, a in enumerate(areas):
-        p = 'area%d_' % ai
-        L.append('    {%s, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %slinks, %d, %spool, %d, %d, %d, %d},' % (
-            c_string(clean_text(a['name'].upper())), a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']),
-            p, len(a['people']), p, len(a['links']), p, len(a['pool']) if a['pool'] else 0,
+        L.append('constexpr species_id %spool[] = {%s};\n' % (p, pool or 'species_id::PIDGEY'))
+        map_rows.append('{%s, 0, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
+                        'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0}' % (
+            c_text(a['name'].upper()), a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
+            p, len(a['trainers']), p, len(a['items']), p, len(a['links']), p, len(a['pool']),
             a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4)))
-    L.append('};\n')
+
+    for ri, r in enumerate(rooms):
+        p = 'room%d_' % ri
+        L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in r['behaviour'] for v in row)))
+        people_rows(p, r['people'])
+        things = []
+        for ti, t in enumerate(r['things']):
+            count = lines_array('%sthing%d_lines' % (p, ti), t['text'])
+            things.append('{%d, %d, %sthing%d_lines, %d}' % (t['x'], t['y'], p, ti, count))
+        L.append('constexpr thing %sthings[] = {%s};\n' % (p, nonempty(', '.join(things), '{0, 0, nullptr, 0}')))
+        area = AREAS.index(r['area'])
+        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART'}.get(r['kind'], 'HOUSE')
+        map_rows.append('{%s, %d, %d, %d, ts_%s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, nullptr, 0, nullptr, 0, '
+                        '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d}' % (
+            c_text(name), room_tileset[r['kind']], r['w'], r['h'], r['kind'], p, p, len(r['people']), p, len(r['things']),
+            r['spawn']['x'], r['spawn']['y'], 8, area, r['door']['x'], r['door']['y']))
+    # Room metatile maps go before the map table (shared by every room of a kind).
+    room_maps = ['constexpr uint16_t ts_%s_map[] = {%s};' % (k, ', '.join(map(str, v))) for k, v in sorted(room_meta.items())]
+    L += room_maps
+    L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows))
+    L.append('constexpr int areas_count = %d;' % len(areas))
+    L.append('constexpr int trainers_count = %d;' % trainer_count)
+    L.append('constexpr int items_count = %d;\n' % item_count)
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_world_data.h'), '\n'.join(L))
-    print('build_assets: overworld %d tiles, %d palette banks, %d metatiles' % (len(uniq), len(banks), len(metas)))
+    print('build_assets: ' + ', '.join('%s %d tiles/%d banks' % (t.name, len(t.uniq), len(t.bank_lists)) for t in tilesets))
 
 # ---------------------------------------------------------------------------------------------------
 def art_image(a, bg=None):
@@ -220,8 +356,9 @@ def art_image(a, bg=None):
         return base.convert('RGB')
     return img
 
-def quantize_rgba(img, max_colors):
-    """RGBA -> list of opaque rgb555 colours (<= max_colors) and an index map (0 = transparent)."""
+def quantize_rgba(img, max_colors, fixed=None):
+    """RGBA -> list of opaque rgb555 colours (<= max_colors) and an index map (0 = transparent).
+    `fixed` (a palette list) maps colours to existing slots instead."""
     px = img.load()
     w, h = img.size
     cols = {}
@@ -231,8 +368,12 @@ def quantize_rgba(img, max_colors):
             if p[3] >= 128:
                 c = rgb555(p)
                 cols[c] = cols.get(c, 0) + 1
-    palette = list(cols)
+    palette = list(fixed) if fixed else list(cols)
     remap = {c: c for c in palette}
+    if fixed:
+        for c in cols:
+            if c not in remap:
+                remap[c] = min(palette, key=lambda q: sum((q[k] - c[k]) ** 2 for k in range(3)))
     # Too many colours: merge the closest pair (keeping the more common one) until it fits.
     while len(palette) > max_colors:
         best = None
@@ -270,31 +411,40 @@ def save_indexed_bmp(path, palette555, idx, json_obj, transparent=(255, 0, 255))
     img.save(path)
     write_if_changed(path[:-4] + '.json', json.dumps(json_obj))
 
-def sprite_sheet(frames, fw, fh, max_colors=15):
-    """Frames (RGBA images fw x fh) stacked vertically, sharing one palette."""
+def save_sprite(gfx, name, frames, fw, fh):
     sheet = Image.new('RGBA', (fw, fh * len(frames)), (0, 0, 0, 0))
     for i, f in enumerate(frames):
         sheet.alpha_composite(f, (0, i * fh))
-    return quantize_rgba(sheet, max_colors)
+    pal, idx = quantize_rgba(sheet, 15)
+    save_indexed_bmp(os.path.join(gfx, name + '.bmp'), pal, idx, {'type': 'sprite', 'height': fh, 'bpp_mode': 'bpp_4'})
+
+def save_bg(img, gfx, name, bpp='bpp_4'):
+    pal, idx = quantize_rgba(img, 15 if bpp == 'bpp_4' else 255)
+    save_indexed_bmp(os.path.join(gfx, name + '.bmp'), pal, idx, {'type': 'regular_bg', 'bpp_mode': bpp})
+
+def person_frame(f, scale=1):
+    img = Image.new('RGBA', (16, 21), (0, 0, 0, 0))
+    px = img.load()
+    for y, row in enumerate(f['px']):
+        for x, c in enumerate(row):
+            if c:
+                px[x, y] = tuple(c) + (255,)
+    return img.resize((16 * scale, 21 * scale), Image.NEAREST) if scale > 1 else img
 
 def build_people(data, gfx):
     # 16x32 sprites: the 16x21 frame sits 10 px down (11 on step frames), so the feet land on the tile.
-    names = []
     for kind, dirs in data['people'].items():
         frames = []
         for d in ('down', 'up', 'left'):
             for f in dirs[d]:
                 img = Image.new('RGBA', (16, 32), (0, 0, 0, 0))
-                px = img.load()
-                for y, row in enumerate(f['px']):
-                    for x, c in enumerate(row):
-                        if c:
-                            px[x, y + 10 + f['dy']] = tuple(c) + (255,)
+                img.alpha_composite(person_frame(f), (0, 10 + f['dy']))
                 frames.append(img)
-        pal, idx = sprite_sheet(frames, 16, 32)
-        save_indexed_bmp(os.path.join(gfx, 'person_%s.bmp' % kind), pal, idx, {'type': 'sprite', 'height': 32, 'bpp_mode': 'bpp_4'})
-        names.append(kind)
-    return names
+        save_sprite(gfx, 'person_' + kind, frames, 16, 32)
+    # The professor in the intro, at twice the size (the web game draws him scaled up on a dark stage).
+    big = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+    big.alpha_composite(person_frame(data['people']['prof']['down'][0], 2), (16, 64 - 42))
+    save_sprite(gfx, 'prof_big', [big], 64, 64)
 
 def mon_sprite(path):
     """A 96x96 sprite cropped to the 64x64 GBA frame: centred on its content, feet at the bottom."""
@@ -321,75 +471,107 @@ def build_mons(data, gfx):
                              {'type': 'sprite', 'bpp_mode': 'bpp_4'})
 
 # ---------------------------------------------------------------------------------------------------
-# Full-screen backgrounds (256x256 so Butano can use them as regular BGs; the screen shows 240x160).
-BOX_DARK = (40, 56, 96)       # frame colours, after the web game's text box
-BOX_MID = (104, 136, 200)
-BOX_FILL = (248, 248, 248)
+# UI: 9-slice window styles (8x8 corners, edges and fill), all in one 15-colour palette bank, after the
+# web game's stylesheet: .gba-box (white window), .bdark (battle message), .hpbox, the party screen's
+# slots, the bag's and the summary's boxes.
+UI_STYLES = [
+    # name,      fill,      border,    inner line, radius, border width
+    ('WINDOW',   '#f8f8f8', '#3c4858', '#98b8d0', 3, 2),
+    ('DARK',     '#305870', '#e0b060', '#1c3444', 3, 2),
+    ('HUD',      '#f8f8d8', '#404858', None,      3, 2),
+    ('SLOT',     '#4c98d4', '#183050', None,      4, 2),
+    ('SLOT_ON',  '#f09060', '#f8f0a0', None,      4, 2),
+    ('SLOT_FNT', '#b46868', '#183050', None,      4, 2),
+    ('BAG',      '#f8f8f8', '#806040', None,      3, 2),
+    ('PAGE',     '#f8f8f8', '#a89878', None,      3, 2),
+]
 
-def rounded_box(draw, x0, y0, x1, y1, fill=BOX_FILL):
-    draw.rounded_rectangle((x0, y0, x1, y1), radius=4, fill=BOX_DARK)
-    draw.rounded_rectangle((x0 + 1, y0 + 1, x1 - 1, y1 - 1), radius=3, fill=BOX_MID)
-    draw.rounded_rectangle((x0 + 3, y0 + 3, x1 - 3, y1 - 3), radius=2, fill=fill)
-
-def save_bg(img, gfx, name, bpp='bpp_4'):
-    pal, idx = quantize_rgba(img, 15 if bpp == 'bpp_4' else 255)
-    save_indexed_bmp(os.path.join(gfx, name + '.bmp'), pal, idx, {'type': 'regular_bg', 'bpp_mode': bpp})
-
-def build_ui(data, gfx):
-    # Message box across the bottom (overworld and battle).
-    img = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
-    rounded_box(ImageDraw.Draw(img), 2, 114, 237, 159)
-    save_bg(img, gfx, 'ui_textbox')
-    # Small menu box on the right, above the message box (YES/NO, battle commands, start menu).
-    img = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
-    rounded_box(ImageDraw.Draw(img), 152, 50, 237, 113)
-    save_bg(img, gfx, 'ui_menu')
-    # Tall menu box on the right (start menu, move list).
-    img = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
-    rounded_box(ImageDraw.Draw(img), 136, 2, 237, 113)
-    save_bg(img, gfx, 'ui_menu_tall')
-
-def build_battle_bg(data, gfx):
-    a = data['art']
-    img = Image.new('RGBA', (256, 256), (0xd4, 0xf2, 0xc4, 255))
-    bg = art_image(a['battle_bg'])
-    for x in range(0, 256, bg.size[0]):
-        img.alpha_composite(bg, (x, 0))
-    def platform(l, m, r, x, y, mids):
-        L, M, R = art_image(a[l]), art_image(a[m]), art_image(a[r])
-        img.alpha_composite(L, (x, y))
-        cx = x + L.size[0]
-        for _ in range(mids):
-            img.alpha_composite(M, (cx, y))
-            cx += M.size[0]
-        img.alpha_composite(R, (cx, y))
-    platform('plat_enemy_l', 'plat_enemy_m', 'plat_enemy_r', 140, 52, 5)     # 24 + 40 + 24 = 88 wide
-    platform('plat_player_l', 'plat_player_m', 'plat_player_r', 4, 86, 4)    # 32 + 32 + 32 = 96 wide
-    save_bg(img.copy(), gfx, 'battle_bg_plain', 'bpp_8')     # intro and starter choice
+def style_box(fill, border, inner, radius, bw):
+    img = Image.new('RGBA', (24, 24), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # HP panels: the foe's top left, yours above the message box on the right.
-    for (x0, y0, x1, y1) in ((4, 6, 112, 38), (126, 68, 236, 110)):
-        d.rounded_rectangle((x0, y0, x1, y1), radius=5, fill=(40, 48, 56))
-        d.rounded_rectangle((x0 + 1, y0 + 1, x1 - 1, y1 - 1), radius=4, fill=(248, 248, 216))
-    for (x, y) in ((36, 28), (164, 88)):     # HP bar troughs ("HP" label + 48 px bar)
-        d.rectangle((x - 1, y - 1, x + 48, y + 5), fill=(64, 72, 80))
-        d.rectangle((x, y, x + 48, y + 4), fill=(56, 64, 72))
-    save_bg(img, gfx, 'battle_bg', 'bpp_8')
+    d.rounded_rectangle((0, 0, 23, 23), radius=radius, fill=border)
+    if inner:
+        d.rounded_rectangle((bw, bw, 23 - bw, 23 - bw), radius=max(0, radius - bw), fill=inner)
+        d.rectangle((bw + 1, bw + 1, 22 - bw, 22 - bw), fill=fill)
+    else:
+        d.rounded_rectangle((bw, bw, 23 - bw, 23 - bw), radius=max(0, radius - bw), fill=fill)
+    return img
 
-def build_hpbar(gfx):
-    # 8x8 bar segments: fill 0-8 px, in green, yellow and red (27 frames).
+def build_ui_tiles(out_inc):
+    colors = []
+    for _, fill, border, inner, _, _ in UI_STYLES:
+        for h in (fill, border, inner):
+            if h and hex555(h) not in colors:
+                colors.append(hex555(h))
+    if len(colors) > 15:
+        raise SystemExit('UI styles need %d colours (max 15)' % len(colors))
+    lut = {c: i + 1 for i, c in enumerate(colors)}
+    tiles = [(0,) * 64]          # tile 0: empty (transparent)
+    for _, fill, border, inner, radius, bw in UI_STYLES:
+        img = style_box(fill, border, inner, radius, bw)
+        px = img.load()
+        for ty in range(3):
+            for tx in range(3):
+                t = []
+                for y in range(8):
+                    for x in range(8):
+                        p = px[tx * 8 + x, ty * 8 + y]
+                        t.append(lut[rgb555(p)] if p[3] >= 128 else 0)
+                tiles.append(tuple(t))
+    def words(t):
+        out = []
+        for y in range(8):
+            v = 0
+            for x in range(8):
+                v |= t[y * 8 + x] << (4 * x)
+            out.append('0x%08x' % v)
+        return '{' + ', '.join(out) + '}'
+    pal = [(0, 0, 0)] + colors + [(0, 0, 0)] * (15 - len(colors))
+    L = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_UI_DATA_H\n#define PR_UI_DATA_H\n',
+         '#include "bn_tile.h"\n#include "bn_color.h"\n', 'namespace pr::ui_data\n{\n',
+         '// Window styles: 9 tiles each (top-left, top, top-right, left, fill, right, bottom-left, bottom, bottom-right).',
+         'enum class style : uint8_t\n{\n' + ''.join('    %s,\n' % s[0] for s in UI_STYLES) + '};\n',
+         'alignas(int) constexpr bn::tile tiles[] = {\n    %s\n};' % ',\n    '.join(words(t) for t in tiles),
+         'constexpr bn::color colors[] = {%s};\n' % ', '.join(c_color(c) for c in pal), '}\n\n#endif']
+    write_if_changed(os.path.join(out_inc, 'pr_ui_data.h'), '\n'.join(L))
+
+def build_small_sprites(gfx):
+    # Menu cursor: the web game's ▶ in ink (#383840) with its light shadow.
+    cur = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
+    d = ImageDraw.Draw(cur)
+    d.polygon([(2, 1), (6, 4), (2, 7)], fill=(0xd0, 0xd0, 0xc8, 255))
+    d.polygon([(1, 0), (5, 3), (1, 6)], fill=(0x38, 0x38, 0x40, 255))
+    save_sprite(gfx, 'cursor', [cur], 8, 8)
+    # "More text" arrow: the web game's red ▼ (#f85838), two bounce frames.
+    frames = []
+    for dy in (0, 1):
+        f = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
+        d = ImageDraw.Draw(f)
+        d.polygon([(0, 1 + dy), (6, 1 + dy), (3, 5 + dy)], fill=(0x88, 0x28, 0x18, 255))
+        d.polygon([(0, 1 + dy), (5, 1 + dy), (3, 4 + dy)], fill=(0xf8, 0x58, 0x38, 255))
+        frames.append(f)
+    save_sprite(gfx, 'next_arrow', frames, 8, 8)
+    # Trainer's "!" (the web game's .ow-bang: white box, dark border, red mark).
+    b = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+    d = ImageDraw.Draw(b)
+    d.rounded_rectangle((3, 0, 12, 11), radius=2, fill=(0x30, 0x28, 0x30, 255))
+    d.rounded_rectangle((4, 1, 11, 10), radius=1, fill=(0xf8, 0xf8, 0xf8, 255))
+    d.rectangle((7, 2, 8, 6), fill=(0xe0, 0x30, 0x30, 255))
+    d.rectangle((7, 8, 8, 9), fill=(0xe0, 0x30, 0x30, 255))
+    d.polygon([(6, 11), (9, 11), (7, 14)], fill=(0x30, 0x28, 0x30, 255))
+    save_sprite(gfx, 'bang', [b], 16, 16)
+    # HP bar segments: 8x8, fill 0-8 px, in green, yellow and red (27 frames), on the web game's trough.
     frames = []
     for col in ((88, 208, 128), (248, 216, 56), (240, 72, 56)):
         for n in range(9):
             f = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
             d = ImageDraw.Draw(f)
-            d.rectangle((0, 0, 7, 4), fill=(56, 64, 72, 255))
+            d.rectangle((0, 0, 7, 3), fill=(0x58, 0x60, 0x68, 255))
             if n:
-                d.rectangle((0, 0, n - 1, 4), fill=col + (255,))
+                d.rectangle((0, 0, n - 1, 3), fill=col + (255,))
                 d.rectangle((0, 0, n - 1, 0), fill=tuple(min(255, v + 60) for v in col) + (255,))
             frames.append(f)
-    pal, idx = sprite_sheet(frames, 8, 8)
-    save_indexed_bmp(os.path.join(gfx, 'hpbar.bmp'), pal, idx, {'type': 'sprite', 'height': 8, 'bpp_mode': 'bpp_4'})
+    save_sprite(gfx, 'hpbar', frames, 8, 8)
 
 def build_grass_front(data, gfx):
     # The bottom half of a tall-grass tile, drawn over whoever stands in it (the web game's .tg-front).
@@ -400,17 +582,65 @@ def build_grass_front(data, gfx):
             c = data['tall_grass'][y + 8][x]
             if c:
                 px[x, y] = tuple(c) + (255,)
-    pal, idx = quantize_rgba(img, 15)
-    save_indexed_bmp(os.path.join(gfx, 'grass_front.bmp'), pal, idx, {'type': 'sprite', 'height': 8, 'bpp_mode': 'bpp_4'})
+    save_sprite(gfx, 'grass_front', [img], 16, 8)
 
-def build_title(data, gfx):
-    # Title backdrop: a slice of the home town.
-    a = data['areas'][0]
-    img = Image.frombytes('RGB', (a['w'] * 16, a['h'] * 16), open(os.path.join(EXP, 'map_%d.rgb' % a['index']), 'rb').read())
-    crop = img.crop((96, 120, 96 + 256, 120 + 256)).convert('RGBA')
-    d = ImageDraw.Draw(crop)
-    rounded_box(d, 24, 18, 215, 62)
-    save_bg(crop, gfx, 'title_bg', 'bpp_8')
+# ---------------------------------------------------------------------------------------------------
+# Full-screen backgrounds (256x256 so Butano can use them as regular BGs; the screen shows 240x160).
+def build_backgrounds(data, gfx):
+    a = data['art']
+    # Battle: the sky/hedge backdrop repeated sideways over its fill, and the two platforms.
+    img = Image.new('RGBA', (256, 256), (0xd4, 0xf2, 0xc4, 255))
+    bg = art_image(a['battle_bg'])
+    for x in range(0, 256, bg.size[0]):
+        img.alpha_composite(bg, (x, 0))
+    def platform(l, m, r, x, y, mids):
+        Lp, M, R = art_image(a[l]), art_image(a[m]), art_image(a[r])
+        img.alpha_composite(Lp, (x, y))
+        cx = x + Lp.size[0]
+        for _ in range(mids):
+            img.alpha_composite(M, (cx, y))
+            cx += M.size[0]
+        img.alpha_composite(R, (cx, y))
+    platform('plat_enemy_l', 'plat_enemy_m', 'plat_enemy_r', 132, 50, 6)     # 24 + 48 + 24 = 96 wide
+    platform('plat_player_l', 'plat_player_m', 'plat_player_r', 0, 84, 5)    # 32 + 40 + 32 = 104 wide
+    save_bg(img, gfx, 'battle_bg', 'bpp_8')
+
+    # Intro stage: the web game's dark radial spotlight (.intro-stage).
+    img = Image.new('RGBA', (256, 256), (0x10, 0x18, 0x20, 255))
+    px = img.load()
+    for y in range(160):
+        for x in range(240):
+            dx, dy = (x - 120) / 150.0, (y - 72) / 100.0
+            t = min(1.0, max(0.0, ((dx * dx + dy * dy) ** 0.5 - 0.3) / 0.4))
+            c0, c1 = (0x38, 0x48, 0x68), (0x10, 0x18, 0x20)
+            px[x, y] = tuple(int(c0[k] + (c1[k] - c0[k]) * t) for k in range(3)) + (255,)
+    save_bg(img, gfx, 'intro_bg', 'bpp_8')
+
+    # Title: a slice of the home town.
+    t = data['areas'][0]
+    town = Image.frombytes('RGB', (t['w'] * 16, t['h'] * 16), open(os.path.join(EXP, 'map_%d.rgb' % t['index']), 'rb').read())
+    save_bg(town.crop((96, 120, 96 + 256, 120 + 256)).convert('RGBA'), gfx, 'title_bg', 'bpp_8')
+
+    # Party screen: the web game's diagonal blue stripes (.pty), at GBA scale.
+    img = Image.new('RGBA', (256, 256))
+    px = img.load()
+    for y in range(256):
+        for x in range(256):
+            px[x, y] = (0x40, 0x80, 0xb0, 255) if ((x + y) // 4) % 2 == 0 else (0x38, 0x78, 0xa8, 255)
+    save_bg(img, gfx, 'party_bg')
+    # Bag: vertical tan stripes (.bag).
+    img = Image.new('RGBA', (256, 256))
+    px = img.load()
+    for y in range(256):
+        for x in range(256):
+            px[x, y] = (0xf8, 0xd8, 0x90, 255) if (x // 4) % 2 == 0 else (0xf0, 0xc8, 0x78, 255)
+    save_bg(img, gfx, 'bag_bg')
+    # Summary: cream page, blue header, gold left panel (.sm).
+    img = Image.new('RGBA', (256, 256), (0xf8, 0xf0, 0xe0, 255))
+    d = ImageDraw.Draw(img)
+    d.rectangle((0, 18, 87, 159), fill=(0xf0, 0xd0, 0x78, 255))
+    d.rectangle((0, 0, 239, 17), fill=(0x38, 0x68, 0xb8, 255))
+    save_bg(img, gfx, 'summary_bg')
 
 # ---------------------------------------------------------------------------------------------------
 def build_game_data(data, out_inc):
@@ -424,22 +654,16 @@ def build_game_data(data, out_inc):
     chart = data['chart']
     rows = []
     for at in types:
-        row = []
-        for dt in types:
-            m = chart.get(at, {}).get(dt, 1)
-            row.append(str(int(m * 2)))      # x2 so 0.5 fits an integer
-        rows.append('{' + ', '.join(row) + '}')
+        rows.append('{' + ', '.join(str(int(chart.get(at, {}).get(dt, 1) * 2)) for dt in types) + '}')
     L.append('// Damage multiplier x2: [attacking type][defending type].')
     L.append('constexpr uint8_t type_chart[%d][%d] = {\n    %s\n};\n' % (len(types), len(types), ',\n    '.join(rows)))
     cat = {'phys': 'move_category::PHYSICAL', 'spec': 'move_category::SPECIAL', 'status': 'move_category::STATUS'}
-    st = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
-          'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
     mv = []
     for m in data['moves']:
         sec = m.get('sec') or {}
         mv.append('{%s, %d, %d, %s, %d, %s, %s, %d}' % (
-            c_string(clean_text(m['n'].upper())), types.index(m['t']), m['p'], cat[m['c']], m['a'],
-            st[m.get('status')], st[sec.get('status')], sec.get('chance', 0)))
+            c_text(m['n'].upper()), types.index(m['t']), m['p'], cat[m['c']], m['a'],
+            STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0)))
     L.append('constexpr move moves[] = {\n    ' + ',\n    '.join(mv) + '\n};\n')
     names = [s['name'] for s in data['species']]
     for s in data['species']:
@@ -448,39 +672,43 @@ def build_game_data(data, out_inc):
     for s in data['species']:
         b = s['base']
         evo = s['evo']
-        evo_to = -1
-        if evo:
-            tgt = [i for i, n in enumerate(names) if n == evo['to']]
-            evo_to = tgt[0] if tgt else -1
+        evo_to = names.index(evo['to']) if evo and evo['to'] in names else -1
         t2 = types.index(s['types'][1]) if len(s['types']) > 1 else -1
         L.append('    {%s, %d, %d, %d, {%d, %d, %d, %d, %d, %d}, learn_%d, %d, %d, %d, bn::sprite_items::mon_front_%d, bn::sprite_items::mon_back_%d},' % (
-            c_string(clean_text(s['name'].upper())), s['num'], types.index(s['types'][0]), t2,
+            c_text(s['name'].upper()), s['num'], types.index(s['types'][0]), t2,
             b['hp'], b['atk'], b['def'], b['spa'], b['spd'], b['spe'], s['num'], max(1, len(s['learn'])),
-            evo_to, evo['level'] if evo and evo.get('level') else 0, s['num'], s['num']))
+            evo_to, evo['level'] if evo_to >= 0 else 0, s['num'], s['num']))
     L.append('};\n')
+    # Items (ITEM_INFO): name, pocket, description, price, and what they do.
+    its = []
+    for i in ITEM_IDS:
+        it = data['items'][i]
+        its.append('{%s, %d, %s, %d, %d, %s, %s, %s}' % (
+            c_text(it['name']), it['pocket'], c_text(it['desc']), it.get('price', 0), it.get('heal', 0),
+            STATUS[it.get('cure')], 'true' if it.get('revive') else 'false', 'true' if it.get('full') else 'false'))
+    L.append('constexpr item_info items[] = {\n    %s\n};' % ',\n    '.join(its))
+    L.append('constexpr item_id mart_stock[] = {%s};\n' % ', '.join('item_id::%s' % i.upper() for i in MART_STOCK))
     L.append('constexpr species_id starters[] = {%s};' % ', '.join('species_id::%s' % enum_name(n) for n in data['starters']))
-    L.append('constexpr const char* prof_name = %s;\n' % c_string(clean_text(data['prof'])))
+    L.append('constexpr const char* prof_name = %s;' % c_text(data['prof']))
+    L.append('constexpr const char* intro_lines[] = {%s};\n' % ', '.join(c_text(l) for l in data['intro']))
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_game_data.h'), '\n'.join(L))
-    # The species enum is needed by both headers, so it lives on its own.
-    E = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_SPECIES_ID_H\n#define PR_SPECIES_ID_H\n',
+
+    # Enums shared by the data headers.
+    kinds = list(data['people'])
+    E = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_IDS_H\n#define PR_IDS_H\n',
          '#include <cstdint>\n', 'namespace pr\n{\n', 'enum class species_id : uint8_t\n{']
     E += ['    %s,' % enum_name(n) for n in names]
     E += ['};\n', 'constexpr int species_count = %d;' % len(names), 'constexpr int types_count = %d;\n' % len(types)]
-    kinds = list(data['people'])
+    E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
+          'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']
-    write_if_changed(os.path.join(out_inc, 'pr_species_id.h'), '\n'.join(E))
+    write_if_changed(os.path.join(out_inc, 'pr_ids.h'), '\n'.join(E))
     P = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_PEOPLE_SPRITES_H\n#define PR_PEOPLE_SPRITES_H\n']
     P += ['#include "bn_sprite_items_person_%s.h"' % k for k in kinds]
     P += ['\nnamespace pr\n{\n', 'constexpr const bn::sprite_item* person_sprites[] = {%s};\n' %
           ', '.join('&bn::sprite_items::person_%s' % k for k in kinds), '}\n', '#endif']
     write_if_changed(os.path.join(out_inc, 'pr_people_sprites.h'), '\n'.join(P))
-
-def write_if_changed(path, text):
-    if os.path.exists(path) and open(path, encoding='utf8').read() == text:
-        return
-    with open(path, 'w', encoding='utf8') as f:
-        f.write(text)
 
 def inputs_hash():
     h = hashlib.sha256()
@@ -504,17 +732,22 @@ def main():
     digest = inputs_hash()
     if os.path.exists(stamp) and open(stamp).read() == digest:
         return
+    # Graphics from older builds would still be picked up by Butano, so start clean.
+    for f in os.listdir(gfx):
+        os.remove(os.path.join(gfx, f))
+    for f in ('pr_species_id.h',):
+        if os.path.exists(os.path.join(inc, f)):
+            os.remove(os.path.join(inc, f))
     subprocess.run(['node', os.path.join(HERE, 'export.js'), EXP] + [str(a) for a in AREAS], check=True)
     data = json.load(open(os.path.join(EXP, 'data.json'), encoding='utf8'))
     build_world(EXP, data, inc)
     build_game_data(data, inc)
+    build_ui_tiles(inc)
     build_people(data, gfx)
     build_mons(data, gfx)
-    build_ui(data, gfx)
-    build_battle_bg(data, gfx)
-    build_hpbar(gfx)
+    build_small_sprites(gfx)
     build_grass_front(data, gfx)
-    build_title(data, gfx)
+    build_backgrounds(data, gfx)
     open(stamp, 'w').write(digest)
 
 if __name__ == '__main__':

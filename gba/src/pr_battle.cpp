@@ -1,22 +1,24 @@
-// A wild battle, following the web game's rules (js/app.js submitTurn / damage / checkEnd): moves in
-// speed order, type chart and STAB, accuracy, status (poison, burn, paralysis, sleep, freeze), Poké Balls
-// with the same catch odds, running away, EXP for the whole party, level-ups, new moves and evolution.
-// This build fights one-on-one with your lead; the web game's party-against-pack battles come next.
-#include "bn_core.h"
-#include "bn_keypad.h"
+// Battles, on the web game's rules (js/app.js startWildBattle / startTrainerBattle / renderCmd / submitTurn /
+// checkEnd): your whole party against a wild pack or a trainer's team. Every Pokémon of yours that can
+// fight gets a command (FIGHT and a target, BAG, a look at the party, or RUN), then everyone acts in speed
+// order (items first): type chart and STAB, accuracy, status, Poké Balls with the same catch odds, EXP for
+// the whole party, level-ups, new moves, evolution and prize money.
+// Layout: Emerald's (foe top right, yours bottom left, the dark message box with the white command box);
+// with more than one Pokémon a side, sprites shrink and the HP boxes go compact, as the web game's do.
 #include "bn_bg_palettes.h"
+#include "bn_keypad.h"
 #include "bn_optional.h"
-#include "bn_random.h"
 #include "bn_regular_bg_ptr.h"
 #include "bn_sprite_ptr.h"
 #include "bn_string.h"
+#include "bn_unique_ptr.h"
 #include "bn_vector.h"
 
 #include "bn_regular_bg_items_battle_bg.h"
-#include "bn_sprite_items_hpbar.h"
 
 #include "pr_game_data.h"
 #include "pr_scenes.h"
+#include "pr_screens.h"
 #include "pr_state.h"
 #include "pr_ui.h"
 #include "pr_world_data.h"
@@ -26,75 +28,54 @@ namespace pr
 
 namespace
 {
-    constexpr int sx(int x)
-    {
-        return x - 120;
-    }
-    constexpr int sy(int y)
-    {
-        return y - 80;
-    }
+    constexpr int max_foes = 6;
 
-    // Layout (screen pixels), matching battle_bg from build_assets.py.
-    constexpr int foe_x = 184, foe_y = 34;              // sprite centre
-    constexpr int own_x = 58, own_y = 80;
-    constexpr int foe_name_x = 10, foe_name_y = 9, foe_panel_right = 108, foe_bar_x = 36, foe_bar_y = 28;
-    constexpr int own_name_x = 132, own_name_y = 70, own_panel_right = 232, own_bar_x = 164, own_bar_y = 88;
+    // Sprite sizes by count, from the web game's spriteSize() (player 170..80 px, foe 120..70 px).
+    constexpr int own_scale_x100[] = { 100, 82, 71, 59, 53, 47 };
+    constexpr int foe_scale_x100[] = { 100, 87, 77, 70, 63, 58 };
 
-    struct panel
+    struct fighter
     {
-        bn::vector<bn::sprite_ptr, 16> text;
-        bn::vector<bn::sprite_ptr, 6> bar;
+        mon* m = nullptr;
+        bool own = false;
+        bool caught = false;
+        int shown_hp = 0;
+        int base_x = 0, base_y = 0;     // sprite centre (screen)
+        bn::optional<bn::sprite_ptr> sprite;
+        bn::vector<bn::sprite_ptr, 10> hud_text;
+        bn::vector<bn::sprite_ptr, 8> bar;
+        int hud_tx = 0, hud_ty = 0, hud_tw = 0, hud_th = 0;
+        bool hud_big = false;
+
+        [[nodiscard]] bool out() const
+        {
+            return m->fainted() || caught;
+        }
     };
 
-    void draw_bar(panel& p, int x, int y, int hp, int max_hp)
+    enum class choice_kind
     {
-        // 48 px in six 8 px segments; green over half, yellow over a fifth, red below (hpClass).
-        int fill = max_hp ? (hp * 48 + max_hp - 1) / max_hp : 0;
-        if(hp > 0)
-        {
-            fill = bn::max(fill, 1);
-        }
-        int colour = hp * 2 > max_hp ? 0 : hp * 5 > max_hp ? 1 : 2;
-        if(p.bar.empty())
-        {
-            for(int i = 0; i < 6; ++i)
-            {
-                p.bar.push_back(bn::sprite_items::hpbar.create_sprite(sx(x + 8 * i + 4), sy(y + 4), 0));
-                p.bar.back().set_bg_priority(1);
-            }
-        }
-        for(int i = 0; i < 6; ++i)
-        {
-            int seg = bn::clamp(fill - 8 * i, 0, 8);
-            p.bar[i].set_tiles(bn::sprite_items::hpbar.tiles_item(), colour * 9 + seg);
-        }
-    }
+        MOVE,
+        BALL,
+        ITEM
+    };
 
-    void draw_panel(ui& ui, panel& p, const mon& m, int shown_hp, bool own)
+    struct choice
     {
-        bn::sprite_text_generator& gen = ui.text_generator();
-        p.text.clear();
-        int name_x = own ? own_name_x : foe_name_x;
-        int name_y = own ? own_name_y : foe_name_y;
-        int right = own ? own_panel_right : foe_panel_right;
-        gen.generate_top_left(name_x, name_y, m.name(), p.text);
-        bn::string<8> lv("Lv");
-        lv.append(bn::to_string<4>(m.level));
-        gen.generate_top_left(right - gen.width(lv), name_y, lv, p.text);
-        if(own)
-        {
-            bn::string<16> hp(bn::to_string<4>(shown_hp));
-            hp.append("/");
-            hp.append(bn::to_string<4>(m.max_hp));
-            gen.generate_top_left(right - gen.width(hp), own_bar_y + 4, hp, p.text);
-        }
-        for(bn::sprite_ptr& s : p.text)
-        {
-            s.set_bg_priority(1);
-        }
-        draw_bar(p, own ? own_bar_x : foe_bar_x, own ? own_bar_y : foe_bar_y, shown_hp, m.max_hp);
-    }
+        choice_kind kind = choice_kind::MOVE;
+        int move = 0;          // index into the user's moves
+        int target = 0;        // foe index (MOVE / BALL)
+        item_id item = item_id::POTION;
+    };
+
+    struct action
+    {
+        fighter* user;
+        fighter* target;
+        choice c;
+        bool own;
+        int order;
+    };
 
     const char* status_word(status s)
     {
@@ -132,456 +113,1017 @@ namespace
     {
 
     public:
-        battle(ui& ui, const encounter& wild) :
-            _ui(ui),
-            _foe(mon::make(wild.species, wild.level)),
+        explicit battle(const encounter& e) :
+            _e(e),
             _bg(bn::regular_bg_items::battle_bg.create_bg(8, 48))
         {
             _bg.set_priority(3);
         }
 
-        battle_outcome run()
-        {
-            game_state& g = state();
-            _own_index = g.first_able();
-            _foe_sprite = _foe.data().front.create_sprite(sx(foe_x), sy(foe_y));
-            _foe_sprite->set_bg_priority(2);
-            _foe_hp = _foe.hp;
-            draw_panel(_ui, _foe_panel, _foe, _foe_hp, false);
-            _ui.set_keep_box(true);
-            ui::fade_in(16);
-
-            bn::string<64> text("A wild ");
-            text.append(_foe.name());
-            text.append(" appeared!");
-            _ui.say(text);
-            _send_out();
-
-            while(true)
-            {
-                mon& own = g.party[_own_index];
-                text = "What will ";
-                text.append(own.name());
-                text.append(" do?");
-                _ui.show_text(text);
-                constexpr bn::string_view commands[] = { "FIGHT", "BALL", "RUN" };
-                int command = _ui.menu(commands, 3, false, _last_command, false);
-                _ui.clear_text();
-                _last_command = command;
-
-                if(command == 2)
-                {
-                    _ui.say("Got away safely!");
-                    return _finish(battle_outcome::RAN);
-                }
-                int own_move = -1;
-                bool throw_ball = false;
-                if(command == 0)
-                {
-                    own_move = _pick_move(own);
-                    if(own_move < 0)
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    if(! g.poke_balls)
-                    {
-                        _ui.say("You don't have any POKé BALLS!");
-                        continue;
-                    }
-                    throw_ball = true;
-                }
-
-                // Order by speed (paralysis halves it); the web game lets yours go first on a tie.
-                int foe_move = _foe.moves[_random.get_int(_foe.move_count)];
-                int own_speed = own.st == status::PARALYSIS ? own.spe / 2 : own.spe;
-                int foe_speed = _foe.st == status::PARALYSIS ? _foe.spe / 2 : _foe.spe;
-                bool own_first = own_speed >= foe_speed;
-                for(int turn = 0; turn < 2; ++turn)
-                {
-                    bool own_turn = (turn == 0) == own_first;
-                    mon& user = own_turn ? own : _foe;
-                    mon& target = own_turn ? _foe : own;
-                    if(user.fainted() || target.fainted())
-                    {
-                        continue;
-                    }
-                    if(own_turn && throw_ball)
-                    {
-                        if(_throw_ball())
-                        {
-                            return _finish(battle_outcome::CAUGHT);
-                        }
-                        continue;
-                    }
-                    _use_move(user, own_turn ? own_move : foe_move, target, own_turn);
-                }
-                // End of turn: burn and poison.
-                for(int side = 0; side < 2; ++side)
-                {
-                    mon& m = side == 0 ? own : _foe;
-                    if(! m.fainted() && (m.st == status::BURN || m.st == status::POISON))
-                    {
-                        int hurt = m.max_hp / 12;
-                        _set_hp(m, m.hp - hurt, side == 0);
-                        text = side == 0 ? "" : "Wild ";
-                        text.append(m.name());
-                        text.append(m.st == status::BURN ? " is hurt by its burn!" : " is hurt by poison!");
-                        _ui.say(text);
-                        _check_faint(m, side == 0);
-                    }
-                }
-                if(_foe.fainted())
-                {
-                    _win();
-                    return _finish(battle_outcome::WON);
-                }
-                if(own.fainted())
-                {
-                    _own_index = g.first_able();
-                    if(_own_index < 0)
-                    {
-                        _ui.say("You have no more POKéMON that can fight!");
-                        _ui.say("You whited out!");
-                        return _finish(battle_outcome::WHITED_OUT);
-                    }
-                    _send_out();
-                }
-            }
-        }
+        battle_outcome run();
 
     private:
-        ui& _ui;
-        bn::random& _random = rng();
-        mon _foe;
-        int _foe_hp = 0;
-        int _own_hp = 0;
-        int _own_index = 0;
-        int _last_command = 0;
-        int _last_move = 0;
+        const encounter& _e;
         bn::regular_bg_ptr _bg;
-        bn::optional<bn::sprite_ptr> _foe_sprite;
-        bn::optional<bn::sprite_ptr> _own_sprite;
-        panel _foe_panel;
-        panel _own_panel;
+        mon _foe_mons[max_foes];
+        fighter _own[max_party];
+        fighter _foes[max_foes];
+        int _own_count = 0;
+        int _foe_count = 0;
+        const trainer* _trainer = nullptr;
+        int _active = -1;           // own fighter being commanded (it bobs)
+        int _bob = 0;
+        int _last_command = 0;
+        int _last_move[max_party] = {};
 
-        void _send_out()
+        [[nodiscard]] bn::string<24> label(const fighter& f) const
         {
-            mon& own = state().party[_own_index];
-            bn::string<48> text("Go! ");
-            text.append(own.name());
-            text.append("!");
-            _own_sprite = own.data().back.create_sprite(sx(own_x), sy(own_y));
-            _own_sprite->set_bg_priority(2);
-            _own_hp = own.hp;
-            draw_panel(_ui, _own_panel, own, _own_hp, true);
-            _ui.say(text);
+            bn::string<24> s(f.own ? "" : _trainer ? "Foe " : "Wild ");
+            s.append(f.m->name());
+            return s;
+        }
+        [[nodiscard]] int alive(bool own) const
+        {
+            int n = 0;
+            const fighter* side = own ? _own : _foes;
+            for(int i = 0; i < (own ? _own_count : _foe_count); ++i)
+            {
+                n += ! side[i].out();
+            }
+            return n;
         }
 
-        int _pick_move(const mon& own)
+        void setup();
+        void layout_sprites();
+        void create_sprite(fighter& f);
+        void draw_hud(fighter& f);
+        void bob();
+        static void bob_hook(void* self)
         {
-            bn::string_view names[4];
-            bn::string<40> hints[4];
-            bn::string_view hint_views[4];
-            for(int i = 0; i < own.move_count; ++i)
+            static_cast<battle*>(self)->bob();
+        }
+
+        bool command(choice* choices, bool& ran);
+        int pick_target(const char* what);
+        int pick_move(int own_index);
+        void turn(choice* choices);
+        void use_move(fighter& user, int move_index, fighter& target);
+        bool can_act(fighter& f);
+        void apply_status(fighter& target, status s, int chance);
+        void throw_ball(fighter& user, fighter& target);
+        void set_hp(fighter& f, int hp);
+        void flash(fighter& f);
+        void faint(fighter& f);
+        void win();
+        battle_outcome finish(battle_outcome outcome);
+        void hide_sprites(bool hidden);
+    };
+
+    // ----- Setup -----
+    void battle::setup()
+    {
+        game_state& g = state();
+        bn::random& r = rng();
+        if(_e.trainer)
+        {
+            // A route trainer: their team's first `party size` Pokémon, a level under your party's average.
+            const map_def& m = world_data::maps[_e.map];
+            _trainer = &m.trainers[_e.trainer_index];
+            int lv = bn::max(3, bn::min(int(m.level_cap), g.average_level() - 1));
+            _foe_count = bn::min(int(_trainer->team_count), bn::max(1, int(g.party_count)));
+            _foe_count = bn::min(_foe_count, max_foes);
+            for(int i = 0; i < _foe_count; ++i)
             {
-                const move& mv = move_data(own.moves[i]);
-                names[i] = mv.name;
-                hints[i] = type_name(mv.type);
-                if(mv.category == move_category::STATUS)
+                _foe_mons[i] = mon::make(_trainer->team[i], lv);
+            }
+        }
+        else
+        {
+            _foe_count = _e.count;
+            for(int i = 0; i < _foe_count; ++i)
+            {
+                _foe_mons[i] = mon::make(_e.species[i], _e.level);
+            }
+        }
+        (void) r;
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            _foes[i].m = &_foe_mons[i];
+            _foes[i].own = false;
+            _foes[i].shown_hp = _foe_mons[i].hp;
+            g.seen.set(_foe_mons[i].species_index);
+        }
+        _own_count = g.party_count;
+        for(int i = 0; i < _own_count; ++i)
+        {
+            _own[i].m = &g.party[i];
+            _own[i].own = true;
+            _own[i].shown_hp = g.party[i].hp;
+        }
+        layout_sprites();
+    }
+
+    void battle::layout_sprites()
+    {
+        // Foes across the far platform (x 128-232), yours across the near one (x 0-112); every other one a
+        // little lower, so a pack reads as a group.
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            fighter& f = _foes[i];
+            f.base_x = 128 + (2 * i + 1) * 104 / (2 * _foe_count);
+            f.base_y = 30 + (_foe_count > 1 ? (i % 2) * 8 : 0);
+        }
+        for(int i = 0; i < _own_count; ++i)
+        {
+            fighter& f = _own[i];
+            int scale = own_scale_x100[_own_count - 1];
+            f.base_x = 4 + (2 * i + 1) * 108 / (2 * _own_count);
+            f.base_y = 112 - 32 * scale / 100 - (_own_count > 1 && i % 2 ? 0 : 4);
+        }
+        // HUD: Emerald's two big boxes for one-on-one, compact boxes otherwise.
+        bool big = _own_count == 1 && _foe_count == 1;
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            fighter& f = _foes[i];
+            f.hud_big = big;
+            if(big)
+            {
+                f.hud_tx = 0; f.hud_ty = 1; f.hud_tw = 14; f.hud_th = 4;
+            }
+            else
+            {
+                f.hud_tx = (i % 2) * 7; f.hud_ty = (i / 2) * 2; f.hud_tw = 7; f.hud_th = 2;
+            }
+        }
+        for(int i = 0; i < _own_count; ++i)
+        {
+            fighter& f = _own[i];
+            f.hud_big = big;
+            if(big)
+            {
+                f.hud_tx = 15; f.hud_ty = 8; f.hud_tw = 15; f.hud_th = 6;
+            }
+            else
+            {
+                f.hud_tx = 16 + (i % 2) * 7; f.hud_ty = 8 + (i / 2) * 2; f.hud_tw = 7; f.hud_th = 2;
+            }
+        }
+    }
+
+    void battle::create_sprite(fighter& f)
+    {
+        const species& s = f.m->data();
+        f.sprite = (f.own ? s.back : s.front).create_sprite(sx(f.base_x), sy(f.base_y));
+        f.sprite->set_bg_priority(2);
+        int scale = f.own ? own_scale_x100[_own_count - 1] : foe_scale_x100[_foe_count - 1];
+        if(scale != 100)
+        {
+            f.sprite->set_scale(bn::fixed(scale) / 100);
+        }
+        f.sprite->set_z_order(-f.base_y);
+        f.sprite->set_visible(! f.out());
+    }
+
+    void battle::draw_hud(fighter& f)
+    {
+        ui& u = gui();
+        f.hud_text.clear();
+        u.win().box(window_style::HUD, f.hud_tx, f.hud_ty, f.hud_tw, f.hud_th);
+        int x = f.hud_tx * 8, y = f.hud_ty * 8;
+        bn::string<8> lv("Lv");
+        lv.append(bn::to_string<4>(f.m->level));
+        if(f.hud_big)
+        {
+            u.print(x + 8, y + 3, f.m->name(), text_color::HUD, f.hud_text);
+            u.print(x + f.hud_tw * 8 - 8 - u.width(lv), y + 3, lv, text_color::HUD, f.hud_text);
+            draw_hp_bar(f.bar, x + f.hud_tw * 8 - 8 - 48, y + 20, 6, f.shown_hp, f.m->max_hp);
+            if(f.own)
+            {
+                bn::string<16> hp(bn::to_string<4>(f.shown_hp));
+                hp.append("/");
+                hp.append(bn::to_string<4>(f.m->max_hp));
+                u.print(x + f.hud_tw * 8 - 8 - u.width(hp), y + 27, hp, text_color::HUD, f.hud_text);
+            }
+        }
+        else
+        {
+            // Compact (the web game's .dense HP boxes): name and level on one line, the bar under them.
+            int room = f.hud_tw * 8 - 11;
+            bn::string<16> name(f.m->name());
+            int lv_w = u.width(lv, true);
+            if(u.width(name, true) + lv_w > room)
+            {
+                lv = bn::to_string<4>(f.m->level);     // just the number when it's tight
+                lv_w = u.width(lv, true);
+            }
+            while(name.size() > 3 && u.width(name, true) + lv_w > room)
+            {
+                name.pop_back();
+            }
+            u.print(x + 4, y + 2, name, text_color::HUD, f.hud_text, true);
+            u.print(x + f.hud_tw * 8 - 4 - lv_w, y + 2, lv, text_color::HUD, f.hud_text, true);
+            draw_hp_bar(f.bar, x + 4, y + 10, 6, f.shown_hp, f.m->max_hp);
+        }
+        if(f.out())
+        {
+            f.bar.clear();
+            f.hud_text.clear();
+            u.win().clear(f.hud_tx, f.hud_ty, f.hud_tw, f.hud_th);
+        }
+    }
+
+    void battle::bob()
+    {
+        ++_bob;
+        for(int i = 0; i < _own_count; ++i)
+        {
+            fighter& f = _own[i];
+            if(f.sprite)
+            {
+                int dy = i == _active ? ((_bob / 10) % 2) : 0;
+                f.sprite->set_y(sy(f.base_y + dy));
+            }
+        }
+    }
+
+    void battle::hide_sprites(bool hidden)
+    {
+        // Full-screen menus need the sprite palettes, so the battlers step aside meanwhile.
+        for(fighter* side : { _own, _foes })
+        {
+            int n = side == _own ? _own_count : _foe_count;
+            for(int i = 0; i < n; ++i)
+            {
+                fighter& f = side[i];
+                if(hidden)
                 {
-                    hints[i].append("  STATUS");
+                    f.sprite.reset();
+                    f.bar.clear();
+                    f.hud_text.clear();
                 }
                 else
                 {
-                    hints[i].append("  POWER ");
-                    hints[i].append(bn::to_string<4>(mv.power));
+                    create_sprite(f);
+                    if(! f.out())
+                    {
+                        draw_hud(f);
+                    }
                 }
-                hints[i].append("  ACC ");
-                hints[i].append(bn::to_string<4>(mv.accuracy));
-                hint_views[i] = hints[i];
             }
-            int pick = _ui.menu(names, own.move_count, true, bn::min(_last_move, own.move_count - 1), true, hint_views);
-            if(pick >= 0)
-            {
-                _last_move = pick;
-                return own.moves[pick];
-            }
-            return -1;
         }
-
-        // Animates the HP bar down (or up) to the new value.
-        void _set_hp(mon& m, int new_hp, bool own)
+        if(hidden)
         {
-            new_hp = bn::clamp(new_hp, 0, int(m.max_hp));
-            int& shown = own ? _own_hp : _foe_hp;
-            int target = new_hp;
-            m.hp = uint16_t(new_hp);
-            int step = bn::max(1, bn::abs(target - shown) / 24);
-            while(shown != target)
+            gui().win().clear_all();
+        }
+        else
+        {
+            gui().set_battle_style(true);
+        }
+    }
+
+    // ----- Commands -----
+    struct move_info_ctx
+    {
+        battle* b;
+        const mon* m;
+        bn::vector<bn::sprite_ptr, 8>* sprites;
+    };
+
+    void show_move_info(void* p, int index)
+    {
+        auto* c = static_cast<move_info_ctx*>(p);
+        ui& u = gui();
+        c->sprites->clear();
+        if(index >= c->m->move_count)
+        {
+            return;
+        }
+        const move& mv = move_data(c->m->moves[index]);
+        bn::string<16> pwr;
+        if(mv.category == move_category::STATUS)
+        {
+            pwr = "STATUS";
+        }
+        else
+        {
+            pwr = "PWR ";
+            pwr.append(bn::to_string<4>(mv.power));
+        }
+        u.print(170, 119, pwr, text_color::INK, *c->sprites);
+        u.print(170, 135, type_name(mv.type), text_color::INK, *c->sprites);
+    }
+
+    int battle::pick_move(int own_index)
+    {
+        ui& u = gui();
+        const mon& m = *_own[own_index].m;
+        bn::string_view names[4];
+        for(int i = 0; i < m.move_count; ++i)
+        {
+            names[i] = move_data(m.moves[i]).name;
+        }
+        // Emerald: the moves in a 2x2 grid on the left, TYPE and power on the right.
+        bn::vector<bn::sprite_ptr, 8> info;
+        u.win().box(window_style::WINDOW, 20, 14, 10, 6);
+        move_info_ctx ctx{ this, &m, &info };
+        menu_spec s;
+        s.options = names;
+        s.count = m.move_count;
+        s.tx = 0; s.ty = 14; s.tw = 20; s.th = 6;
+        s.columns = 2;
+        s.column_width = 72;
+        s.start = bn::min(_last_move[own_index], m.move_count - 1);
+        s.on_move = show_move_info;
+        s.ctx = &ctx;
+        int pick = u.menu(s);
+        info.clear();
+        u.win().clear(20, 14, 10, 6);
+        u.set_battle_style(true);
+        if(pick >= 0)
+        {
+            _last_move[own_index] = pick;
+        }
+        return pick;
+    }
+
+    int battle::pick_target(const char* what)
+    {
+        ui& u = gui();
+        int idx[max_foes];
+        bn::string<24> names[max_foes];
+        bn::string_view views[max_foes];
+        int n = 0;
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            if(! _foes[i].out())
             {
-                shown += shown < target ? bn::min(step, target - shown) : -bn::min(step, shown - target);
-                if(own)
+                idx[n] = i;
+                names[n] = _foes[i].m->name();
+                views[n] = names[n];
+                ++n;
+            }
+        }
+        if(n == 1)
+        {
+            return idx[0];
+        }
+        u.show_text(what, 80);
+        menu_spec s;
+        s.options = views;
+        s.count = n;
+        s.tx = 12; s.ty = 14; s.tw = 18; s.th = 6;
+        s.columns = 2;
+        s.column_width = 66;
+        int pick = u.menu(s);
+        u.clear_text();
+        return pick < 0 ? -1 : idx[pick];
+    }
+
+    // Each Pokémon that can fight gets a command; B goes back to the previous one. Returns false if the
+    // player ran.
+    bool battle::command(choice* choices, bool& ran)
+    {
+        ui& u = gui();
+        game_state& g = state();
+        int queue[max_party];
+        int qn = 0;
+        for(int i = 0; i < _own_count; ++i)
+        {
+            if(! _own[i].out())
+            {
+                queue[qn++] = i;
+            }
+        }
+        int pos = 0;
+        while(pos < qn)
+        {
+            int who = queue[pos];
+            _active = who;
+            const mon& m = *_own[who].m;
+            bn::string<48> prompt("What will ");
+            prompt.append(m.name());
+            prompt.append(" do?");
+            if(qn > 1)
+            {
+                prompt.append(" ");
+                prompt.append(bn::to_string<4>(pos + 1));
+                prompt.append("/");
+                prompt.append(bn::to_string<4>(qn));
+            }
+            u.show_text(prompt, 104);
+            constexpr bn::string_view commands[] = { "FIGHT", "BAG", "POKéMON", "RUN" };
+            menu_spec s;
+            s.options = commands;
+            s.count = 4;
+            s.tx = 15; s.ty = 14; s.tw = 15; s.th = 6;
+            s.columns = 2;
+            s.column_width = 58;
+            s.start = _last_command;
+            s.cancel = pos > 0;
+            int c = u.menu(s);
+            u.clear_text();
+            if(c < 0)
+            {
+                --pos;
+                continue;
+            }
+            _last_command = c;
+            if(c == 0)
+            {
+                int mv = pick_move(who);
+                if(mv < 0)
                 {
-                    draw_panel(_ui, _own_panel, m, shown, true);
+                    continue;
+                }
+                int target = pick_target("Attack which one?");
+                if(target < 0)
+                {
+                    continue;
+                }
+                choices[who] = { choice_kind::MOVE, mv, target, item_id::POTION };
+                ++pos;
+            }
+            else if(c == 1)
+            {
+                hide_sprites(true);
+                int it = bag_screen(bag_mode::BATTLE);
+                hide_sprites(false);
+                ui::fade_in(8);
+                if(it < 0)
+                {
+                    continue;
+                }
+                item_id id = item_id(it);
+                if(id == item_id::POKEBALL)
+                {
+                    if(_trainer)
+                    {
+                        u.say("The TRAINER blocked the BALL! Don't be a thief!");
+                        continue;
+                    }
+                    int target = pick_target("Throw at which one?");
+                    if(target < 0)
+                    {
+                        continue;
+                    }
+                    choices[who] = { choice_kind::BALL, 0, target, id };
                 }
                 else
                 {
-                    draw_bar(_foe_panel, foe_bar_x, foe_bar_y, shown, m.max_hp);
+                    choices[who] = { choice_kind::ITEM, 0, 0, id };
                 }
-                bn::core::update();
+                ++pos;
             }
-        }
-
-        void _flash(bool own)
-        {
-            bn::optional<bn::sprite_ptr>& s = own ? _own_sprite : _foe_sprite;
-            for(int i = 0; i < 4; ++i)
+            else if(c == 2)
             {
-                s->set_visible(false);
-                ui::wait(4);
-                s->set_visible(true);
-                ui::wait(4);
+                hide_sprites(true);
+                party_screen(party_mode::BATTLE);
+                hide_sprites(false);
+                ui::fade_in(8);
             }
-        }
-
-        void _check_faint(mon& m, bool own)
-        {
-            if(! m.fainted())
+            else
             {
-                return;
-            }
-            // Sink a little and blink out (a full slide off the platform would cross the HP panels).
-            bn::optional<bn::sprite_ptr>& s = own ? _own_sprite : _foe_sprite;
-            for(int i = 0; i < 16; ++i)
-            {
-                if(i % 2 == 0)
+                if(_trainer)
                 {
-                    s->set_y(s->y() + 1);
+                    u.say("No! There's no running from a TRAINER battle!");
+                    continue;
                 }
-                s->set_visible(i < 8 || i % 4 < 2);
-                bn::core::update();
-            }
-            s->set_visible(false);
-            bn::string<48> text(own ? "" : "Wild ");
-            text.append(m.name());
-            text.append(" fainted!");
-            _ui.say(text);
-        }
-
-        bool _can_act(mon& m, bool own)
-        {
-            bn::string<64> text(own ? "" : "Wild ");
-            text.append(m.name());
-            if(m.st == status::PARALYSIS && _random.get_int(4) == 0)
-            {
-                text.append(" is paralyzed! It can't move!");
-                _ui.say(text);
+                u.say("Got away safely!");
+                ran = true;
+                _active = -1;
                 return false;
             }
-            if(m.st == status::SLEEP)
-            {
-                if(m.sleep_turns)
-                {
-                    --m.sleep_turns;
-                }
-                if(m.sleep_turns == 0)
-                {
-                    m.st = status::NONE;
-                    text.append(" woke up!");
-                    _ui.say(text);
-                    return true;
-                }
-                text.append(" is fast asleep.");
-                _ui.say(text);
-                return false;
-            }
-            if(m.st == status::FREEZE)
-            {
-                if(_random.get_int(5) == 0)
-                {
-                    m.st = status::NONE;
-                    text.append(" thawed out!");
-                    _ui.say(text);
-                    return true;
-                }
-                text.append(" is frozen solid!");
-                _ui.say(text);
-                return false;
-            }
-            return true;
         }
+        _active = -1;
+        (void) g;
+        return true;
+    }
 
-        void _apply_status(mon& target, status s, int chance, bool target_own)
+    // ----- The turn -----
+    void battle::turn(choice* choices)
+    {
+        bn::random& r = rng();
+        bn::vector<action, max_party + max_foes> actions;
+        int order = 0;
+        for(int i = 0; i < _own_count; ++i)
         {
-            if(target.st != status::NONE || target.fainted() || s == status::NONE)
+            if(! _own[i].out())
             {
-                return;
+                actions.push_back({ &_own[i], &_foes[choices[i].target], choices[i], true, order++ });
             }
-            if(_random.get_int(100) >= chance)
-            {
-                return;
-            }
-            target.st = s;
-            if(s == status::SLEEP)
-            {
-                target.sleep_turns = uint8_t(1 + _random.get_int(3));
-            }
-            bn::string<80> text(target_own ? "" : "Wild ");
-            text.append(target.name());
-            text.append(status_word(s));
-            _ui.say(text);
         }
-
-        void _use_move(mon& user, int move_index, mon& target, bool own)
+        // Foes pick a random move and a random target among yours.
+        for(int i = 0; i < _foe_count; ++i)
         {
-            if(! _can_act(user, own))
+            fighter& f = _foes[i];
+            if(f.out() || ! alive(true))
             {
-                return;
+                continue;
             }
-            const move& mv = move_data(move_index);
-            bn::string<64> text(own ? "" : "Wild ");
-            text.append(user.name());
-            text.append(" used ");
-            text.append(mv.name);
-            text.append("!");
-            _ui.say(text);
-            if(_random.get_int(100) >= mv.accuracy)
+            int targets[max_party], tn = 0;
+            for(int k = 0; k < _own_count; ++k)
             {
-                text = own ? "" : "Wild ";
-                text.append(user.name());
-                text.append("'s attack missed!");
-                _ui.say(text);
-                return;
-            }
-            if(mv.category == move_category::STATUS)
-            {
-                status had = target.st;
-                _apply_status(target, mv.inflicts, 100, ! own);
-                if(target.st == had)
+                if(! _own[k].out())
                 {
-                    _ui.say("But it failed!");
+                    targets[tn++] = k;
                 }
-                return;
             }
-            damage_result r = calc_damage(user, mv, target, _random);
-            _flash(! own);
-            _set_hp(target, target.hp - r.damage, ! own);
-            if(r.effectiveness_x4 == 0)
-            {
-                text = "It doesn't affect ";
-                text.append(own ? "Wild " : "");
-                text.append(target.name());
-                text.append("...");
-                _ui.say(text);
-            }
-            else if(r.effectiveness_x4 > 4)
-            {
-                _ui.say("It's super effective!");
-            }
-            else if(r.effectiveness_x4 < 4)
-            {
-                _ui.say("It's not very effective...");
-            }
-            if(mv.secondary != status::NONE)
-            {
-                _apply_status(target, mv.secondary, mv.secondary_chance, ! own);
-            }
-            _check_faint(target, ! own);
+            choice c;
+            c.kind = choice_kind::MOVE;
+            c.move = r.get_int(f.m->move_count);
+            actions.push_back({ &f, &_own[targets[r.get_int(tn)]], c, false, order++ });
         }
-
-        bool _throw_ball()
+        // Items first, then by speed (paralysis halves it); ties keep their order.
+        auto speed = [](const action& a){ return a.user->m->st == status::PARALYSIS ? a.user->m->spe / 2 : int(a.user->m->spe); };
+        for(int i = 1; i < actions.size(); ++i)
         {
-            game_state& g = state();
-            --g.poke_balls;
-            _ui.say("You threw a POKé BALL!");
-            // Same odds as the web game: 0.95 - 0.7 x HP fraction, clamped to 0.1-0.95, x1.5 with a
-            // status; three shake checks at the cube root.
-            int chance = 950 - (700 * _foe.hp) / bn::max(1, int(_foe.max_hp));
-            chance = bn::clamp(chance, 100, 950);
-            if(_foe.st != status::NONE)
+            for(int j = i; j > 0; --j)
             {
-                chance = bn::min(1000, chance * 3 / 2);
-            }
-            int per_shake = cbrt_scaled(chance);
-            int shakes = 0;
-            while(shakes < 3 && _random.get_int(1000) < per_shake)
-            {
-                ++shakes;
-            }
-            _foe_sprite->set_visible(false);
-            for(int i = 0; i < bn::max(1, shakes); ++i)
-            {
-                _ui.show_text(i == 0 ? "..." : i == 1 ? "... ..." : "... ... ...");
-                ui::wait(30);
-            }
-            _ui.clear_text();
-            if(shakes == 3)
-            {
-                bn::string<64> text("Gotcha! ");
-                text.append(_foe.name());
-                text.append(" was caught!");
-                _ui.say(text);
-                if(g.add_to_party(_foe))
+                const action& a = actions[j - 1];
+                const action& b = actions[j];
+                bool a_item = a.c.kind == choice_kind::ITEM, b_item = b.c.kind == choice_kind::ITEM;
+                bool swap = (b_item && ! a_item) || (a_item == b_item && speed(b) > speed(a));
+                if(! swap)
                 {
-                    text = _foe.name();
-                    text.append(" joined your party!");
+                    break;
+                }
+                action t = actions[j - 1];
+                actions[j - 1] = actions[j];
+                actions[j] = t;
+            }
+        }
+        for(action& act : actions)
+        {
+            if(act.user->out() || ! alive(true) || ! alive(false))
+            {
+                continue;
+            }
+            if(act.c.kind == choice_kind::ITEM)
+            {
+                game_state& g = state();
+                int index = act.user->m - g.party.data();
+                bn::string<80> message;
+                bn::string<128> text("You used a ");
+                text.append(game_data::items[int(act.c.item)].name);
+                text.append("! ");
+                if(use_item(act.c.item, index, message))
+                {
+                    text.append(message);
+                    set_hp(*act.user, act.user->m->hp);
                 }
                 else
                 {
-                    // No PC boxes in this build yet.
-                    text = "Your party is full, so ";
-                    text.append(_foe.name());
-                    text.append(" was released.");
+                    text = "It won't have any effect.";
                 }
-                _ui.say(text);
-                return true;
+                gui().say(text);
+                continue;
             }
-            _foe_sprite->set_visible(true);
-            bn::string<64> text("Oh no! The wild ");
-            text.append(_foe.name());
-            text.append(" broke free!");
-            _ui.say(text);
+            // Its target already fainted: an attack moves on to another foe (tester #19).
+            if(act.target->out())
+            {
+                if(act.c.kind == choice_kind::BALL)
+                {
+                    continue;
+                }
+                fighter* side = act.own ? _foes : _own;
+                int n = act.own ? _foe_count : _own_count;
+                act.target = nullptr;
+                for(int i = 0; i < n && ! act.target; ++i)
+                {
+                    if(! side[i].out())
+                    {
+                        act.target = &side[i];
+                    }
+                }
+                if(! act.target)
+                {
+                    continue;
+                }
+            }
+            if(act.c.kind == choice_kind::BALL)
+            {
+                throw_ball(*act.user, *act.target);
+                continue;
+            }
+            use_move(*act.user, act.user->m->moves[act.c.move], *act.target);
+        }
+        // End of turn: burn and poison, yours first.
+        for(fighter* side : { _own, _foes })
+        {
+            int n = side == _own ? _own_count : _foe_count;
+            for(int i = 0; i < n; ++i)
+            {
+                fighter& f = side[i];
+                if(! f.out() && (f.m->st == status::BURN || f.m->st == status::POISON))
+                {
+                    set_hp(f, f.m->hp - f.m->max_hp / 12);
+                    bn::string<64> text(label(f));
+                    text.append(f.m->st == status::BURN ? " is hurt by its burn!" : " is hurt by poison!");
+                    gui().say(text);
+                    faint(f);
+                }
+            }
+        }
+    }
+
+    bool battle::can_act(fighter& f)
+    {
+        bn::random& r = rng();
+        mon& m = *f.m;
+        bn::string<64> text(label(f));
+        if(m.st == status::PARALYSIS && r.get_int(4) == 0)
+        {
+            text.append(" is paralyzed! It can't move!");
+            gui().say(text);
             return false;
         }
-
-        void _win()
+        if(m.st == status::SLEEP)
         {
-            game_state& g = state();
-            constexpr int xp = 18;       // checkEnd(): 18 per wild Pokémon, to the whole party
-            bn::string<64> text("Your party gained ");
-            text.append(bn::to_string<4>(xp));
-            text.append(" EXP. Points!");
-            _ui.say(text);
-            for(int i = 0; i < g.party_count; ++i)
+            if(m.sleep_turns)
             {
-                g.party[i].grant_xp(xp, _ui);
+                --m.sleep_turns;
+            }
+            if(m.sleep_turns == 0)
+            {
+                m.st = status::NONE;
+                text.append(" woke up!");
+                gui().say(text);
+                return true;
+            }
+            text.append(" is fast asleep.");
+            gui().say(text);
+            return false;
+        }
+        if(m.st == status::FREEZE)
+        {
+            if(r.get_int(5) == 0)
+            {
+                m.st = status::NONE;
+                text.append(" thawed out!");
+                gui().say(text);
+                return true;
+            }
+            text.append(" is frozen solid!");
+            gui().say(text);
+            return false;
+        }
+        return true;
+    }
+
+    void battle::apply_status(fighter& target, status s, int chance)
+    {
+        if(target.m->st != status::NONE || target.out() || s == status::NONE || rng().get_int(100) >= chance)
+        {
+            return;
+        }
+        target.m->st = s;
+        if(s == status::SLEEP)
+        {
+            target.m->sleep_turns = uint8_t(1 + rng().get_int(3));
+        }
+        bn::string<80> text(label(target));
+        text.append(status_word(s));
+        gui().say(text);
+    }
+
+    void battle::use_move(fighter& user, int move_index, fighter& target)
+    {
+        if(! can_act(user))
+        {
+            return;
+        }
+        const move& mv = move_data(move_index);
+        bn::string<64> text(label(user));
+        text.append(" used ");
+        text.append(mv.name);
+        text.append("!");
+        gui().say(text);
+        if(rng().get_int(100) >= mv.accuracy)
+        {
+            text = label(user);
+            text.append("'s attack missed!");
+            gui().say(text);
+            return;
+        }
+        if(mv.category == move_category::STATUS)
+        {
+            status had = target.m->st;
+            apply_status(target, mv.inflicts, 100);
+            if(target.m->st == had)
+            {
+                gui().say("But it failed!");
+            }
+            return;
+        }
+        damage_result r = calc_damage(*user.m, mv, *target.m, rng());
+        flash(target);
+        set_hp(target, target.m->hp - r.damage);
+        if(r.effectiveness_x4 == 0)
+        {
+            text = "It doesn't affect ";
+            text.append(label(target));
+            text.append("...");
+            gui().say(text);
+        }
+        else if(r.effectiveness_x4 > 4)
+        {
+            gui().say("It's super effective!");
+        }
+        else if(r.effectiveness_x4 < 4)
+        {
+            gui().say("It's not very effective...");
+        }
+        if(mv.secondary != status::NONE)
+        {
+            apply_status(target, mv.secondary, mv.secondary_chance);
+        }
+        faint(target);
+    }
+
+    void battle::throw_ball(fighter& user, fighter& target)
+    {
+        game_state& g = state();
+        ui& u = gui();
+        (void) user;
+        if(! g.item_count(item_id::POKEBALL))
+        {
+            u.say("No POKé BALLS left!");
+            return;
+        }
+        g.items[int(item_id::POKEBALL)] = uint8_t(g.items[int(item_id::POKEBALL)] - 1);
+        bn::string<64> text(g.name);
+        text.append(" used POKé BALL!");
+        u.say(text);
+        // The web game's odds: 0.95 - 0.7 x HP fraction, clamped to 0.1-0.95, x1.5 with a status; three
+        // shake checks at the cube root.
+        mon& m = *target.m;
+        int chance = bn::clamp(950 - (700 * m.hp) / bn::max(1, int(m.max_hp)), 100, 950);
+        if(m.st != status::NONE)
+        {
+            chance = bn::min(1000, chance * 3 / 2);
+        }
+        int per_shake = cbrt_scaled(chance);
+        int shakes = 0;
+        while(shakes < 3 && rng().get_int(1000) < per_shake)
+        {
+            ++shakes;
+        }
+        target.sprite->set_visible(false);
+        for(int i = 0; i < bn::max(1, shakes); ++i)
+        {
+            u.show_text(i == 0 ? "..." : i == 1 ? "... ..." : "... ... ...");
+            wait(30);
+        }
+        u.clear_text();
+        if(shakes < 3)
+        {
+            target.sprite->set_visible(true);
+            text = "Oh no! The wild ";
+            text.append(m.name());
+            text.append(" broke free!");
+            u.say(text);
+            return;
+        }
+        target.caught = true;
+        draw_hud(target);
+        text = "Gotcha! ";
+        text.append(m.name());
+        text.append(" was caught!");
+        u.say(text);
+        if(! g.owned.test(m.species_index))
+        {
+            g.owned.set(m.species_index);
+            text = m.name();
+            text.append("'s data was added to the POKéDEX.");
+            u.say(text);
+        }
+        mon caught = m;
+        caught.st = status::NONE;
+        bool to_box = false;
+        if(! g.add_mon(caught, to_box))
+        {
+            text = "There's no room for ";
+            text.append(m.name());
+            text.append(", so it was released.");
+            u.say(text);
+        }
+        else if(to_box)
+        {
+            text = m.name();
+            text.append(" was sent to the BOX (party full).");
+            u.say(text);
+        }
+    }
+
+    // Animates the HP bar to the new value.
+    void battle::set_hp(fighter& f, int hp)
+    {
+        hp = bn::clamp(hp, 0, int(f.m->max_hp));
+        f.m->hp = uint16_t(hp);
+        int step = bn::max(1, bn::abs(hp - f.shown_hp) / 24);
+        while(f.shown_hp != hp)
+        {
+            f.shown_hp += f.shown_hp < hp ? bn::min(step, hp - f.shown_hp) : -bn::min(step, f.shown_hp - hp);
+            draw_hud(f);
+            frame();
+        }
+        draw_hud(f);
+    }
+
+    void battle::flash(fighter& f)
+    {
+        for(int i = 0; i < 4; ++i)
+        {
+            f.sprite->set_visible(false);
+            wait(4);
+            f.sprite->set_visible(true);
+            wait(4);
+        }
+    }
+
+    void battle::faint(fighter& f)
+    {
+        if(! f.m->fainted() || ! f.sprite->visible())
+        {
+            return;
+        }
+        // Sink a little and blink out.
+        for(int i = 0; i < 16; ++i)
+        {
+            if(i % 2 == 0)
+            {
+                f.sprite->set_y(f.sprite->y() + 1);
+            }
+            f.sprite->set_visible(i < 8 || i % 4 < 2);
+            frame();
+        }
+        f.sprite->set_visible(false);
+        f.m->st = status::NONE;
+        draw_hud(f);
+        bn::string<48> text(label(f));
+        text.append(" fainted!");
+        gui().say(text);
+    }
+
+    void battle::win()
+    {
+        game_state& g = state();
+        ui& u = gui();
+        // checkEnd(): 18 EXP per wild Pokémon (35 from a route trainer) to the whole party.
+        int xp = _trainer ? 35 : 18 * _foe_count;
+        bn::string<96> text;
+        if(_trainer)
+        {
+            text = "You defeated ";
+            text.append(_trainer->title);
+            text.append("!");
+            u.say(text);
+            bn::string<128> after(_trainer->title);
+            after.append(": \"");
+            after.append(_trainer->after);
+            after.append("\"");
+            u.say(after);
+            int top = 0;
+            for(int i = 0; i < _foe_count; ++i)
+            {
+                top = bn::max(top, int(_foe_mons[i].level));
+            }
+            int prize = top * 20;
+            g.money += uint32_t(prize);
+            g.beaten.set(_trainer->id);
+            text = g.name;
+            text.append(" got $");
+            text.append(bn::to_string<8>(prize));
+            text.append(" for winning!");
+            u.say(text);
+        }
+        text = "Your party gained ";
+        text.append(bn::to_string<4>(xp));
+        text.append(" EXP. Points!");
+        u.say(text);
+        for(int i = 0; i < g.party_count; ++i)
+        {
+            int before = g.party[i].species_index;
+            g.party[i].grant_xp(xp, u);
+            if(g.party[i].species_index != before)
+            {
+                g.owned.set(g.party[i].species_index);
+                g.seen.set(g.party[i].species_index);
             }
         }
+    }
 
-        battle_outcome _finish(battle_outcome outcome)
+    battle_outcome battle::finish(battle_outcome outcome)
+    {
+        gui().set_frame_hook(nullptr, nullptr);
+        ui::fade_out(16);
+        gui().set_battle_style(false);
+        gui().win().clear_all();
+        return outcome;
+    }
+
+    battle_outcome battle::run()
+    {
+        ui& u = gui();
+        setup();
+        for(int i = 0; i < _foe_count; ++i)
         {
-            ui::fade_out(16);
-            _ui.set_keep_box(false);
-            return outcome;
+            create_sprite(_foes[i]);
+            draw_hud(_foes[i]);
         }
-    };
+        u.set_battle_style(true);
+        u.set_frame_hook(bob_hook, this);
+        ui::fade_in(16);
+
+        bn::string<96> text;
+        if(_trainer)
+        {
+            text = _trainer->title;
+            text.append(" would like to battle!");
+        }
+        else
+        {
+            text = "Wild ";
+            for(int i = 0; i < _foe_count; ++i)
+            {
+                if(i)
+                {
+                    text.append(i == _foe_count - 1 ? " and " : ", ");
+                }
+                text.append(_foe_mons[i].name());
+            }
+            text.append(" appeared!");
+        }
+        u.say(text);
+        // Your party comes out together.
+        text = "Go! ";
+        int sent = 0;
+        for(int i = 0; i < _own_count; ++i)
+        {
+            create_sprite(_own[i]);
+            if(! _own[i].out())
+            {
+                draw_hud(_own[i]);
+                if(sent < 3)
+                {
+                    if(sent)
+                    {
+                        text.append(", ");
+                    }
+                    text.append(_own[i].m->name());
+                }
+                ++sent;
+            }
+        }
+        text.append(sent > 3 ? " and the rest!" : "!");
+        u.say(text);
+
+        while(true)
+        {
+            choice choices[max_party];
+            bool ran = false;
+            if(! command(choices, ran))
+            {
+                return finish(battle_outcome::RAN);
+            }
+            turn(choices);
+            if(! alive(false))
+            {
+                bool caught_any = false;
+                for(int i = 0; i < _foe_count; ++i)
+                {
+                    caught_any |= _foes[i].caught;
+                }
+                win();
+                return finish(caught_any && ! _trainer ? battle_outcome::CAUGHT : battle_outcome::WON);
+            }
+            if(! alive(true))
+            {
+                u.say("Your party was defeated...");
+                text = state().name;
+                text.append(" whited out!");
+                u.say(text);
+                return finish(battle_outcome::WHITED_OUT);
+            }
+        }
+    }
 }
 
-battle_outcome battle_scene(ui& ui, const encounter& wild)
+battle_outcome battle_scene(const encounter& e)
 {
     bn::bg_palettes::set_transparent_color(bn::color(26, 30, 24));
-    battle b(ui, wild);
-    battle_outcome outcome = b.run();
+    battle_outcome outcome;
+    {
+        bn::unique_ptr<battle> b(new battle(e));
+        outcome = b->run();
+    }
     if(outcome == battle_outcome::WHITED_OUT)
     {
-        // sendToCenter(): back home, outside the POKéMON CENTER, healed.
+        // sendToCenter(): outside the POKéMON CENTER at home, healed.
         game_state& g = state();
         g.heal_party();
-        g.area = 0;
-        const pr::area& home = world_data::areas[0];
+        const map_def& home = world_data::maps[0];
+        g.map = 0;
         g.x = home.spawn_x;
         g.y = home.spawn_y;
         for(int i = 0; i < home.doors_count; ++i)

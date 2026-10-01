@@ -4,7 +4,7 @@
 
 #include <cstdint>
 #include "bn_sprite_item.h"
-#include "pr_species_id.h"
+#include "pr_ids.h"
 
 namespace pr
 {
@@ -52,6 +52,19 @@ struct base_stats
     uint8_t spa;
     uint8_t spd;
     uint8_t spe;
+};
+
+// ITEM_INFO: pocket 0 is ITEMS, 1 is POKé BALLS.
+struct item_info
+{
+    const char* name;
+    uint8_t pocket;
+    const char* desc;
+    uint16_t price;
+    uint16_t heal;            // HP restored
+    status cure;              // status cured
+    bool revive;              // revives a fainted Pokémon to half HP
+    bool full;                // full HP and status
 };
 
 struct species

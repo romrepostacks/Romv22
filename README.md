@@ -76,5 +76,5 @@ stick with it, or use Export/Import Save Code to move a save between them).
 ## Game Boy Advance version
 
 `gba/` builds a real GBA ROM (for Delta, mGBA or a flash cart) from this game's own maps, art and
-Pokémon data. It's a proof of concept for now: the home town, Route 1, wild battles and saving. See
-`gba/README.md`.
+Pokémon data. It covers the opening for now: the home town and its buildings, Route 1 with its trainers,
+party battles and saving. See `gba/README.md`.
