@@ -517,6 +517,11 @@ int bag_screen(bag_mode mode)
                 bn::string_view lines[3];
                 bn::string_view text = said.empty() ? (index < count ? game_data::items[ids[index]].desc : "Close the BAG.")
                                                     : bn::string_view(said);
+                // In battle the web game's tip shows for POKé BALLS (renderCmd's bag view).
+                if(said.empty() && mode == bag_mode::BATTLE && index < count && ids[index] == int(item_id::POKEBALL))
+                {
+                    text = "Weaken it first for a better catch rate!";
+                }
                 // Two lines of description, wrapped by words.
                 int line = 0;
                 const char* data = text.data();

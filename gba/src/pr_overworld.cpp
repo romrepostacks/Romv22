@@ -177,6 +177,8 @@ namespace
         void starter_event();
         int starter_bag();
         void starter_thanks();
+        void rival_leaves();
+        void story_enter();
 
         // START
         void start_menu();
@@ -340,6 +342,11 @@ namespace
         for(int i = 0; i < _map->trainers_count && ! _actors.full(); ++i)
         {
             const trainer& t = _map->trainers[i];
+            // A beaten rival has left (unless they're still about to say goodbye).
+            if(t.vanish && state().beaten.test(t.id) && state().walk_off != t.id)
+            {
+                continue;
+            }
             actor a;
             a.tr = &t;
             a.kind = t.kind;
@@ -566,6 +573,40 @@ namespace
             }
             return;
         }
+        // The way on is shut until this place's rival or Gym Leader is beaten (linkAreas gate).
+        if(target_place.link >= 0 && _map->links[target_place.link].gate && _map->leader_id >= 0 &&
+           ! g.beaten.test(_map->leader_id))
+        {
+            set_frame(*_player, person_kind::player, g.facing, 0);
+            if(_map->gate == gate_kind::RIVAL)
+            {
+                // Slipped past the rival's line of sight? They call you back.
+                bn::string<128> text(_map->leader_name);
+                text.append(": \"Hey! Not so fast! You're not getting past without a battle!\"");
+                gui().say(text);
+                for(int i = 0; i < _actors.size(); ++i)
+                {
+                    if(_actors[i].tr && _actors[i].tr->id == _map->leader_id)
+                    {
+                        trainer_approach(i);
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                bn::string<96> text("You should challenge Gym Leader ");
+                text.append(_map->leader_name);
+                text.append(" before moving on.");
+                gui().say(text);
+            }
+            _fresh_press = true;
+            while(bn::keypad::up_held() || bn::keypad::down_held() || bn::keypad::left_held() || bn::keypad::right_held())
+            {
+                tick();
+            }
+            return;
+        }
         // Walking into an unbeaten trainer starts their battle.
         if(who >= 0 && _actors[who].active_trainer())
         {
@@ -657,6 +698,7 @@ namespace
                 starter_event();
                 return;
             }
+            story_enter();
         }
         behaviour b = behaviour_at(g.x, g.y);
         if(b == behaviour::DOOR)
@@ -795,11 +837,10 @@ namespace
             gui().say("Your whole party has fainted! Rest at the POKéMON CENTER.");
             return;
         }
-        bn::string<160> text(a.tr->title);
-        text.append(": \"");
-        text.append(a.tr->intro);
-        text.append("\"");
-        gui().say(text);
+        for(int i = 0; i < a.tr->intro_count; ++i)
+        {
+            gui().say(a.tr->intro[i]);
+        }
         encounter& e = *_battle;
         e = encounter();
         e.trainer = true;
@@ -863,6 +904,20 @@ namespace
             pc_screen();
             return;
         }
+        if(b == behaviour::STATUE)
+        {
+            // "CINDERGATE TOWN POKéMON GYM / Leader: RELL / Winning trainers: ..."
+            bn::string<64> text(m.place_name);
+            text.append(" POKéMON GYM");
+            u.say(text);
+            text = "Leader: ";
+            text.append(m.leader_name);
+            u.say(text);
+            text = "Winning trainers: ";
+            text.append(m.leader_id >= 0 && g.beaten.test(m.leader_id) ? bn::string_view(g.name) : bn::string_view("..."));
+            u.say(text);
+            return;
+        }
         if(b == behaviour::WATER)
         {
             u.say("The water is a deep, clear blue.");
@@ -896,11 +951,10 @@ namespace
                 start_trainer_battle(index);
                 return;
             }
-            bn::string<160> text(a.tr->title);
-            text.append(": \"");
-            text.append(a.tr->after);
-            text.append("\"");
-            gui().say(text);
+            for(int i = 0; i < a.tr->after_count; ++i)
+            {
+                gui().say(a.tr->after[i]);
+            }
             return;
         }
         const person& p = *a.who;
@@ -964,6 +1018,7 @@ namespace
         g.y = int8_t(g.y + 1);
         _grass_y = g.y;
         _fresh_press = true;
+        story_enter();
     }
 
     // The POKéMON CENTER nurse (Emerald's script, as the web game's nurseTalk/nurseHeal).
@@ -1439,6 +1494,80 @@ namespace
         refresh();
     }
 
+    // A beaten rival says their piece and walks off (afterStory: walkOff).
+    void overworld::rival_leaves()
+    {
+        game_state& g = state();
+        int index = -1;
+        for(int i = 0; i < _actors.size(); ++i)
+        {
+            if(_actors[i].tr && _actors[i].tr->id == g.walk_off)
+            {
+                index = i;
+            }
+        }
+        g.walk_off = -1;
+        if(index < 0)
+        {
+            return;
+        }
+        actor& r = _actors[index];
+        r.facing = toward(r.x, r.y, g.x, g.y);
+        set_frame(*r.sprite, r.kind, r.facing, 0);
+        tick();
+        for(int i = 0; i < r.tr->after_count; ++i)
+        {
+            gui().say(r.tr->after[i]);
+        }
+        direction d = r.x > g.x ? direction::RIGHT : r.x < g.x ? direction::LEFT : r.y > g.y ? direction::DOWN : direction::UP;
+        for(int i = 0; i < 3; ++i)
+        {
+            int nx = r.x + dx_of(d), ny = r.y + dy_of(d);
+            behaviour b = behaviour_at(nx, ny);
+            if(b != behaviour::WALK && b != behaviour::TALL_GRASS)
+            {
+                break;
+            }
+            r.facing = d;
+            r.x = nx;
+            r.y = ny;
+            r.move_dir = d;
+            r.move_frames = walk_frames;
+            r.step_foot = ! r.step_foot;
+            while(_actors[index].move_frames > 0)
+            {
+                tick();
+            }
+        }
+        // Gone (the web game fades them out).
+        for(int f = 0; f < 12; ++f)
+        {
+            _actors[index].sprite->set_visible(f % 4 < 2);
+            tick();
+        }
+        _actors.erase(_actors.begin() + index);
+        refresh();
+    }
+
+    // storyEnter(): outdoors, the professor calls once you have your first badge.
+    void overworld::story_enter()
+    {
+        game_state& g = state();
+        if(_map->is_room() || (g.story & story_call1) || g.badges() < 1)
+        {
+            return;
+        }
+        g.story = uint8_t(g.story | story_call1);
+        bn::string<80> text("Beep beep beep! Incoming call from ");
+        text.append(game_data::prof_name);
+        text.append("...");
+        gui().say(text);
+        for(const char* line : game_data::first_badge_call)
+        {
+            gui().say(line);
+        }
+    }
+
     // ----- START -----
     void overworld::start_menu()
     {
@@ -1546,7 +1675,7 @@ namespace
             u.print(118 - u.width(value), 26 + i * 16, value, text_color::INK, info);
         };
         row(0, "PLAYER", g.name);
-        row(1, "BADGES", "0");
+        row(1, "BADGES", bn::to_string<4>(g.badges()));
         row(2, "POKéDEX", bn::to_string<4>(g.owned.count()));
         row(3, "TIME", play_time(g.play_frames));
         u.show_text("Would you like to save the game?");
@@ -1575,6 +1704,11 @@ namespace
         {
             starter_thanks();
         }
+        if(g.walk_off >= 0)
+        {
+            rival_leaves();
+        }
+        story_enter();
         while(! _quit && ! _start_battle)
         {
             direction want = g.facing;

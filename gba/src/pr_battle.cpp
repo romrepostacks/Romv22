@@ -15,6 +15,7 @@
 #include "bn_vector.h"
 
 #include "bn_regular_bg_items_battle_bg.h"
+#include "bn_sprite_items_ball.h"
 
 #include "pr_game_data.h"
 #include "pr_scenes.h"
@@ -41,6 +42,7 @@ namespace
         bool caught = false;
         int shown_hp = 0;
         int base_x = 0, base_y = 0;     // sprite centre (screen)
+        bn::fixed scale = 1;
         bn::optional<bn::sprite_ptr> sprite;
         bn::vector<bn::sprite_ptr, 10> hud_text;
         bn::vector<bn::sprite_ptr, 8> bar;
@@ -90,23 +92,15 @@ namespace
         }
     }
 
-    // Integer cube root of x (0..1000), scaled by 1000: cbrt(x/1000) * 1000.
-    int cbrt_scaled(int x)
+    // Integer square root (pokeemerald's Sqrt).
+    int isqrt(int x)
     {
-        int lo = 0, hi = 1000;
-        while(lo < hi)
+        int r = 0;
+        while((r + 1) * (r + 1) <= x)
         {
-            int mid = (lo + hi + 1) / 2;
-            if(int64_t(mid) * mid * mid <= int64_t(x) * 1000000)
-            {
-                lo = mid;
-            }
-            else
-            {
-                hi = mid - 1;
-            }
+            ++r;
         }
-        return lo;
+        return r;
     }
 
     class battle
@@ -171,6 +165,7 @@ namespace
         bool can_act(fighter& f);
         void apply_status(fighter& target, status s, int chance);
         void throw_ball(fighter& user, fighter& target);
+        void ball_animation(fighter& target, int wobbles, bool caught);
         void set_hp(fighter& f, int hp);
         void flash(fighter& f);
         void faint(fighter& f);
@@ -186,15 +181,74 @@ namespace
         bn::random& r = rng();
         if(_e.trainer)
         {
-            // A route trainer: their team's first `party size` Pokémon, a level under your party's average.
             const map_def& m = world_data::maps[_e.map];
             _trainer = &m.trainers[_e.trainer_index];
-            int lv = bn::max(3, bn::min(int(m.level_cap), g.average_level() - 1));
-            _foe_count = bn::min(int(_trainer->team_count), bn::max(1, int(g.party_count)));
-            _foe_count = bn::min(_foe_count, max_foes);
+            const trainer& t = *_trainer;
+            int cap = m.level_cap;
+            int avg = g.average_level();
+            int badges = g.badges();
+            species_id names[max_foes];
+            int n = 0;
+            int lv;
+            if(t.role == trainer_role::ROUTE || t.role == trainer_role::JUNIOR)
+            {
+                // Route trainers bring the first `party size` of their team, a level under your average; gym
+                // juniors the first `party size` (at most 1 + badges), two under.
+                bool junior = t.role == trainer_role::JUNIOR;
+                int size = bn::max(1, junior ? bn::min(int(g.party_count), 1 + badges) : int(g.party_count));
+                n = bn::min(bn::min(size, int(t.team_count)), max_foes);
+                for(int i = 0; i < n; ++i)
+                {
+                    names[i] = t.team[i];
+                }
+                lv = bn::max(3, bn::min(cap, avg - (junior ? 2 : 1)));
+            }
+            else
+            {
+                // Leaders and rivals: their signature team, at most 2 + badges Pokémon (trimmed keeping the
+                // ace, the last one), filled out to your party's size from the gym's juniors or the area.
+                int most = bn::min(6, 2 + badges);
+                if(t.team_count > most)
+                {
+                    for(int i = 0; i < most - 1; ++i)
+                    {
+                        names[n++] = t.team[i];
+                    }
+                    names[n++] = t.team[t.team_count - 1];
+                }
+                else
+                {
+                    for(int i = 0; i < t.team_count; ++i)
+                    {
+                        names[n++] = t.team[i];
+                    }
+                }
+                int size = bn::min(most, bn::max(n, int(g.party_count)));
+                for(int i = 0; i < t.fill_count && n < size; ++i)
+                {
+                    bool dup = false;
+                    for(int k = 0; k < n; ++k)
+                    {
+                        dup |= names[k] == t.fill[i];
+                    }
+                    if(! dup)
+                    {
+                        names[n++] = t.fill[i];
+                    }
+                }
+                for(int i = 0; n < size && t.fill_count; ++i)
+                {
+                    names[n++] = t.fill[i % t.fill_count];
+                }
+                // Outnumbered (a small or battered party): 2 levels lower per extra Pokémon.
+                lv = bn::max(3, bn::min(cap, avg - 1));
+                int extra = bn::max(0, n - g.able_count());
+                lv = bn::max(2, lv - 2 * extra);
+            }
+            _foe_count = n;
             for(int i = 0; i < _foe_count; ++i)
             {
-                _foe_mons[i] = mon::make(_trainer->team[i], lv);
+                _foe_mons[i] = mon::make(names[i], lv);
             }
         }
         else
@@ -276,9 +330,10 @@ namespace
         f.sprite = (f.own ? s.back : s.front).create_sprite(sx(f.base_x), sy(f.base_y));
         f.sprite->set_bg_priority(2);
         int scale = f.own ? own_scale_x100[_own_count - 1] : foe_scale_x100[_foe_count - 1];
+        f.scale = bn::fixed(scale) / 100;
         if(scale != 100)
         {
-            f.sprite->set_scale(bn::fixed(scale) / 100);
+            f.sprite->set_scale(f.scale);
         }
         f.sprite->set_z_order(-f.base_y);
         f.sprite->set_visible(! f.out());
@@ -633,7 +688,7 @@ namespace
             c.move = r.get_int(f.m->move_count);
             actions.push_back({ &f, &_own[targets[r.get_int(tn)]], c, false, order++ });
         }
-        // Items first, then by speed (paralysis halves it); ties keep their order.
+        // Items and POKé BALLS first, then by speed (paralysis halves it); ties keep their order.
         auto speed = [](const action& a){ return a.user->m->st == status::PARALYSIS ? a.user->m->spe / 2 : int(a.user->m->spe); };
         for(int i = 1; i < actions.size(); ++i)
         {
@@ -641,7 +696,8 @@ namespace
             {
                 const action& a = actions[j - 1];
                 const action& b = actions[j];
-                bool a_item = a.c.kind == choice_kind::ITEM, b_item = b.c.kind == choice_kind::ITEM;
+                // The BAG (medicine and POKé BALLS) goes before any move, as in Emerald.
+                bool a_item = a.c.kind != choice_kind::MOVE, b_item = b.c.kind != choice_kind::MOVE;
                 bool swap = (b_item && ! a_item) || (a_item == b_item && speed(b) > speed(a));
                 if(! swap)
                 {
@@ -854,30 +910,37 @@ namespace
         bn::string<64> text(g.name);
         text.append(" used POKé BALL!");
         u.say(text);
-        // The web game's odds: 0.95 - 0.7 x HP fraction, clamped to 0.1-0.95, x1.5 with a status; three
-        // shake checks at the cube root.
+        // Emerald's catch formula (pokeemerald ball_catch / CalcCatchOdds): the species' catch rate scaled by
+        // missing HP, x2 asleep or frozen, x1.5 with another status; past 254 it's caught outright, otherwise
+        // four checks against 1048560 / sqrt(sqrt(16711680 / odds)), and the ball wobbles once per check passed.
         mon& m = *target.m;
-        int chance = bn::clamp(950 - (700 * m.hp) / bn::max(1, int(m.max_hp)), 100, 950);
-        if(m.st != status::NONE)
+        int max_hp = bn::max(1, int(m.max_hp));
+        int odds = m.data().capture_rate * (3 * max_hp - 2 * m.hp) / (3 * max_hp);
+        if(m.st == status::SLEEP || m.st == status::FREEZE)
         {
-            chance = bn::min(1000, chance * 3 / 2);
+            odds *= 2;
         }
-        int per_shake = cbrt_scaled(chance);
-        int shakes = 0;
-        while(shakes < 3 && rng().get_int(1000) < per_shake)
+        else if(m.st != status::NONE)
         {
-            ++shakes;
+            odds = odds * 15 / 10;
         }
-        target.sprite->set_visible(false);
-        for(int i = 0; i < bn::max(1, shakes); ++i)
+        int checks = 0;
+        if(odds > 254)
         {
-            u.show_text(i == 0 ? "..." : i == 1 ? "... ..." : "... ... ...");
-            wait(30);
+            checks = 4;
         }
-        u.clear_text();
-        if(shakes < 3)
+        else
         {
-            target.sprite->set_visible(true);
+            int b = 1048560 / bn::max(1, isqrt(isqrt(16711680 / bn::max(1, odds))));
+            while(checks < 4 && rng().get_int(65536) < b)
+            {
+                ++checks;
+            }
+        }
+        bool caught = checks == 4;
+        ball_animation(target, bn::min(checks, 3), caught);
+        if(! caught)
+        {
             text = "Oh no! The wild ";
             text.append(m.name());
             text.append(" broke free!");
@@ -897,10 +960,10 @@ namespace
             text.append("'s data was added to the POKéDEX.");
             u.say(text);
         }
-        mon caught = m;
-        caught.st = status::NONE;
+        mon new_member = m;
+        new_member.st = status::NONE;
         bool to_box = false;
-        if(! g.add_mon(caught, to_box))
+        if(! g.add_mon(new_member, to_box))
         {
             text = "There's no room for ";
             text.append(m.name());
@@ -912,6 +975,60 @@ namespace
             text = m.name();
             text.append(" was sent to the BOX (party full).");
             u.say(text);
+        }
+    }
+
+    // The throw: the ball arcs over from your side, the Pokémon is drawn into it, the ball drops and wobbles
+    // once per check passed; caught, it stays shut; not, it bursts open and the Pokémon is back.
+    void battle::ball_animation(fighter& target, int wobbles, bool caught)
+    {
+        bn::sprite_ptr ball = bn::sprite_items::ball.create_sprite(sx(40), sy(90));
+        ball.set_bg_priority(1);
+        int tx = target.base_x, ty = target.base_y + 4;
+        constexpr int flight = 24;
+        for(int f = 1; f <= flight; ++f)
+        {
+            int x = 40 + (tx - 40) * f / flight;
+            int y = 90 + (ty - 90) * f / flight - (f * (flight - f) * 48) / (flight * flight);
+            ball.set_position(sx(x), sy(y));
+            ball.set_rotation_angle((f * 30) % 360);
+            frame();
+        }
+        ball.set_rotation_angle(0);
+        for(int f = 10; f > 0; --f)
+        {
+            target.sprite->set_scale(target.scale * f / 10 + bn::fixed(0.01));
+            frame();
+        }
+        target.sprite->set_visible(false);
+        for(int f = 0; f < 10; ++f)
+        {
+            ball.set_y(ball.y() + 1);
+            frame();
+        }
+        wait(20);
+        for(int w = 0; w < wobbles; ++w)
+        {
+            for(int f = 0; f < 24; ++f)
+            {
+                int a = f < 6 ? -f * 4 : f < 18 ? -24 + (f - 6) * 4 : 24 - (f - 18) * 4;
+                ball.set_rotation_angle(a < 0 ? 360 + a : a);
+                frame();
+            }
+            ball.set_rotation_angle(0);
+            wait(20);
+        }
+        if(caught)
+        {
+            wait(20);
+            return;
+        }
+        ball.set_visible(false);
+        target.sprite->set_visible(true);
+        for(int f = 1; f <= 10; ++f)
+        {
+            target.sprite->set_scale(target.scale * f / 10);
+            frame();
         }
     }
 
@@ -969,26 +1086,31 @@ namespace
     {
         game_state& g = state();
         ui& u = gui();
-        // checkEnd(): 18 EXP per wild Pokémon (35 from a route trainer) to the whole party.
-        int xp = _trainer ? 35 : 18 * _foe_count;
-        bn::string<96> text;
+        // checkEnd(): 18 EXP per wild Pokémon, 35 from a trainer, 60 from a Gym Leader, to the whole party; prize
+        // money is the top level x 20 (route trainers, gym juniors), x 60 (rivals) or x 100 (Gym Leaders).
+        bool leader = _trainer && _trainer->role == trainer_role::LEADER;
+        bool rival = _trainer && _trainer->role == trainer_role::RIVAL;
+        int xp = ! _trainer ? 18 * _foe_count : leader ? 60 : 35;
+        bn::string<128> text;
         if(_trainer)
         {
             text = "You defeated ";
             text.append(_trainer->title);
             text.append("!");
             u.say(text);
-            bn::string<128> after(_trainer->title);
-            after.append(": \"");
-            after.append(_trainer->after);
-            after.append("\"");
-            u.say(after);
+            if(! leader && ! rival)
+            {
+                for(int i = 0; i < _trainer->after_count; ++i)
+                {
+                    u.say(_trainer->after[i]);
+                }
+            }
             int top = 0;
             for(int i = 0; i < _foe_count; ++i)
             {
                 top = bn::max(top, int(_foe_mons[i].level));
             }
-            int prize = top * 20;
+            int prize = top * (leader ? 100 : rival ? 60 : 20);
             g.money += uint32_t(prize);
             g.beaten.set(_trainer->id);
             text = g.name;
@@ -996,6 +1118,18 @@ namespace
             text.append(bn::to_string<8>(prize));
             text.append(" for winning!");
             u.say(text);
+            if(leader)
+            {
+                text = g.name;
+                text.append(" received a badge from ");
+                text.append(world_data::maps[_e.map].leader_name);
+                text.append("!");
+                u.say(text);
+            }
+            if(rival && _trainer->vanish)
+            {
+                g.walk_off = _trainer->id;      // the rival says goodbye back on the overworld (afterStory)
+            }
         }
         text = "Your party gained ";
         text.append(bn::to_string<4>(xp));
@@ -1036,7 +1170,18 @@ namespace
         ui::fade_in(16);
 
         bn::string<96> text;
-        if(_trainer)
+        if(_trainer && (_trainer->role == trainer_role::LEADER || _trainer->role == trainer_role::RIVAL))
+        {
+            // "Gym Leader RELL challenges you with 3 POKéMON! (Lv.9)"
+            text = _trainer->role == trainer_role::LEADER ? "Gym Leader " : "Rival ";
+            text.append(world_data::maps[_e.map].leader_name[0] ? world_data::maps[_e.map].leader_name : _trainer->title);
+            text.append(" challenges you with ");
+            text.append(bn::to_string<4>(_foe_count));
+            text.append(" POKéMON! (Lv.");
+            text.append(bn::to_string<4>(_foe_mons[0].level));
+            text.append(")");
+        }
+        else if(_trainer)
         {
             text = _trainer->title;
             text.append(" would like to battle!");

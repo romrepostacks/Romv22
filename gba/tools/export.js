@@ -25,7 +25,8 @@ const src = ['js/dexdata.js', 'js/dexinfo.js', 'js/tileart.js', 'js/app.js'].map
 vm.runInContext(src + `
 ;this.G = {LOCATIONS, getMap, getInterior, neighbours, TILE_ART, TILE_CLS, WALKABLE, LEDGE_DIR, EDGE_GROUPS, edgeOverlay, ROOF_SWAP,
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
-  STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS};`, ctx);
+  STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, GYM_JUNIORS, PROF_CALLS,
+  areaPool};`, ctx);
 const G = ctx.G;
 
 // ---------- Pixels ----------
@@ -54,7 +55,7 @@ class Canvas {
 const GRASS = hex(G.GROUND.base);
 const tallGrass = svgPixels(G.tallGrassSvg());
 const BEHAVIOUR = {walk:0, solid:1, tall:2, water:3, ledgeDown:4, ledgeRight:5, ledgeLeft:6, sign:7, door:8, item:9,
-  counter:10, pc:11, mat:12};
+  counter:10, pc:11, mat:12, statue:13};
 function behaviour(ch){
   if(ch==='"') return BEHAVIOUR.tall;
   if(ch==='~') return BEHAVIOUR.water;
@@ -67,6 +68,7 @@ function behaviour(ch){
   if(ch==='c' || ch==='C') return BEHAVIOUR.counter;
   if(ch==='P') return BEHAVIOUR.pc;
   if(ch==='M') return BEHAVIOUR.mat;
+  if(ch==='u') return BEHAVIOUR.statue;
   return G.WALKABLE.has(ch) ? BEHAVIOUR.walk : BEHAVIOUR.solid;
 }
 
@@ -90,6 +92,19 @@ function drawArea(map){
     else if(cls==='ledge-e') c.draw(artPixels('ledge_e'), X, Y);
     else if(cls==='ledge-w') c.draw(artPixels('ledge_w'), X, Y);
     else if(cls!=='tree' && G.TILE_ART[cls]) c.draw(artPixels(cls), X, Y);   // flower, fence, sign, rsign, rock, item, ledge
+  }
+  // Ash settled on the grass (the web game's .t.ashy, around Cindergate): grey specks.
+  if(map.weather==='ash') for(let y=0; y<map.h; y++) for(let x=0; x<map.w; x++){
+    const cls = G.TILE_CLS[at(x,y)], v = ((x*73856093) ^ (y*19349663)) >>> 0;
+    if(!(cls==='grass' && v % 11 < 6) && cls!=='tall') continue;
+    // (The web game also lays a faint grey veil over these tiles; on the GBA that would cost palette banks
+    // the area can't spare, so the specks carry it.)
+    const X = x*16, Y = y*16;
+    // Specks in the rock art's greys (close to the web's #6a6a70 / #707078), so they add no new colours.
+    for(const [fx,fy,col] of [[0.2,0.3,'#707068'],[0.6,0.7,'#a0a098'],[0.8,0.2,'#707068'],[0.4,0.85,'#a0a098']]){
+      const px = X + Math.floor(fx*16), py = Y + Math.floor(fy*16);
+      c.set(px, py, hex(col)); c.set(px+1, py, hex(col));
+    }
   }
   // Buildings (as buildingHtml lays them out).
   for(const b of map.buildings){
@@ -137,7 +152,32 @@ const ROOM_ART = {house:{floor:'floor_house', wall:'wall_house', counter:'counte
   mart:{floor:'floor_mart', wall:'wall_mart', counter:'counter_mart', cend:'counter_end_mart'}};
 const DECO = {n:'deco_poster', m:'deco_map', w:'deco_window', K:'deco_clock'};
 const TALL_PIECES = new Set(['bookshelf', 'plant', 'shelf', 'healer', 'pc']);
+// Gyms (css: .room-gym, .gym-<theme>): the theme's floor art under everything, maze walls and statues on
+// it, plain painted walls, a rug and the exit mat.
+const GYM_WALL = {fire:['#e08858','#b05830'], water:['#a8d8f8','#6098d0'], ground:['#c8a060','#987038'], ghost:['#786098','#503870']};
+const GYM_RUG = {fire:'#f8c048', water:'#f8f8f8', ground:'#98b050', ghost:'#9870c8'};
+function drawGym(room){
+  const theme = room.theme || 'fire', c = new Canvas(room.w*16, room.h*16, [0,0,0]);
+  const at = (x,y)=>room.tiles[y] ? room.tiles[y][x] : '#';
+  const statues = [];
+  for(let y=0; y<room.h; y++) for(let x=0; x<room.w; x++){
+    const ch = at(x,y), X = x*16, Y = y*16;
+    if(ch==='#'){
+      if('#M'.includes(at(x,y+1)) || y+1>=room.h){ c.rect(X, Y, 16, 16, hex('#383040')); c.rect(X, Y+15, 16, 1, hex('#504858')); }
+      else { const [w1,w2] = GYM_WALL[theme]; c.rect(X, Y, 16, 12, hex(w1)); c.rect(X, Y+11, 16, 2, hex(w2)); c.rect(X, Y+13, 16, 3, hex('#584848')); }
+      continue;
+    }
+    c.draw(artPixels('gymfloor_' + theme), X, Y);
+    if(ch==='x' && G.TILE_ART['gymwall_' + theme]) c.draw(artPixels('gymwall_' + theme), X, Y);
+    else if(ch==='o') c.rect(X, Y, 16, 16, hex(GYM_RUG[theme]));
+    else if(ch==='M'){ for(let xx=0; xx<16; xx++) c.rect(X+xx, Y, 1, 16, hex(Math.floor(xx/2)%2 ? '#a03030' : '#c04848')); c.rect(X, Y, 16, 1, hex('#702020')); c.rect(X, Y+15, 16, 1, hex('#702020')); }
+    else if(ch==='u') statues.push([X, Y]);
+  }
+  for(const [X, Y] of statues) c.draw(artPixels('statue'), X, Y - 8);
+  return c;
+}
 function drawRoom(room){
+  if(room.interior==='gym') return drawGym(room);
   const art = ROOM_ART[room.interior], c = new Canvas(room.w*16, room.h*16, [0,0,0]);
   const at = (x,y)=>room.tiles[y] ? room.tiles[y][x] : '#';
   const pieces = [];
@@ -165,6 +205,22 @@ function drawRoom(room){
   return c;
 }
 
+// Trainers as the GBA sees them. Route trainers and gym juniors have their own team (role 'route' / 'junior');
+// a gym leader or rival fields the place's signature team (role 'leader' / 'rival'; startTrainerBattle).
+function trainerOut(n, loc){
+  if(n.id) return {kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:/#gym\d/.test(n.id) ? 'junior' : 'route', title:n.title, team:n.team,
+    intro:[`${n.title}: "${n.intro}"`], after:[`${n.title}: "${n.after}"`], vanish:false};
+  const leader = loc.type==='gym', name = loc.leaderName.toUpperCase();
+  const quote = leader ? `So, a new challenger has come to the ${loc.name.split(' ')[0]} Gym. Show me what your Pokémon can do!`
+    : (loc.desc.match(/"([^"]+)"/)||[])[1] || "Let's battle!";
+  const theme = leader ? (G.GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase() : '';
+  return {kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:leader ? 'leader' : 'rival', title:(leader ? 'GYM LEADER ' : 'RIVAL ') + name,
+    team:loc.leaderTeam, fill:leader && G.GYM_JUNIORS[theme] ? G.GYM_JUNIORS[theme].team : G.areaPool(loc),
+    intro:[`${name}: "${quote}"`],
+    after:leader ? [`${name}: "You've already beaten me. The road ahead is waiting for you!"`] : (loc.rivalAfter || []).map(l=>`${name}: ${l}`),
+    vanish:!!n.vanish};
+}
+
 fs.mkdirSync(OUT, {recursive:true});
 const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival']);
 const roomKinds = new Set(), trainerSpecies = new Set();
@@ -173,16 +229,19 @@ for(const li of AREAS){
   const loc = G.LOCATIONS[li], map = G.getMap(loc);
   fs.writeFileSync(path.join(OUT, `map_${li}.rgb`), drawArea(map).d);
   const nb = G.neighbours(li);
-  const people = map.npcs.filter(n=>!n.trainer), trainers = map.npcs.filter(n=>n.trainer && n.id);
+  const people = map.npcs.filter(n=>!n.trainer), trainers = map.npcs.filter(n=>n.trainer && !n.legend);
   for(const n of map.npcs) peopleKinds.add(n.kind);
-  for(const t of trainers) t.team.forEach(s=>trainerSpecies.add(s));
+  for(const t of trainers.map(n=>trainerOut(n, loc))) [...t.team, ...(t.fill || [])].forEach(s=>trainerSpecies.add(s));
   const doors = map.buildings.map((b, bi)=>{
     const room = G.getInterior(loc, bi);
     roomKinds.add(room.interior);
     for(const n of room.npcs) peopleKinds.add(n.kind);
-    rooms.push({area:li, building:bi, kind:room.interior, home:!!b.home, w:room.w, h:room.h, tiles:room.tiles.map(r=>r.join('')),
+    const roomTrainers = room.npcs.filter(n=>n.trainer).map(n=>trainerOut(n, loc));
+    for(const t of roomTrainers) [...t.team, ...(t.fill || [])].forEach(s=>trainerSpecies.add(s));
+    rooms.push({area:li, building:bi, kind:room.interior, theme:room.theme, home:!!b.home, w:room.w, h:room.h, tiles:room.tiles.map(r=>r.join('')),
+      trainers:roomTrainers, gym:room.interior==='gym' ? {name:loc.name.toUpperCase(), leader:loc.leaderName.toUpperCase()} : null,
       behaviour:room.tiles.map(r=>r.map(behaviour)), spawn:room.spawn, door:{x:b.door.x, y:b.door.y},
-      people:room.npcs.map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:n.role || '', wander:!!n.wander, lines:lines(n)})),
+      people:room.npcs.filter(n=>!n.trainer).map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:n.role || '', wander:!!n.wander, lines:lines(n)})),
       things:room.tiles.flatMap((r,y)=>r.map((ch,x)=>({x, y, text:G.THING_TEXT[(G.TILE_CLS[ch]||'').split(' ')[0]]})).filter(t=>t.text))});
     return {x:b.door.x, y:b.door.y, kind:b.kind, room:rooms.length-1};
   });
@@ -191,11 +250,12 @@ for(const li of AREAS){
   map.tiles.forEach((r,y)=>r.forEach((ch,x)=>{ if(ch==='I' && !items.some(i=>i.x===x && i.y===y)) items.push({x, y, id:'pokeball'}); }));
   areas.push({index:li, name:loc.name, type:loc.type, w:map.w, h:map.h, desc:loc.desc,
     tiles:map.tiles.map(r=>r.join('')), behaviour:map.tiles.map(r=>r.map(behaviour)),
-    links:nb.map(n=>({to:n.exit.to, dir:n.exit.dir, ox:n.ox, oy:n.oy, w:n.map.w, h:n.map.h, name:G.LOCATIONS[n.exit.to].name})),
+    links:nb.map(n=>({to:n.exit.to, dir:n.exit.dir, ox:n.ox, oy:n.oy, w:n.map.w, h:n.map.h, name:G.LOCATIONS[n.exit.to].name, gate:!!n.exit.gate})),
+    gate_kind:loc.type==='gym' ? 'gym' : loc.type==='trainer' ? 'rival' : '', leader_name:loc.leaderName ? loc.leaderName.toUpperCase() : '',
     signs:map.signs.map(s=>({x:s.x, y:s.y, text:s.text, route:!!s.route})),
     doors, items,
     people:people.map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
-    trainers:trainers.map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, title:n.title, team:n.team, intro:n.intro, after:n.after})),
+    trainers:trainers.map(n=>trainerOut(n, loc)),
     spawn:map.spawn, pool:loc.pool || [], tier:loc.tier ?? li});
 }
 for(const kind of roomKinds){
@@ -230,6 +290,9 @@ for(const name of [...usedSpecies]){
   let d = G.DEX.find(e=>e.name===name), e;
   while(d && (e = evoOf(d)) && e.to && e.level && !usedSpecies.has(e.to)){ usedSpecies.add(e.to); d = G.DEX.find(x=>x.name===e.to); }
 }
+// Catch rates (PokeAPI pokemon_species.csv, vendored in data/capture_rates.json): the web game has none, so
+// the GBA uses Emerald's formula with each species' real rate.
+const CAPTURE = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'capture_rates.json'), 'utf8'));
 const moveIdx = new Map(), moves = [];
 const addMove = m=>{ const k = m.n; if(!moveIdx.has(k)){ moveIdx.set(k, moves.length); moves.push(m); } return moveIdx.get(k); };
 addMove(G.STRUGGLE);
@@ -238,14 +301,16 @@ const species = [...usedSpecies].map(name=>{
   if(!d) throw new Error('no species ' + name);
   const num = G.DEX_NUM[G.slug(d.name)];
   const evo = evoOf(d);
-  return {name:d.name, num, types:d.types, base:d.base, evo:evo && evo.to && evo.level && usedSpecies.has(evo.to) ? evo : null,
+  const rate = CAPTURE[G.slug(d.name)] ?? CAPTURE[G.slug(d.name).replace(/-.*/, '')] ?? 45;
+  return {name:d.name, num, types:d.types, base:d.base, capture:rate, evo:evo && evo.to && evo.level && usedSpecies.has(evo.to) ? evo : null,
     learn:(d.learn || []).filter(([lv])=>lv<=100).map(([lv, mi])=>[lv, addMove(G.MOVEDATA[mi])])};
 });
 
 fs.writeFileSync(path.join(OUT, 'data.json'), JSON.stringify({
   areas, rooms, people, species, moves, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
-  starters:G.STARTER_TRIOS[2], prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO,
+  starters:G.STARTER_TRIOS[2], prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO, prof_calls:G.PROF_CALLS,
   art:Object.fromEntries(['battle_bg', 'plat_enemy_l', 'plat_enemy_m', 'plat_enemy_r', 'plat_player_l', 'plat_player_m', 'plat_player_r',
     'forest_fill', 'grass_v0', 'floor_house'].map(n=>[n, G.TILE_ART[n]])),
+  ball:svgPixels(G.BALL_SVG).px,
 }));
 console.log(`export: ${areas.length} areas, ${rooms.length} rooms, ${species.length} species, ${moves.length} moves, ${Object.keys(people).length} people`);

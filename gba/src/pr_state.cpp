@@ -3,13 +3,15 @@
 #include "bn_common.h"
 #include "bn_sram.h"
 
+#include "pr_world_data.h"
+
 namespace pr
 {
 
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 2;
+    constexpr int save_version = 3;
 
     struct save_block
     {
@@ -126,6 +128,20 @@ int game_state::average_level() const
         sum += party[i].level;
     }
     return (sum + party_count / 2) / party_count;
+}
+
+int game_state::badges() const
+{
+    int n = 0;
+    for(int i = 0; i < world_data::areas_count; ++i)
+    {
+        const map_def& m = world_data::maps[i];
+        if(m.gate == gate_kind::GYM && m.leader_id >= 0)
+        {
+            n += beaten.test(m.leader_id);
+        }
+    }
+    return n;
 }
 
 bool save_exists()

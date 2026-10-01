@@ -3,7 +3,8 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Test build **0.2**: the opening of the game (home town and Route 1), built on the web game's own data.
+Test build **0.3**: the opening of the game up to the first badge (Duskmere Hollow, Route 1, Fernway Overlook
+and Cindergate Town with its gym), built on the web game's own data.
 
 ## What's in this build
 
@@ -20,7 +21,14 @@ Test build **0.2**: the opening of the game (home town and Route 1), built on th
 - **Battles as in the web game:** your whole party against a wild pack (1 up to half your party, at most 4)
   or a trainer's team. Every Pokémon gets a command, then everyone acts in speed order. You pick targets and
   can use the BAG (POKé BALLS and medicine). The web game's damage, type chart, accuracy, status effects,
-  catch odds, EXP, level-ups, new moves, evolution and prize money all apply.
+  EXP, level-ups, new moves, evolution and prize money all apply.
+- **Fernway Overlook and Cindergate Town:** your rival WREN waits on the Overlook and won't let you into
+  Cindergate until you beat them. Cindergate has its own POKéMON CENTER, MART and houses, and a Fire gym
+  where GYM LEADER RELL gives you your first badge. Gym statues, the professor's call after your first
+  badge, and the next route held shut until you beat the leader all follow the web game.
+- **Catching as in Emerald:** each species has its real catch rate, and the odds use Gen 3's formula
+  (lower HP and status help a lot). POKé BALLS are thrown before anyone attacks, and the ball arcs,
+  shakes up to three times and clicks shut, or the Pokémon breaks free.
 - **Emerald's screens and menus:** text prints letter by letter with the ▼ prompt. The START menu, YES/NO
   boxes, battle command and move windows, party screen, summary, bag and save window all sit where Emerald
   puts them, styled after the web game.
@@ -28,8 +36,12 @@ Test build **0.2**: the opening of the game (home town and Route 1), built on th
   spot first. Also ledge hops, tall grass over your legs, signs and item balls.
 - **Saving** to cartridge SRAM from START > SAVE.
 
-Not yet: gyms and the rest of the region, the rival, PP and abilities, the POKéDEX screen, music and sound.
-Areas past Route 1 show a "not in this test build yet" message. Saves from 0.1 aren't compatible.
+Not yet: the rest of the region, PP and abilities, the POKéDEX screen, music and sound. Areas past
+Cindergate show a "not in this test build yet" message. Saves from 0.2 and earlier aren't compatible.
+
+Catching differs from the web game on purpose: the web game uses a flat 25% chance at full HP for every
+species, so a ball thrown at a healthy Pokémon usually failed. The GBA build uses Emerald's formula instead
+(for example about 34% at full HP for Route 1's common Pokémon, 78% at half HP and nearly certain at 1/5).
 
 ## Building
 

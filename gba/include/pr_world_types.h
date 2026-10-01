@@ -33,7 +33,8 @@ enum class behaviour : uint8_t
     ITEM,
     COUNTER,        // talk across it
     PC,
-    MAT             // a room's exit
+    MAT,            // a room's exit
+    STATUE          // a gym's statue (its name, leader and winners)
 };
 
 // Building kinds, as the web game names them (buildTown).
@@ -95,20 +96,43 @@ struct person
     int8_t lines_count;
 };
 
-// A route trainer (buildRoute): watches up to 5 tiles ahead and battles with the first `party size`
-// Pokémon of their team.
+// Who a trainer is (startTrainerBattle): route trainers and gym juniors bring their own team; a gym leader
+// or rival brings the place's signature team, filled out to your party's size.
+enum class trainer_role : uint8_t
+{
+    ROUTE,
+    JUNIOR,
+    LEADER,
+    RIVAL
+};
+
+// A trainer: watches up to 5 tiles ahead and battles you when they see you.
 struct trainer
 {
     int8_t x;
     int8_t y;
     person_kind kind;
     direction facing;
+    trainer_role role;
     const char* title;
     const species_id* team;
     int8_t team_count;
-    const char* intro;
-    const char* after;
+    const species_id* fill;         // leaders and rivals: extra Pokémon to match your party's size
+    int8_t fill_count;
+    const char* const* intro;
+    int8_t intro_count;
+    const char* const* after;       // said when you talk to them after (a rival says it, then leaves)
+    int8_t after_count;
+    bool vanish;                    // a rival leaves once beaten
     int8_t id;                      // bit in game_state::beaten
+};
+
+// What holds a place's exit shut (linkAreas gate): its rival, or its gym's leader.
+enum class gate_kind : uint8_t
+{
+    NONE,
+    GYM,
+    RIVAL
 };
 
 struct item_ball
@@ -138,6 +162,7 @@ struct link
     int16_t w;
     int16_t h;
     const char* name;
+    bool gate;                      // shut until this place's leader or rival is beaten
 };
 
 // An area or a room.
@@ -171,6 +196,10 @@ struct map_def
     int8_t exit_map;                // rooms: the area outside, and the door you came in by
     int8_t exit_x;
     int8_t exit_y;
+    int8_t leader_id;               // the trainer id of this place's rival or gym leader, or -1
+    gate_kind gate;
+    const char* place_name;         // gyms: the town, for the statues
+    const char* leader_name;
 
     [[nodiscard]] bool is_room() const
     {

@@ -297,7 +297,7 @@ void title_scene()
         u.win().box(window_style::WINDOW, 3, 2, 24, 6);
         u.text().set_center_alignment();
         u.print(120, 26, "PARTY ROYALE", text_color::INK, title);
-        u.print(120, 42, "GBA test build 0.2", text_color::INK, title);
+        u.print(120, 42, "GBA test build 0.3", text_color::INK, title);
         bn::vector<bn::sprite_ptr, 16> press;
         u.print(120, 124, "PRESS START", text_color::WHITE, press);
         u.text().set_left_alignment();

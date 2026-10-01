@@ -76,5 +76,5 @@ stick with it, or use Export/Import Save Code to move a save between them).
 ## Game Boy Advance version
 
 `gba/` builds a real GBA ROM (for Delta, mGBA or a flash cart) from this game's own maps, art and
-Pokémon data. It covers the opening for now: the home town and its buildings, Route 1 with its trainers,
-party battles and saving. See `gba/README.md`.
+Pokémon data. It covers the game up to the first badge: the home town, Route 1, Fernway Overlook with
+the rival, and Cindergate Town with its Fire gym, plus party battles, catching and saving. See `gba/README.md`.

@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 GBA = os.path.dirname(HERE)
 ROOT = os.path.dirname(GBA)
-AREAS = [0, 1]          # Duskmere Hollow, Route 1
+AREAS = [0, 1, 2, 3]    # Duskmere Hollow, Route 1, Fernway Overlook, Cindergate Town
 MAP_BANKS = 15          # BG palette banks a map tileset may use; the 16th is the UI's
 ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'hyperpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal',
             'revive', 'fullrestore']
@@ -273,6 +273,47 @@ def build_world(exp, data, out_inc):
     for i, r in enumerate(rooms):
         room_index[(r['area'], r['building'])] = len(areas) + i
 
+    # Trainer ids (bits in game_state::beaten), areas first then rooms; each area's gate keeper is its rival
+    # or its gym's leader.
+    ids = {}
+    for ai, a in enumerate(areas):
+        for ti in range(len(a['trainers'])):
+            ids[('area', ai, ti)] = len(ids)
+    for ri, r in enumerate(rooms):
+        for ti in range(len(r['trainers'])):
+            ids[('room', ri, ti)] = len(ids)
+    if len(ids) > 64:
+        raise SystemExit('%d trainers (max 64)' % len(ids))
+    def leader_of(ai):
+        a = areas[ai]
+        for ti, t in enumerate(a['trainers']):
+            if t['role'] in ('rival', 'leader'):
+                return ids[('area', ai, ti)]
+        for ri, r in enumerate(rooms):
+            if r['area'] == a['index']:
+                for ti, t in enumerate(r['trainers']):
+                    if t['role'] == 'leader':
+                        return ids[('room', ri, ti)]
+        return -1
+
+    def trainer_rows(p, trainers, key):
+        rows = []
+        for ti, t in enumerate(trainers):
+            q = '%strainer%d_' % (p, ti)
+            L.append('constexpr species_id %steam[] = {%s};' % (q, ', '.join('species_id::%s' % enum_name(n) for n in t['team'])))
+            fill = t.get('fill') or []
+            L.append('constexpr species_id %sfill[] = {%s};' % (q, ', '.join('species_id::%s' % enum_name(n) for n in fill) or 'species_id::PIDGEY'))
+            intro = lines_array(q + 'intro', t['intro'])
+            after = lines_array(q + 'after', t['after']) if t['after'] else 0
+            if not t['after']:
+                L.append('constexpr const char* %safter[] = {""};' % q)
+            rows.append('{%d, %d, person_kind::%s, direction::%s, trainer_role::%s, %s, %steam, %d, %sfill, %d, %sintro, %d, '
+                        '%safter, %d, %s, %d}' % (
+                t['x'], t['y'], t['kind'], t['facing'].upper(), t['role'].upper(), c_text(t['title']), q, len(t['team']),
+                q, len(fill), q, intro, q, after, 'true' if t['vanish'] else 'false', ids[key + (ti,)]))
+        L.append('constexpr trainer %strainers[] = {%s};' % (p, nonempty(', '.join(rows),
+            '{0, 0, person_kind::player, direction::DOWN, trainer_role::ROUTE, "", nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, false, 0}')))
+
     for ai, (a, mm) in enumerate(zip(areas, area_meta)):
         p = 'map%d_' % ai
         L.append('constexpr uint16_t %smap[] = {%s};' % (p, ', '.join(map(str, mm))))
@@ -280,23 +321,15 @@ def build_world(exp, data, out_inc):
         # Town signs read their name and then the place's description (owInteract); route signs just point.
         desc = re.sub(r'\s*"[^"]*"\s*', ' ', a['desc']).strip()
         signs = []
-        for si, s in enumerate(a['signs']):
-            count = lines_array('%ssign%d_lines' % (p, si), [s['text']] if s['route'] else [s['text'], desc])
-            signs.append('{%d, %d, %ssign%d_lines, %d}' % (s['x'], s['y'], p, si, count))
+        for si, sg in enumerate(a['signs']):
+            count = lines_array('%ssign%d_lines' % (p, si), [sg['text']] if sg['route'] else [sg['text'], desc])
+            signs.append('{%d, %d, %ssign%d_lines, %d}' % (sg['x'], sg['y'], p, si, count))
         L.append('constexpr sign %ssigns[] = {%s};' % (p, nonempty(', '.join(signs), '{0, 0, nullptr, 0}')))
         L.append('constexpr door %sdoors[] = {%s};' % (p, nonempty(', '.join(
             '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
             for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
         people_rows(p, a['people'])
-        trs = []
-        for ti, t in enumerate(a['trainers']):
-            L.append('constexpr species_id %strainer%d_team[] = {%s};' % (p, ti, ', '.join('species_id::%s' % enum_name(s) for s in t['team'])))
-            trs.append('{%d, %d, person_kind::%s, direction::%s, %s, %strainer%d_team, %d, %s, %s, %d}' % (
-                t['x'], t['y'], t['kind'], t['facing'].upper(), c_text(t['title']), p, ti, len(t['team']),
-                c_text(t['intro']), c_text(t['after']), trainer_count))
-            trainer_count += 1
-        L.append('constexpr trainer %strainers[] = {%s};' % (p, nonempty(', '.join(trs),
-            '{0, 0, person_kind::player, direction::DOWN, "", nullptr, 0, "", "", 0}')))
+        trainer_rows(p, a['trainers'], ('area', ai))
         its = []
         for it in a['items']:
             its.append('{%d, %d, item_id::%s, %d}' % (it['x'], it['y'], it['id'].upper(), item_count))
@@ -305,37 +338,44 @@ def build_world(exp, data, out_inc):
         links = []
         for ln in a['links']:
             target = AREAS.index(ln['to']) if ln['to'] in AREAS else -1
-            links.append('{%d, %d, %d, %d, %d, %s}' % (target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper())))
-        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, ""}')))
-        pool = ', '.join('species_id::%s' % enum_name(s) for s in a['pool'])
+            links.append('{%d, %d, %d, %d, %d, %s, %s}' % (target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper()),
+                                                        'true' if ln['gate'] else 'false'))
+        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, "", false}')))
+        pool = ', '.join('species_id::%s' % enum_name(n) for n in a['pool'])
         L.append('constexpr species_id %spool[] = {%s};\n' % (p, pool or 'species_id::PIDGEY'))
+        gate = {'gym': 'GYM', 'rival': 'RIVAL'}.get(a['gate_kind'], 'NONE')
         map_rows.append('{%s, 0, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
-                        'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0}' % (
+                        'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0, %d, gate_kind::%s, %s, %s}' % (
             c_text(a['name'].upper()), a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
             p, len(a['trainers']), p, len(a['items']), p, len(a['links']), p, len(a['pool']),
-            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4)))
+            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4), leader_of(ai), gate,
+            c_text(a['name'].upper()), c_text(a['leader_name'])))
 
     for ri, r in enumerate(rooms):
         p = 'room%d_' % ri
         L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in r['behaviour'] for v in row)))
         people_rows(p, r['people'])
+        trainer_rows(p, r['trainers'], ('room', ri))
         things = []
         for ti, t in enumerate(r['things']):
             count = lines_array('%sthing%d_lines' % (p, ti), t['text'])
             things.append('{%d, %d, %sthing%d_lines, %d}' % (t['x'], t['y'], p, ti, count))
         L.append('constexpr thing %sthings[] = {%s};\n' % (p, nonempty(', '.join(things), '{0, 0, nullptr, 0}')))
         area = AREAS.index(r['area'])
-        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART'}.get(r['kind'], 'HOUSE')
-        map_rows.append('{%s, %d, %d, %d, ts_%s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, nullptr, 0, nullptr, 0, '
-                        '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d}' % (
-            c_text(name), room_tileset[r['kind']], r['w'], r['h'], r['kind'], p, p, len(r['people']), p, len(r['things']),
-            r['spawn']['x'], r['spawn']['y'], 8, area, r['door']['x'], r['door']['y']))
+        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART', 'gym': 'POKéMON GYM'}.get(r['kind'], 'HOUSE')
+        gym = r.get('gym') or {}
+        map_rows.append('{%s, %d, %d, %d, ts_%s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
+                        '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d, %d, gate_kind::NONE, %s, %s}' % (
+            c_text(name), room_tileset[r['kind']], r['w'], r['h'], r['kind'], p, p, len(r['people']), p, len(r['trainers']),
+            p, len(r['things']), r['spawn']['x'], r['spawn']['y'], min(50, 8 + areas[area]['tier'] * 4), area,
+            r['door']['x'], r['door']['y'], leader_of(area) if r['kind'] == 'gym' else -1,
+            c_text(gym.get('name', '')), c_text(gym.get('leader', ''))))
     # Room metatile maps go before the map table (shared by every room of a kind).
     room_maps = ['constexpr uint16_t ts_%s_map[] = {%s};' % (k, ', '.join(map(str, v))) for k, v in sorted(room_meta.items())]
     L += room_maps
     L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows))
     L.append('constexpr int areas_count = %d;' % len(areas))
-    L.append('constexpr int trainers_count = %d;' % trainer_count)
+    L.append('constexpr int trainers_count = %d;' % len(ids))
     L.append('constexpr int items_count = %d;\n' % item_count)
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_world_data.h'), '\n'.join(L))
@@ -440,7 +480,7 @@ def build_people(data, gfx):
                 img = Image.new('RGBA', (16, 32), (0, 0, 0, 0))
                 img.alpha_composite(person_frame(f), (0, 10 + f['dy']))
                 frames.append(img)
-        save_sprite(gfx, 'person_' + kind, frames, 16, 32)
+        save_sprite(gfx, 'person_' + kind.lower(), frames, 16, 32)     # Butano wants lowercase names
     # The professor in the intro, at twice the size (the web game draws him scaled up on a dark stage).
     big = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
     big.alpha_composite(person_frame(data['people']['prof']['down'][0], 2), (16, 64 - 42))
@@ -535,6 +575,8 @@ def build_ui_tiles(out_inc):
          'constexpr bn::color colors[] = {%s};\n' % ', '.join(c_color(c) for c in pal), '}\n\n#endif']
     write_if_changed(os.path.join(out_inc, 'pr_ui_data.h'), '\n'.join(L))
 
+BALL = []
+
 def build_small_sprites(gfx):
     # Menu cursor: the web game's ▶ in ink (#383840) with its light shadow.
     cur = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
@@ -560,6 +602,14 @@ def build_small_sprites(gfx):
     d.rectangle((7, 8, 8, 9), fill=(0xe0, 0x30, 0x30, 255))
     d.polygon([(6, 11), (9, 11), (7, 14)], fill=(0x30, 0x28, 0x30, 255))
     save_sprite(gfx, 'bang', [b], 16, 16)
+    # The web game's POKé BALL (BALL_SVG, 12x12) in a 16x16 sprite.
+    b = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+    px = b.load()
+    for y, row in enumerate(BALL):
+        for x, c in enumerate(row):
+            if c:
+                px[x + 2, y + 2] = tuple(c) + (255,)
+    save_sprite(gfx, 'ball', [b], 16, 16)
     # HP bar segments: 8x8, fill 0-8 px, in green, yellow and red (27 frames), on the web game's trough.
     frames = []
     for col in ((88, 208, 128), (248, 216, 56), (240, 72, 56)):
@@ -674,10 +724,10 @@ def build_game_data(data, out_inc):
         evo = s['evo']
         evo_to = names.index(evo['to']) if evo and evo['to'] in names else -1
         t2 = types.index(s['types'][1]) if len(s['types']) > 1 else -1
-        L.append('    {%s, %d, %d, %d, {%d, %d, %d, %d, %d, %d}, learn_%d, %d, %d, %d, bn::sprite_items::mon_front_%d, bn::sprite_items::mon_back_%d},' % (
+        L.append('    {%s, %d, %d, %d, {%d, %d, %d, %d, %d, %d}, learn_%d, %d, %d, %d, %d, bn::sprite_items::mon_front_%d, bn::sprite_items::mon_back_%d},' % (
             c_text(s['name'].upper()), s['num'], types.index(s['types'][0]), t2,
             b['hp'], b['atk'], b['def'], b['spa'], b['spd'], b['spe'], s['num'], max(1, len(s['learn'])),
-            evo_to, evo['level'] if evo_to >= 0 else 0, s['num'], s['num']))
+            evo_to, evo['level'] if evo_to >= 0 else 0, s['capture'], s['num'], s['num']))
     L.append('};\n')
     # Items (ITEM_INFO): name, pocket, description, price, and what they do.
     its = []
@@ -690,7 +740,10 @@ def build_game_data(data, out_inc):
     L.append('constexpr item_id mart_stock[] = {%s};\n' % ', '.join('item_id::%s' % i.upper() for i in MART_STOCK))
     L.append('constexpr species_id starters[] = {%s};' % ', '.join('species_id::%s' % enum_name(n) for n in data['starters']))
     L.append('constexpr const char* prof_name = %s;' % c_text(data['prof']))
-    L.append('constexpr const char* intro_lines[] = {%s};\n' % ', '.join(c_text(l) for l in data['intro']))
+    L.append('constexpr const char* intro_lines[] = {%s};' % ', '.join(c_text(l) for l in data['intro']))
+    call = data['prof_calls'][0]
+    L.append('// The professor\'s call after the first badge (PROF_CALLS).')
+    L.append('constexpr const char* first_badge_call[] = {%s};\n' % ', '.join(c_text(data['prof'] + ': ' + l) for l in call['lines']))
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_game_data.h'), '\n'.join(L))
 
@@ -705,9 +758,9 @@ def build_game_data(data, out_inc):
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']
     write_if_changed(os.path.join(out_inc, 'pr_ids.h'), '\n'.join(E))
     P = ['// Generated by tools/build_assets.py; do not edit.', '#ifndef PR_PEOPLE_SPRITES_H\n#define PR_PEOPLE_SPRITES_H\n']
-    P += ['#include "bn_sprite_items_person_%s.h"' % k for k in kinds]
+    P += ['#include "bn_sprite_items_person_%s.h"' % k.lower() for k in kinds]
     P += ['\nnamespace pr\n{\n', 'constexpr const bn::sprite_item* person_sprites[] = {%s};\n' %
-          ', '.join('&bn::sprite_items::person_%s' % k for k in kinds), '}\n', '#endif']
+          ', '.join('&bn::sprite_items::person_%s' % k.lower() for k in kinds), '}\n', '#endif']
     write_if_changed(os.path.join(out_inc, 'pr_people_sprites.h'), '\n'.join(P))
 
 def inputs_hash():
@@ -745,6 +798,7 @@ def main():
     build_ui_tiles(inc)
     build_people(data, gfx)
     build_mons(data, gfx)
+    BALL.extend(data['ball'])
     build_small_sprites(gfx)
     build_grass_front(data, gfx)
     build_backgrounds(data, gfx)

@@ -78,6 +78,7 @@ struct species
     int16_t learnset_count;
     int8_t evolves_to;        // index into species_list, -1 if none in this build
     uint8_t evolve_level;
+    uint8_t capture_rate;     // Emerald's catch rate (PokeAPI), 3-255
     const bn::sprite_item& front;
     const bn::sprite_item& back;
 };

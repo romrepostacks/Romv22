@@ -17,6 +17,7 @@ constexpr int name_length = 7;          // Emerald's player names
 // Story progress (the web game's adv.starterPending / adv.starterThanks).
 constexpr uint8_t story_starter = 1;    // got a partner from the professor's bag
 constexpr uint8_t story_thanks = 2;     // the professor still has to thank you after the first battle
+constexpr uint8_t story_call1 = 4;      // the professor's call after the first badge (PROF_CALLS)
 
 template<int Bits>
 struct bitset
@@ -55,6 +56,8 @@ struct game_state
     uint8_t box_count = 0;
     bool mart_gift = false;             // the clerk's free POKé BALLS (talkTo: restockedLoc)
     uint8_t story = 0;                  // story_* bits
+    int8_t walk_off = -1;               // a beaten rival (trainer id) who still has to say goodbye and leave
+    uint8_t padding[3] = {};
     uint32_t money = 3000;              // introFinish(): ₽3000
     uint32_t play_frames = 0;
     char name[name_length + 1] = {};
@@ -77,6 +80,7 @@ struct game_state
         return items[int(id)];
     }
     [[nodiscard]] int average_level() const;
+    [[nodiscard]] int badges() const;           // gym leaders beaten (badgeCount)
 };
 
 // The one game in progress.
