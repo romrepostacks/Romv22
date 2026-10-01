@@ -242,6 +242,7 @@ namespace
                 int x = r.tx * 8, y = r.ty * 8;
                 bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(x + (k ? 10 : 14)), sy(y + (k ? 8 : 12)));
                 icon.set_bg_priority(0);
+                icon.set_z_order(1);        // under the name's text
                 _icons.push_back(icon);
                 _icon_y[_icons.size() - 1] = y + (k ? 8 : 12);
                 _icon_slot[_icons.size() - 1] = k;
@@ -249,7 +250,7 @@ namespace
                 lv.append(bn::to_string<4>(m.level));
                 if(k == 0)
                 {
-                    u.print(x + 30, y + 5, m.name(), text_color::WHITE, _texts);
+                    u.print_fit_slide(x + 30, x + 5, x + r.tw * 8 - 4, y + 5, m.name(), text_color::WHITE, _texts);
                     u.print(x + 36, y + 22, lv, text_color::WHITE, _texts, true);
                     draw_hp_bar(_bars[k], x + 8, y + 36, 8, m.hp, m.max_hp);
                     bn::string<16> hp(bn::to_string<4>(m.hp));
@@ -259,12 +260,7 @@ namespace
                 }
                 else
                 {
-                    bn::string<16> name(m.name());
-                    while(name.size() > 3 && u.width(name, true) > 44)
-                    {
-                        name.pop_back();
-                    }
-                    u.print(x + 22, y + 2, name, text_color::WHITE, _texts, true);
+                    u.print_fit_slide(x + 22, x + 3, x + r.tw * 8 - 1, y + 2, m.name(), text_color::WHITE, _texts, true);
                     u.print(x + 22, y + 12, lv, text_color::WHITE, _texts, true);
                     draw_hp_bar(_bars[k], x + 44, y + 14, 3, m.hp, m.max_hp);
                 }
@@ -470,7 +466,7 @@ void summary_screen(const mon* mons, int count, int index)
                 u.print(196, 4, "< PAGE >", text_color::WHITE, texts, true);
                 mon_sprite = m.data().front.create_sprite(sx(44), sy(56));
                 mon_sprite->set_bg_priority(1);
-                u.print(6, 92, m.name(), text_color::INK, texts);
+                u.print_fit(6, 92, m.name(), 76, text_color::INK, texts);
                 bn::string<16> lv("Lv");
                 lv.append(bn::to_string<4>(m.level));
                 u.print(6, 108, lv, text_color::INK, texts);
@@ -479,7 +475,10 @@ void summary_screen(const mon* mons, int count, int index)
                 auto line = [&](int i, const char* label, const bn::string_view& value)
                 {
                     u.print(98, 30 + i * 17, label, text_color::INK, texts);
-                    u.print(232 - u.width(value), 30 + i * 17, value, text_color::INK, texts);
+                    // The value right-aligned after its label, in a smaller font if it's long (ability names).
+                    int room = 232 - (98 + u.width(label) + 6);
+                    int w = u.fit_width(value, room);
+                    u.print_fit(232 - w, 30 + i * 17, value, room, text_color::INK, texts);
                 };
                 if(page == 0)
                 {
@@ -518,7 +517,7 @@ void summary_screen(const mon* mons, int count, int index)
                     for(int i = 0; i < m.move_count; ++i)
                     {
                         const move& mv = move_data(m.moves[i]);
-                        u.print(98, 28 + i * 30, mv.name, text_color::INK, texts);
+                        u.print_fit(98, 28 + i * 30, mv.name, 136, text_color::INK, texts);
                         u.print(100, 43 + i * 30, type_name(mv.type), text_color::BLUE, texts, true);
                         if(mv.power)
                         {
@@ -632,9 +631,9 @@ int bag_screen(bag_mode mode)
                         break;
                     }
                     const item_info& it = game_data::items[ids[i]];
-                    u.print(126, y, it.name, text_color::INK, texts, true);
                     bn::string<8> n("x");
                     n.append(bn::to_string<4>(g.items[ids[i]]));
+                    u.print_fit(126, y, it.name, 232 - u.width(n, true) - 4 - 126, text_color::INK, texts, true);
                     u.print(232 - u.width(n, true), y, n, text_color::INK, texts, true);
                 }
                 cursor = bn::sprite_items::cursor.create_sprite(sx(118 + 4), sy(13 + index * 15 + 6));
@@ -898,12 +897,7 @@ namespace
                     icon.set_scale(bn::fixed(0.75));
                     icon.set_bg_priority(0);
                     _party_icons.push_back(icon);
-                    bn::string<16> name(m.name());
-                    while(name.size() > 3 && u.width(name, true) > 44)
-                    {
-                        name.pop_back();
-                    }
-                    u.print(tx * 8 + 22, ty * 8 + 3, name, text_color::INK, _texts, true);
+                    u.print_fit_slide(tx * 8 + 22, tx * 8 + 3, tx * 8 + tw * 8 - 1, ty * 8 + 3, m.name(), text_color::INK, _texts, true);
                     bn::string<8> lv("Lv");
                     lv.append(bn::to_string<4>(m.level));
                     u.print(tx * 8 + 22, ty * 8 + 12, lv, text_color::INK, _texts, true);
@@ -975,10 +969,10 @@ namespace
             u.win().box(window_style::WINDOW, 0, 11, 11, 6);
             if(shown)
             {
-                u.print(6, 92, shown->name(), text_color::INK, _info, true);
+                u.print_fit(6, 92, shown->name(), 76, text_color::INK, _info, true);
                 bn::string<24> sp("/");
                 upper(sp, shown->species_name());
-                u.print(6, 104, sp, text_color::INK, _info, true);
+                u.print_fit(6, 104, sp, 76, text_color::INK, _info, true);
                 bn::string<8> lv("Lv");
                 lv.append(bn::to_string<4>(shown->level));
                 u.print(6, 116, lv, text_color::INK, _info, true);
@@ -1009,7 +1003,7 @@ namespace
                 msg.append("/30");
             }
         }
-        u.print(92, 145, msg, text_color::INK, _info, true);
+        u.print_fit(92, 145, msg, 144, text_color::INK, _info, true);
         place_hand();
     }
 
@@ -1514,13 +1508,8 @@ namespace
 
     int seen_count()
     {
-        game_state& g = state();
-        int n = 0;
-        for(int i = 0; i < game_data::dex_order_count; ++i)
-        {
-            n += g.seen.test(game_data::dex_order[i]);
-        }
-        return n;
+        // Every species seen, regional forms included (the web game's Object.keys(adv.seen)).
+        return state().seen.count();
     }
 
     // An entry page. Returns when B (or A on CANCEL) is pressed; Up/Down move to other seen species.
@@ -1577,7 +1566,7 @@ namespace
                     line.append(bn::to_string<4>(sp.dex_number));
                     line.append(" ");
                     line.append(sp.name);
-                    u.print(88, 30, line, text_color::INK, texts);
+                    u.print_fit(88, 30, line, 144, text_color::INK, texts);
                     bn::string<32> genus;
                     if(owned && sp.genus[0])
                     {
@@ -1588,7 +1577,7 @@ namespace
                         genus = "?????";
                     }
                     genus.append(" POKéMON");
-                    u.print(88, 46, genus, text_color::INK, texts);
+                    u.print_fit(88, 46, genus, 144, text_color::INK, texts);
                     bn::string<24> ht("HT  ");
                     bn::string<24> wt("WT  ");
                     if(owned && sp.height)
@@ -1876,25 +1865,14 @@ void dex_screen(int register_species)
                         int s = game_data::dex_order[i];
                         const species& sp = game_data::species_list[s];
                         int y = -8 + r * 16 + 4;
-                        bn::string<32> line("No");
-                        if(sp.dex_number < 100) line.append("0");
-                        if(sp.dex_number < 10) line.append("0");
-                        line.append(bn::to_string<4>(sp.dex_number));
-                        line.append(" ");
-                        if(g.seen.test(s))
-                        {
-                            line.append(sp.name);
-                        }
-                        else
-                        {
-                            line.append("----------");
-                        }
-                        // Cut a long name short at the screen's edge.
-                        while(u.width(line, true) > 91)
-                        {
-                            line.pop_back();
-                        }
-                        u.print(148, y, line, text_color::INK, texts, true);
+                        bn::string<8> number("No");
+                        if(sp.dex_number < 100) number.append("0");
+                        if(sp.dex_number < 10) number.append("0");
+                        number.append(bn::to_string<4>(sp.dex_number));
+                        u.print(148, y, number, text_color::INK, texts, true);
+                        int nx = 148 + u.width(number, true) + 3;
+                        u.print_fit(nx, y, g.seen.test(s) ? bn::string_view(sp.name) : bn::string_view("----------"), 238 - nx,
+                                    text_color::INK, texts, true);
                         if(g.owned.test(s) && ! balls.full())
                         {
                             bn::sprite_ptr b = bn::sprite_items::badge.create_sprite(sx(143), sy(y + 4), 1);
@@ -2374,7 +2352,10 @@ void credits_screen()
             s.set_bg_priority(1);
             hof.push_back(s);
             // (The small font is always drawn from the left: centre it by hand.)
-            u.print(x - u.width(m.name(), true) / 2, 86, m.name(), text_color::WHITE, texts, true);
+            // Each name gets its column (38 px with six): smaller fonts when it's long, never cut.
+            int column = n > 1 ? 36 : 120;
+            int nw = u.fit_width(m.name(), column, true);
+            u.print_fit(x - nw / 2, 86, m.name(), column, text_color::WHITE, texts, true);
             bn::string<8> lv("Lv");
             lv.append(bn::to_string<4>(m.level));
             u.print(x - u.width(lv, true) / 2, 96, lv, text_color::WHITE, texts, true);

@@ -9,6 +9,7 @@
 #include "bn_regular_bg_ptr.h"
 #include "bn_sprite_ptr.h"
 #include "bn_sprite_text_generator.h"
+#include "bn_sprite_affine_mat_ptr.h"
 #include "bn_string_view.h"
 #include "bn_vector.h"
 #include "bn_fixed_point.h"
@@ -122,6 +123,16 @@ public:
     void print(int x, int y, const bn::string_view& text, text_color color, bn::ivector<bn::sprite_ptr>& out,
                bool small = false);
     [[nodiscard]] int width(const bn::string_view& text, bool small = false);
+    // Names are never cut short: print_fit() uses the normal font (or the small one, if small), then smaller
+    // fonts down to the condensed one, until the text fits in max_width. Returns the width used.
+    int print_fit(int x, int y, const bn::string_view& text, int max_width, text_color color,
+                  bn::ivector<bn::sprite_ptr>& out, bool small = false);
+    [[nodiscard]] int fit_width(const bn::string_view& text, int max_width, bool small = false);
+    // print_fit() from x to right, except that a name too long even condensed slides left (down to min_x,
+    // over an icon) rather than being squeezed.
+    int print_fit_slide(int x, int min_x, int right, int y, const bn::string_view& text, text_color color,
+                        bn::ivector<bn::sprite_ptr>& out, bool small = false);
+    [[nodiscard]] int narrow_width(const bn::string_view& text);
 
     void tick();       // per-frame animation (called by pr::frame)
 
@@ -142,6 +153,8 @@ public:
 private:
     bn::sprite_text_generator _generator;
     bn::sprite_text_generator _small_generator;
+    bn::sprite_text_generator _narrow_generator;
+    bn::optional<bn::sprite_affine_mat_ptr> _squeeze[8];     // print_fit's last resort: 8/16 .. 15/16 wide
     windows _windows;
     bn::vector<bn::sprite_ptr, 40> _message;
     bn::optional<bn::sprite_ptr> _arrow;

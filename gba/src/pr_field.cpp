@@ -1871,7 +1871,7 @@ void overworld::save_menu()
     bn::vector<bn::sprite_ptr, 24> info;
     u.win().box(window_style::WINDOW, 0, 0, 16, 10);
     const map_def& here = wd::maps[area_index()];
-    u.print(10, 8, here.name, text_color::BLUE, info);
+    u.print_fit(10, 8, here.name, 112, text_color::BLUE, info);
     auto row = [&](int i, const char* label, const bn::string_view& value)
     {
         u.print(10, 26 + i * 16, label, text_color::INK, info);

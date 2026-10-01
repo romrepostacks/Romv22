@@ -14,6 +14,8 @@
 
 #include "common_variable_8x16_sprite_font.h"
 #include "common_variable_8x8_sprite_font.h"
+#include "pr_narrow_font.h"
+#include "bn_sprite_affine_mat_ptr.h"
 #include "bn_sprite_items_cursor.h"
 #include "bn_sprite_items_next_arrow.h"
 #include "bn_sprite_items_plank.h"
@@ -200,13 +202,16 @@ ui& gui()
 
 ui::ui() :
     _generator(common::variable_8x16_sprite_font, ink_palette),
-    _small_generator(common::variable_8x8_sprite_font, hud_palette)
+    _small_generator(common::variable_8x8_sprite_font, hud_palette),
+    _narrow_generator(narrow_sprite_font, hud_palette)
 {
     instance = this;
     _generator.set_left_alignment();
     _generator.set_bg_priority(0);
     _small_generator.set_left_alignment();
     _small_generator.set_bg_priority(0);
+    _narrow_generator.set_left_alignment();
+    _narrow_generator.set_bg_priority(0);
 }
 
 void ui::tick()
@@ -291,6 +296,74 @@ void ui::set_battle_style(bool battle)
 int ui::width(const bn::string_view& text, bool small)
 {
     return small ? _small_generator.width(text) : _generator.width(text);
+}
+
+int ui::narrow_width(const bn::string_view& text)
+{
+    return _narrow_generator.width(text);
+}
+
+int ui::fit_width(const bn::string_view& text, int max_width, bool small)
+{
+    if(! small && width(text) <= max_width)
+    {
+        return width(text);
+    }
+    if(width(text, true) <= max_width)
+    {
+        return width(text, true);
+    }
+    return bn::min(narrow_width(text), max_width);
+}
+
+int ui::print_fit_slide(int x, int min_x, int right, int y, const bn::string_view& text, text_color color,
+                        bn::ivector<bn::sprite_ptr>& out, bool small)
+{
+    if(narrow_width(text) > right - x)
+    {
+        x = bn::max(min_x, right - narrow_width(text));
+    }
+    return print_fit(x, y, text, right - x, color, out, small);
+}
+
+int ui::print_fit(int x, int y, const bn::string_view& text, int max_width, text_color color,
+                  bn::ivector<bn::sprite_ptr>& out, bool small)
+{
+    if(! small && width(text) <= max_width)
+    {
+        print(x, y, text, color, out);
+        return width(text);
+    }
+    if(width(text, true) <= max_width)
+    {
+        print(x, y + (small ? 0 : 3), text, color, out, true);
+        return width(text, true);
+    }
+    bn::sprite_text_generator& gen = _narrow_generator;
+    gen.set_palette_item(palette_of(color));
+    int first = out.size();
+    gen.generate_top_left(x, y + (small ? 0 : 4), text, out);
+    int w = gen.width(text);
+    if(w > max_width && max_width > 0)
+    {
+        // Still too wide (a 12-letter nickname of Ms): squeezed to fit, in sixteenths.
+        int k16 = bn::clamp(max_width * 16 / w, 8, 15);
+        bn::optional<bn::sprite_affine_mat_ptr>& mat = _squeeze[k16 - 8];
+        if(! mat)
+        {
+            mat = bn::sprite_affine_mat_ptr::create();
+            mat->set_horizontal_scale(bn::fixed(k16) / 16);
+        }
+        bn::fixed left = sx(x);
+        for(int i = first; i < out.size(); ++i)
+        {
+            bn::sprite_ptr& sp = out[i];
+            sp.set_affine_mat(*mat);
+            sp.set_x(left + (sp.x() - left) * k16 / 16);
+        }
+        w = w * k16 / 16;
+    }
+    return w;
 }
 
 void ui::print(int x, int y, const bn::string_view& text, text_color color, bn::ivector<bn::sprite_ptr>& out, bool small)
@@ -499,7 +572,12 @@ int ui::menu(const menu_spec& s)
             int i = s.columns == 1 ? top + k : k;
             if(i < s.count)
             {
-                print(option_x(k), option_y(k), s.options[i], s.color, texts);
+                // Too long for its column (FIRST IMPRESSION): a smaller font, never cut short.
+                // The last column runs to the window's edge; the others stop short of the next one's cursor.
+                bool last_column = s.columns == 1 || k % s.columns == s.columns - 1;
+                int room = last_column ? (s.tx + s.tw) * 8 - 4 - option_x(k) - (rows < s.count ? 10 : 0)
+                                       : s.column_width - 9;
+                print_fit(option_x(k), option_y(k), s.options[i], room, s.color, texts);
             }
         }
         // Scroll marks when there's more above or below.

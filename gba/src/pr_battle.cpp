@@ -47,7 +47,7 @@ namespace
         int base_x = 0, base_y = 0;     // sprite centre (screen)
         bn::fixed scale = 1;
         bn::optional<bn::sprite_ptr> sprite;
-        bn::vector<bn::sprite_ptr, 12> hud_text;
+        bn::vector<bn::sprite_ptr, 16> hud_text;
         bn::vector<bn::sprite_ptr, 8> bar;
         int hud_tx = 0, hud_ty = 0, hud_tw = 0, hud_th = 0;
         bool hud_big = false;
@@ -276,11 +276,11 @@ namespace
 
     void battle::layout()
     {
-        // Foes across the far platform (x 128-232); every other one a little lower, so a pack reads as a group.
+        // Foes across the far platform (x 128-232, a pack 136-232 beside its HP boxes); every other one a little lower, so a pack reads as a group.
         for(int i = 0; i < _foe_count; ++i)
         {
             fighter& f = _foes[i];
-            f.base_x = 128 + (2 * i + 1) * 104 / (2 * _foe_count);
+            f.base_x = _foe_count > 1 ? 136 + (2 * i + 1) * 96 / (2 * _foe_count) : 128 + 52;
             f.base_y = 30 + (_foe_count > 1 ? (i % 2) * 8 : 0);
             bool big = _foe_count == 1;
             f.hud_big = big;
@@ -290,7 +290,7 @@ namespace
             }
             else
             {
-                f.hud_tx = (i % 2) * 7; f.hud_ty = (i / 2) * 2; f.hud_tw = 7; f.hud_th = 2;
+                f.hud_tx = (i % 2) * 8; f.hud_ty = (i / 2) * 2; f.hud_tw = 8; f.hud_th = 2;
             }
         }
         // Your HP boxes: one big box, or compact ones two to a row, standing on the message box.
@@ -371,7 +371,7 @@ namespace
         lv.append(bn::to_string<4>(f.m->level));
         if(f.hud_big)
         {
-            u.print(x + 8, y + 3, f.m->name(), text_color::HUD, f.hud_text);
+            u.print_fit(x + 8, y + 3, f.m->name(), f.hud_tw * 8 - 20 - u.width(lv), text_color::HUD, f.hud_text);
             u.print(x + f.hud_tw * 8 - 8 - u.width(lv), y + 3, lv, text_color::HUD, f.hud_text);
             if(f.m->st != status::NONE)
             {
@@ -397,19 +397,38 @@ namespace
             {
                 right = status_tag(f.m->st);
             }
-            int right_w = u.width(right, true);
-            if(u.width(name, true) + right_w > room && ! st)
+            // Name and level (or status) side by side, the bar under them: the small font with "Lv43", then with
+            // just "43", then the condensed font the same two ways.
+            bn::string<8> number = st ? right : bn::string<8>(bn::to_string<4>(f.m->level));
+            bool placed = false;
+            for(int font = 0; font < 2 && ! placed; ++font)
             {
-                right = bn::to_string<4>(f.m->level);     // just the number when it's tight
-                right_w = u.width(right, true);
+                for(int r = 0; r < 2 && ! placed; ++r)
+                {
+                    const bn::string<8>& rt = r ? number : right;
+                    int rw = u.width(rt, true);
+                    int nw = font ? u.narrow_width(name) : u.width(name, true);
+                    if(nw <= room - rw - 2)
+                    {
+                        u.print_fit(x + 4, y + 2, name, font ? nw : room - rw - 2, text_color::HUD, f.hud_text, true);
+                        u.print(x + f.hud_tw * 8 - 4 - rw, y + 2, rt, st ? text_color::RED : text_color::HUD, f.hud_text, true);
+                        draw_hp_bar(f.bar, x + 4, y + 10, (f.hud_tw * 8 - 8) / 8, f.shown_hp, f.m->max_hp);
+                        placed = true;
+                    }
+                }
             }
-            while(name.size() > 3 && u.width(name, true) + right_w > room)
+            if(! placed)
             {
-                name.pop_back();
+                // A long name takes the whole top line (condensed); the level number or status goes beside a
+                // shorter bar.
+                int rw = u.narrow_width(number);
+                u.print_fit(x + 4, y + 2, name, bn::min(u.narrow_width(name), f.hud_tw * 8 - 7), text_color::HUD,
+                            f.hud_text, true);
+                int segments = (f.hud_tw * 8 - 10 - rw) / 8;
+                draw_hp_bar(f.bar, x + 4, y + 10, segments, f.shown_hp, f.m->max_hp);
+                u.print_fit(x + f.hud_tw * 8 - 3 - rw, y + 8, number, rw, st ? text_color::RED : text_color::HUD, f.hud_text,
+                            true);
             }
-            u.print(x + 4, y + 2, name, text_color::HUD, f.hud_text, true);
-            u.print(x + f.hud_tw * 8 - 4 - right_w, y + 2, right, st ? text_color::RED : text_color::HUD, f.hud_text, true);
-            draw_hp_bar(f.bar, x + 4, y + 10, 6, f.shown_hp, f.m->max_hp);
         }
     }
 
@@ -468,7 +487,7 @@ namespace
     struct move_info_ctx
     {
         const mon* m;
-        bn::vector<bn::sprite_ptr, 12>* sprites;
+        bn::vector<bn::sprite_ptr, 16>* sprites;
     };
 
     // moveInfo(): TYPE, POWER, ACCURACY and the category.
@@ -483,12 +502,16 @@ namespace
         }
         const move& mv = move_data(c->m->moves[index]);
         // Each row: the label on the left, its value on the right (the web's .row spans).
+        // Label on the left, value on the right; a pair too wide for the box drops to the condensed font.
         auto row = [&](int y, const bn::string_view& label, const bn::string_view& value)
         {
-            u.print(150, y, label, text_color::INK, *c->sprites, true);
+            constexpr int left = 166, right = 234;
+            int vw = value.empty() ? 0 : u.fit_width(value, (right - left) / 2, true);
+            int lw = u.print_fit(left, y, label, right - left - vw - 3, text_color::INK, *c->sprites, true);
+            (void) lw;
             if(! value.empty())
             {
-                u.print(234 - u.width(value, true), y, value, text_color::INK, *c->sprites, true);
+                u.print_fit(right - vw, y, value, vw, text_color::INK, *c->sprites, true);
             }
         };
         bn::string<24> type("TYPE/");
@@ -503,48 +526,28 @@ namespace
     {
         ui& u = gui();
         const mon& m = *_own[own_index].m;
-        // Two to a row like Emerald: a name too long for its column (FIRST IMPRESSION) is cut short with a
-        // full stop; the message box still says it in full.
-        bn::string<20> shortened[4];
+        // Two to a row like Emerald; a long name drops to a smaller font (the menu's fit_columns).
         bn::string_view names[4];
         for(int i = 0; i < m.move_count; ++i)
         {
-            bn::string_view name = move_data(m.moves[i]).name;
-            if(u.width(name) > 56)
-            {
-                for(char c : name)
-                {
-                    if(u.width(shortened[i]) > 50)
-                    {
-                        break;
-                    }
-                    shortened[i].push_back(c);
-                }
-                while(! shortened[i].empty() && shortened[i].back() == ' ')
-                {
-                    shortened[i].pop_back();
-                }
-                shortened[i].push_back('.');
-                name = shortened[i];
-            }
-            names[i] = name;
+            names[i] = move_data(m.moves[i]).name;
         }
         // Emerald: the moves in a 2x2 grid on the left, the move's details on the right.
-        bn::vector<bn::sprite_ptr, 12> info;
-        u.win().box(window_style::WINDOW, 18, 14, 12, 6);
+        bn::vector<bn::sprite_ptr, 16> info;
+        u.win().box(window_style::WINDOW, 20, 14, 10, 6);
         move_info_ctx ctx{ &m, &info };
         menu_spec s;
         s.options = names;
         s.count = m.move_count;
-        s.tx = 0; s.ty = 14; s.tw = 18; s.th = 6;
+        s.tx = 0; s.ty = 14; s.tw = 20; s.th = 6;
         s.columns = 2;
-        s.column_width = 66;
+        s.column_width = 72;
         s.start = bn::min(_last_move[own_index], m.move_count - 1);
         s.on_move = show_move_info;
         s.ctx = &ctx;
         int pick = u.menu(s);
         info.clear();
-        u.win().clear(18, 14, 12, 6);
+        u.win().clear(20, 14, 10, 6);
         u.set_battle_style(true);
         if(pick >= 0)
         {

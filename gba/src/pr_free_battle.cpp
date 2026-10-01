@@ -272,14 +272,14 @@ namespace
                     icon.set_scale(bn::fixed(0.5));
                     icon.set_bg_priority(0);
                     icons.push_back(icon);
-                    u.print(40, y, sp.name, text_color::INK, texts, true);
+                    u.print_fit(40, y, sp.name, 80, text_color::INK, texts, true);
                     bn::string<24> t(type_name(sp.type1));
                     if(sp.type2 >= 0)
                     {
                         t.append("/");
                         t.append(type_name(sp.type2));
                     }
-                    u.print(124, y, t, text_color::INK, texts, true);
+                    u.print_fit(124, y, t, 84, text_color::INK, texts, true);
                     for(int k = 0; k < d.picked_count; ++k)
                     {
                         if(d.picked[k] == s)
