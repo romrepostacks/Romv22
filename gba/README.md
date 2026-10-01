@@ -3,41 +3,35 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Test build **0.3**: the opening of the game up to the first badge (Duskmere Hollow, Route 1, Fernway Overlook
-and Cindergate Town with its gym), built on the web game's own data.
+Version **1.0**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
+own data.
 
-## What's in this build
+## What's in it
 
-- **New game the web game's way:** the professor's welcome on a dark stage (with LOTAD), naming yourself,
-  then on Route 1 he runs up chased by a ZIGZAGOON. You pick your partner from his bag (Treecko, Torchic or
-  Mudkip), fight the ZIGZAGOON, and he thanks you. Emerald's main menu shows the save's details under
-  CONTINUE.
-- **Duskmere Hollow and Route 1: Fernway Trail**, with the same layout, art and people as the web game,
-  joined seamlessly like Emerald's map connections. People wander, and route trainers spot you, show a "!",
-  walk up and battle you.
-- **Building interiors:** the POKéMON CENTER (the nurse heals you, and there's the PC with a BOX), the POKé
-  MART (a free gift first, then BUY and SELL with money) and the houses, including home, where Mom heals
-  you.
-- **Battles as in the web game:** your whole party against a wild pack (1 up to half your party, at most 4)
-  or a trainer's team. Every Pokémon gets a command, then everyone acts in speed order. You pick targets and
-  can use the BAG (POKé BALLS and medicine). The web game's damage, type chart, accuracy, status effects,
-  EXP, level-ups, new moves, evolution and prize money all apply.
-- **Fernway Overlook and Cindergate Town:** your rival WREN waits on the Overlook and won't let you into
-  Cindergate until you beat them. Cindergate has its own POKéMON CENTER, MART and houses, and a Fire gym
-  where GYM LEADER RELL gives you your first badge. Gym statues, the professor's call after your first
-  badge, and the next route held shut until you beat the leader all follow the web game.
-- **Catching as in Emerald:** each species has its real catch rate, and the odds use Gen 3's formula
-  (lower HP and status help a lot). POKé BALLS are thrown before anyone attacks, and the ball arcs,
-  shakes up to three times and clicks shut, or the Pokémon breaks free.
-- **Emerald's screens and menus:** text prints letter by letter with the ▼ prompt. The START menu, YES/NO
-  boxes, battle command and move windows, party screen, summary, bag and save window all sit where Emerald
-  puts them, styled after the web game.
-- **Walking** with Emerald timing: a step is 16 frames, a run (hold B) is 8, and a new direction turns on the
-  spot first. Also ledge hops, tall grass over your legs, signs and item balls.
-- **Saving** to cartridge SRAM from START > SAVE.
-
-Not yet: the rest of the region, PP and abilities, the POKéDEX screen, music and sound. Areas past
-Cindergate show a "not in this test build yet" message. Saves from 0.2 and earlier aren't compatible.
+- **All of Vellorin:** every town, route, cave and sea area of the web game (34 areas) and every building
+  inside them, with the same layouts, art and people, joined seamlessly like Emerald's map connections.
+  Water and flowers animate, and each area has its weather (rain, snow, ash, fog, the depths) and the time
+  of day tinting the world, as in the web game.
+- **The story:** the professor's welcome, your partner from a random trio of starters, your rival WREN,
+  TEAM TEMPEST and ADMIN VESPER, the TIDEWARDENS' tablets, the professor's calls, the eight gyms with their
+  juniors, the guardian LUGIA at the Sunken Shrine, VICTORY ROAD, the ELITE FOUR and the CHAMPION, then the
+  Hall of Fame and the credits.
+- **Field moves:** SURF (from SABLE's badge), DIVE down to the sea floor and back (from HALE's), and the OLD
+  ROD from a fisherman.
+- **Battles as in the web game:** your whole party against a wild pack or a trainer's team, every Pokémon
+  commanded, then everyone acting in speed order. Damage, the type chart, accuracy, status, abilities
+  (type immunities and boosts, Iron Fist, Merciless, Corrosion, Disguise), held items (LEFTOVERS,
+  LIFE ORB, FOCUS SASH, SITRUS BERRY, CHOICE SCARF), EXP and EXP SHARE, level-ups, new moves, evolution
+  and prize money all follow the web game. Every move has the web game's animation.
+- **Catching as in Emerald:** each species' real catch rate with Gen 3's formula (the guardian uses the web
+  game's odds). Then the POKéDEX registration page and the nickname prompt.
+- **Menus:** the POKéDEX (list, INFO, AREA, SIZE), the party screen (6 Pokémon, 10 from your fourth badge),
+  summary, bag, the PC's 14 boxes (WITHDRAW, DEPOSIT, MOVE, RELEASE, names and wallpapers), the trainer
+  card, the POKéNAV region map, OPTION (text speed, sound, music, EXP SHARE, weather) and saving.
+- **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
+- **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. Saves from
+  0.3 and earlier aren't compatible.
 
 Catching differs from the web game on purpose: the web game uses a flat 25% chance at full HP for every
 species, so a ball thrown at a healthy Pokémon usually failed. The GBA build uses Emerald's formula instead
@@ -51,10 +45,11 @@ The ROM is built from the web game's own data, so the two stay in step:
    generators and draws each area and room exactly as the web game does. It also exports people art,
    trainers, items, species, moves and the type chart.
 2. `tools/build_assets.py` turns that into GBA data in `generated/`:
-   - a tileset for the outdoors and one per kind of room: 8x8 tiles (flips de-duplicated) packed into 4bpp
-     palette banks, and 16x16 metatiles
+   - a tileset per area (with strips of its neighbours) and per kind of room: 8x8 tiles (flips
+     de-duplicated) packed into 4bpp palette banks, 16x16 metatiles and animation frames
    - every map's metatiles and tile behaviours, with signs, doors, people, trainers and item balls
-   - species, moves, items, window frame tiles, sprites, backgrounds and C++ headers
+   - species, moves (with their animation scripts), items, music, window frame tiles, sprites, backgrounds
+     and C++ headers
 3. Butano compiles `src/` and the generated data into `party-royale.gba`.
 
 The Makefile runs steps 1–2 automatically before every build. It skips them when nothing changed.

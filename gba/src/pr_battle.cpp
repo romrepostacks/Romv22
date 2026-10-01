@@ -252,6 +252,18 @@ namespace
         void apply_status(fighter& target, status s, int chance);
         void throw_ball(fighter& target);
         void ball_animation(fighter& target, int wobbles, bool caught);
+        struct ball_ctx
+        {
+            battle* self;
+            fighter* target;
+            int wobbles;
+            bool caught;
+        };
+        static void ball_hook(void* p)
+        {
+            auto* c = static_cast<ball_ctx*>(p);
+            c->self->ball_animation(*c->target, c->wobbles, c->caught);
+        }
         void set_hp(fighter& f, int hp);
         void flash(fighter& f);
         void faint(fighter& f);
@@ -1138,7 +1150,6 @@ namespace
         g.items[int(item_id::POKEBALL)] = uint8_t(g.items[int(item_id::POKEBALL)] - 1);
         bn::string<64> text(g.name);
         text.append(" used POKé BALL!");
-        u.say(text);
         mon& m = *target.m;
         int wobbles;
         bool caught;
@@ -1195,7 +1206,9 @@ namespace
             caught = checks == 4;
             wobbles = bn::min(checks, 3);
         }
-        ball_animation(target, wobbles, caught);
+        // The throw plays while "used POKé BALL!" is up (ballFx).
+        ball_ctx bc{ this, &target, wobbles, caught };
+        u.say(text, ball_hook, &bc);
         if(! caught)
         {
             text = "Oh no! The wild ";
