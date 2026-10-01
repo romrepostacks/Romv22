@@ -72,3 +72,9 @@ Saves live in the browser's `localStorage` for whatever origin you're
 running on (`http://localhost:8080` if you use the server, or the `file://`
 path if you open it directly — these are different origins, so pick one and
 stick with it, or use Export/Import Save Code to move a save between them).
+
+## Game Boy Advance version
+
+`gba/` builds a real GBA ROM (for Delta, mGBA or a flash cart) from this game's own maps, art and
+Pokémon data. It's a proof of concept for now: the home town, Route 1, wild battles and saving. See
+`gba/README.md`.
