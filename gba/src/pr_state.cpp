@@ -1,6 +1,7 @@
 #include "pr_state.h"
 
 #include "bn_common.h"
+#include <cstddef>
 #include "bn_memory.h"
 #include "bn_sram.h"
 
@@ -12,7 +13,9 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 4;
+    constexpr int save_version = 5;
+    constexpr int v4_game_size = 20324;     // game_state up to `visited` (save version 4: GBA 1.0)
+    static_assert(offsetof(game_state, run) == v4_game_size, "save version 4 must be game_state's prefix");
 
     struct save_block
     {
@@ -24,6 +27,7 @@ namespace
     };
 
     static_assert(sizeof(save_block) <= 32 * 1024, "the save must fit in SRAM");
+    static_assert(sizeof(game_state) > 0, "");
 
     uint32_t checksum_of(const save_block& block)
     {
@@ -50,8 +54,40 @@ namespace
                 return false;
             }
         }
+        if(block.version == 4 && block.size == v4_game_size)
+        {
+            // GBA 1.0's save: the same game_state without `run`, its checksum right after it.
+            const auto* bytes = reinterpret_cast<const uint8_t*>(&block);
+            int length = int(offsetof(save_block, game)) + v4_game_size;
+            uint32_t sum = 0x1234;
+            for(int i = 0; i < length; ++i)
+            {
+                sum = (sum * 31) + bytes[i];
+            }
+            uint32_t stored = uint32_t(bytes[length]) | (uint32_t(bytes[length + 1]) << 8) |
+                              (uint32_t(bytes[length + 2]) << 16) | (uint32_t(bytes[length + 3]) << 24);
+            if(stored != sum)
+            {
+                return false;
+            }
+            block.game.run = run_state();
+            block.version = save_version;
+            block.size = int(sizeof(game_state));
+            return true;
+        }
         return block.version == save_version && block.size == int(sizeof(game_state)) && block.checksum == checksum_of(block);
     }
+
+    // The device unlock, in the SRAM's last 16 bytes.
+    struct clear_mark
+    {
+        char tag[8];
+        uint32_t cleared;
+        uint32_t check;
+    };
+    constexpr int clear_mark_offset = 32 * 1024 - int(sizeof(clear_mark));
+    static_assert(sizeof(save_block) <= clear_mark_offset, "the save must leave room for the clear mark");
+    constexpr char clear_tag[8] = { 'P', 'R', 'C', 'L', 'E', 'A', 'R', '1' };
 
     BN_DATA_EWRAM_BSS game_state current;
     bool active = false;
@@ -76,6 +112,7 @@ void reset_state()
     current.money = 3000;
     current.opt = options();
     current.starter_trio = 2;
+    current.run = run_state();
 }
 
 bool game_active()
@@ -216,6 +253,59 @@ bool game_state::mark_owned(int species)
     bool first = ! owned.test(species);
     owned.set(species);
     return first;
+}
+
+bool device_cleared()
+{
+    clear_mark m;
+    bn::sram::read_offset(m, clear_mark_offset);
+    for(int i = 0; i < 8; ++i)
+    {
+        if(m.tag[i] != clear_tag[i])
+        {
+            return false;
+        }
+    }
+    return m.cleared == 1 && m.check == 0x5eed1234u;
+}
+
+void set_device_cleared()
+{
+    clear_mark m;
+    for(int i = 0; i < 8; ++i)
+    {
+        m.tag[i] = clear_tag[i];
+    }
+    m.cleared = 1;
+    m.check = 0x5eed1234u;
+    bn::sram::write_offset(m, clear_mark_offset);
+}
+
+int level_cap_now()
+{
+    const game_state& g = state();
+    if(! g.run.nuzlocke())
+    {
+        return 100;
+    }
+    // The first gym (in the region's order) whose leader you haven't beaten; after the eighth, the League.
+    for(int i = 0; i < world_data::areas_count; ++i)
+    {
+        const map_def& m = world_data::maps[i];
+        if(m.area && m.area->kind == area_kind::GYM && m.leader_id >= 0 && ! g.beaten.test(m.leader_id))
+        {
+            return m.level_cap;
+        }
+    }
+    for(int i = 0; i < world_data::areas_count; ++i)
+    {
+        const map_def& m = world_data::maps[i];
+        if(m.area && (m.area->flags & area_flag::CHAMPION) && ! (m.leader_id >= 0 && g.beaten.test(m.leader_id)))
+        {
+            return m.level_cap;
+        }
+    }
+    return 100;
 }
 
 bool save_exists()

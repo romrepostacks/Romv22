@@ -3,6 +3,7 @@
 
 #include "bn_vector.h"
 #include "pr_ids.h"
+#include "pr_game_types.h"
 
 namespace pr
 {
@@ -11,7 +12,8 @@ enum class encounter_kind : uint8_t
 {
     WILD,           // a pack from the tall grass, a cave floor or the water (startWildBattle)
     FIXED,          // a scripted wild Pokémon: the professor's ZIGZAGOON, a bite on the line, the guardian
-    TRAINER         // a trainer, rival, Gym Leader, Elite Four or Champion (startTrainerBattle)
+    TRAINER,        // a trainer, rival, Gym Leader, Elite Four or Champion (startTrainerBattle)
+    TOWER           // a CHALLENGE TOWER run: five trainers in a row, then a legendary (ADVENTURE MODE)
 };
 
 // What the overworld hands to a battle.
@@ -25,6 +27,7 @@ struct encounter
     int level = 2;
     bool legendary = false;         // the guardian: tougher, harder to catch (state.legendary)
     bool water = false;
+    bool scripted = false;          // the professor's ZIGZAGOON: never a NUZLOCKE encounter
 };
 
 enum class battle_outcome
@@ -42,6 +45,7 @@ struct battle_report
     bn::vector<int16_t, 4> caught_party;      // party index, or 100 + box slot
     bn::vector<uint16_t, 4> dex_new;          // species index
     bool trainer_beaten = false;
+    bool run_over = false;                    // NUZLOCKE: the party whited out
 };
 
 // Title screen and new game; returns once a game is loaded or started (true), or after FREE BATTLE (false).
@@ -55,6 +59,8 @@ battle_report battle_scene(const encounter& battle);
 
 // FREE BATTLE: draft a side from the whole dex and fight a random one.
 void free_battle_scene();
+// The draft screen alone (NEW ADVENTURE MODE): count Pokémon and their held items; false if backed out.
+bool draft_team(int count, uint16_t* species_out, held_item* items_out);
 
 // The next overworld scene starts a CONTINUEd game (startAdventure: the starter event or the area's story).
 void set_just_loaded();

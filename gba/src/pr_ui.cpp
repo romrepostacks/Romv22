@@ -316,6 +316,93 @@ int ui::fit_width(const bn::string_view& text, int max_width, bool small)
     return bn::min(narrow_width(text), max_width);
 }
 
+namespace
+{
+    // Word wrap with any width measure; returns the lines used (stops at max_lines, the rest in the last).
+    template<typename Measure>
+    int wrap_by(const bn::string_view& text, int width, Measure measure, bn::string_view* lines, int max_lines,
+                bool& all_fit)
+    {
+        const char* data = text.data();
+        int size = text.size();
+        int start = 0, count = 0;
+        all_fit = true;
+        while(start < size && count < max_lines)
+        {
+            while(start < size && data[start] == ' ')
+            {
+                ++start;
+            }
+            if(count == max_lines - 1)
+            {
+                lines[count++] = bn::string_view(data + start, size - start);
+                all_fit = measure(lines[count - 1]) <= width;
+                break;
+            }
+            int end = start, last_space = -1;
+            while(end < size)
+            {
+                int next = end;
+                while(next < size && data[next] != ' ')
+                {
+                    ++next;
+                }
+                if(measure(bn::string_view(data + start, next - start)) > width && last_space > start)
+                {
+                    break;
+                }
+                last_space = next;
+                end = next;
+                if(end < size)
+                {
+                    ++end;
+                }
+            }
+            int stop = last_space > start ? last_space : end;
+            if(end >= size && measure(bn::string_view(data + start, size - start)) <= width)
+            {
+                stop = size;
+            }
+            lines[count++] = bn::string_view(data + start, stop - start);
+            if(measure(lines[count - 1]) > width)
+            {
+                all_fit = false;
+            }
+            start = stop;
+        }
+        return count;
+    }
+}
+
+int ui::wrap_lines(const bn::string_view& text, int width, bool small, bn::string_view* lines, int max_lines)
+{
+    bool all_fit;
+    return wrap_by(text, width, [&](const bn::string_view& t){ return this->width(t, small); }, lines, max_lines, all_fit);
+}
+
+void ui::print_wrapped_fit(int x, int y, int width, const bn::string_view& text, int max_lines, int line_height,
+                           text_color color, bn::ivector<bn::sprite_ptr>& out, bool small)
+{
+    bn::string_view lines[8];
+    max_lines = bn::min(max_lines, 8);
+    bool all_fit;
+    int n = wrap_by(text, width, [&](const bn::string_view& t){ return this->width(t, small); }, lines, max_lines, all_fit);
+    if(all_fit)
+    {
+        for(int i = 0; i < n; ++i)
+        {
+            print(x, y + i * line_height, lines[i], color, out, small);
+        }
+        return;
+    }
+    // The condensed font, each line fitted (the last one squeezed if it must).
+    n = wrap_by(text, width, [&](const bn::string_view& t){ return narrow_width(t); }, lines, max_lines, all_fit);
+    for(int i = 0; i < n; ++i)
+    {
+        print_fit(x, y + i * line_height, lines[i], width, color, out, true);
+    }
+}
+
 int ui::print_fit_slide(int x, int min_x, int right, int y, const bn::string_view& text, text_color color,
                         bn::ivector<bn::sprite_ptr>& out, bool small)
 {

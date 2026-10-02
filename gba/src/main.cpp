@@ -26,6 +26,10 @@ int main()
         {
             report = pr::battle_scene(battle);
             fought = true;
+            if(report.run_over)
+            {
+                break;      // NUZLOCKE: the run has ended
+            }
         }
         pr::set_game_active(false);
     }

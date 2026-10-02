@@ -133,6 +133,12 @@ public:
     int print_fit_slide(int x, int min_x, int right, int y, const bn::string_view& text, text_color color,
                         bn::ivector<bn::sprite_ptr>& out, bool small = false);
     [[nodiscard]] int narrow_width(const bn::string_view& text);
+    // Word-wrapped text in up to max_lines lines of `width` px. If it doesn't all fit, the condensed font is
+    // tried, and the last line is squeezed rather than anything being left out.
+    void print_wrapped_fit(int x, int y, int width, const bn::string_view& text, int max_lines, int line_height,
+                           text_color color, bn::ivector<bn::sprite_ptr>& out, bool small = false);
+    // Splits text into lines of at most `width` px by words (small or normal font). Returns the line count.
+    int wrap_lines(const bn::string_view& text, int width, bool small, bn::string_view* lines, int max_lines);
 
     void tick();       // per-frame animation (called by pr::frame)
 

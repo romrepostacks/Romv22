@@ -14,6 +14,7 @@
 #include "bn_sprite_palette_item.h"
 #include "bn_sprite_palette_ptr.h"
 #include "bn_sprite_palettes.h"
+#include "bn_sprites.h"
 #include "bn_vector.h"
 
 #include "pr_fx_data.h"
@@ -30,6 +31,7 @@ namespace
 
     constexpr int u = 8;                // the web's u (scene width / 28), on the GBA's screen
     constexpr int max_keys = 6;
+    constexpr int sprite_reserve = 6;   // left free for the message box's text
 
     int ms(int milliseconds)
     {
@@ -131,7 +133,12 @@ namespace
                 colors[i] = bn::color(0, 0, 0);
             }
             bn::sprite_palette_item item(colors, bn::bpp_mode::BPP_4);
-            palettes.push_back(bn::sprite_palette_ptr::create_new(item));
+            bn::optional<bn::sprite_palette_ptr> pal = bn::sprite_palette_ptr::create_new_optional(item);
+            if(! pal)
+            {
+                return 0;       // no palette left: the first one (or, with none, nothing is drawn)
+            }
+            palettes.push_back(bn::move(*pal));
             palette_c1.push_back(c1);
             palette_c2.push_back(c2);
             return palettes.size() - 1;
@@ -323,6 +330,12 @@ namespace
             int x = lerp(a.x, b.x, f), y = lerp(a.y, b.y, f), op = lerp(a.op, b.op, f), sc = lerp(a.sc, b.sc, f);
             if(! p.sprite)
             {
+                // A crowded battle (a full party against six) leaves few sprites: then this particle is skipped.
+                if(bn::sprites::available_items_count() <= sprite_reserve || palettes.empty())
+                {
+                    p.done = true;
+                    return;
+                }
                 p.sprite = bn::sprite_items::fx.create_sprite(sx(x), sy(y), p.shape);
                 p.sprite->set_palette(palettes[p.palette]);
                 p.sprite->set_bg_priority(1);
@@ -355,7 +368,8 @@ namespace
             int angle = lerp(a.a, c.a, f), sxp = lerp(a.sx, c.sx, f), op = lerp(a.op, c.op, f);
             int n = bn::clamp(b.len / 5, 1, 14 / b.rows);
             int needed = n * b.rows;
-            while(b.dots.size() < needed && ! b.dots.full())
+            while(b.dots.size() < needed && ! b.dots.full() && bn::sprites::available_items_count() > sprite_reserve &&
+                  ! palettes.empty())
             {
                 bn::sprite_ptr d = bn::sprite_items::fx.create_sprite(0, 0, fx_shape::DOT);
                 d.set_palette(palettes[b.palette]);

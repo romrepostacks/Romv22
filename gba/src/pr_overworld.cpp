@@ -480,6 +480,10 @@ void overworld::load_actors()
     for(int i = 0; i < _map->people_count && ! _actors.full(); ++i)
     {
         const person& p = _map->people[i];
+        if(p.role == person_role::TOWER && ! state().run.adventure)
+        {
+            continue;       // the CHALLENGE TOWER's guide only comes in ADVENTURE MODE
+        }
         actor a;
         a.who = &p;
         a.kind = p.kind;
@@ -1514,6 +1518,14 @@ void overworld::fixed_battle(species_id s, int level, bool legendary)
     _start_battle = true;
 }
 
+void overworld::tower_battle()
+{
+    encounter& e = *_battle;
+    e = encounter();
+    e.kind = encounter_kind::TOWER;
+    _start_battle = true;
+}
+
 // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between; they see
 // across water).
 bool overworld::check_sight()
@@ -1630,6 +1642,14 @@ void overworld::start_trainer_battle(int index)
 void overworld::say(const bn::string_view& text)
 {
     gui().say(text);
+}
+
+void overworld::story_say(const bn::string_view& text)
+{
+    if(! state().run.skip_story)
+    {
+        gui().say(text);
+    }
 }
 
 // ----- Main loop -----

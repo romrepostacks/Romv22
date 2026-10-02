@@ -1,4 +1,5 @@
 #include "pr_mon.h"
+#include "pr_state.h"
 
 #include "bn_vector.h"
 
@@ -180,8 +181,15 @@ void mon::grant_xp(int amount, ui& ui)
     {
         return;
     }
+    // NUZLOCKE's level cap: no EXP past the next gym leader's level.
+    int cap = level_cap_now();
+    if(level >= cap)
+    {
+        xp = 0;
+        return;
+    }
     xp = uint16_t(xp + amount);
-    while(level < 100 && xp >= xp_next())
+    while(level < cap && xp >= xp_next())
     {
         xp = uint16_t(xp - xp_next());
         ++level;
@@ -193,6 +201,10 @@ void mon::grant_xp(int amount, ui& ui)
         ui.say(text);
         _learn_moves_at(level, ui);
         _try_evolve(ui);
+    }
+    if(level >= cap)
+    {
+        xp = 0;
     }
 }
 

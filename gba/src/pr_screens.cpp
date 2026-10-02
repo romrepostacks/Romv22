@@ -54,29 +54,11 @@ namespace
         return m.hp * 2 > m.max_hp ? 0 : m.hp * 5 > m.max_hp ? 1 : 2;
     }
 
-    // Two lines of text, wrapped by words, at (x, y).
+    // Text wrapped by words at (x, y), never cut short (ui::print_wrapped_fit).
     void print_wrapped(ui& u, int x, int y, int width, const bn::string_view& text, text_color color,
                        bn::ivector<bn::sprite_ptr>& out, int max_lines = 2, int line_height = 15, bool small = false)
     {
-        const char* data = text.data();
-        int start = 0, last_space = -1, line = 0;
-        for(int i = 0; i <= text.size() && line < max_lines; ++i)
-        {
-            if(i == text.size() || data[i] == ' ')
-            {
-                if(u.width(bn::string_view(data + start, i - start), small) > width && last_space > start)
-                {
-                    u.print(x, y + line * line_height, bn::string_view(data + start, last_space - start), color, out, small);
-                    ++line;
-                    start = last_space + 1;
-                }
-                last_space = i;
-            }
-        }
-        if(line < max_lines && start < text.size())
-        {
-            u.print(x, y + line * line_height, bn::string_view(data + start, text.size() - start), color, out, small);
-        }
+        u.print_wrapped_fit(x, y, width, text, max_lines, line_height, color, out, small);
     }
 }
 
@@ -117,9 +99,9 @@ bool use_item_on(item_id id, mon& m, bn::string<80>& message)
     }
     if(it.revive)
     {
-        if(! m.fainted())
+        if(! m.fainted() || g.run.nuzlocke())
         {
-            return false;
+            return false;       // (NUZLOCKE: a fallen Pokémon stays fallen)
         }
         m.hp = uint16_t(bn::max(1, m.max_hp / 2));
         message = m.name();
@@ -2153,6 +2135,24 @@ void card_screen()
                 row(0, "AREAS VISITED", bn::to_string<4>(g.visited.count()));
                 row(1, "RIVAL BATTLES WON", bn::to_string<4>(rivals));
                 row(2, "POKéMON IN BOXES", bn::to_string<4>(g.box_used()));
+                if(g.run.nuzlocke())
+                {
+                    // The NUZLOCKE run so far.
+                    row(3, "NUZLOCKE DEATHS", bn::to_string<6>(g.run.deaths));
+                    row(4, "CATCHES", bn::to_string<6>(g.run.catches));
+                    row(5, "ENCOUNTERS USED", bn::to_string<4>(g.run.encounter_used.count()));
+                }
+                else if(g.run.adventure)
+                {
+                    int left = 0;
+                    for(int i = 0; i < game_data::legendaries_count; ++i)
+                    {
+                        left += ! g.owned.test(game_data::legendaries[i]);
+                    }
+                    row(3, "TOWER RANK", bn::to_string<4>(g.run.tower_clears + 1));
+                    row(4, "BEST STREAK", bn::to_string<4>(g.run.tower_best));
+                    row(5, "LEGENDARIES LEFT", bn::to_string<4>(left));
+                }
             }
             redraw = false;
             if(faded)
@@ -2197,6 +2197,7 @@ void region_map_screen()
     bn::vector<bn::sprite_ptr, 64> cells;
     bn::vector<bn::sprite_ptr, 60> links;
     bn::vector<bn::sprite_ptr, 24> texts;
+    bn::vector<bn::sprite_ptr, 24> used_marks;
     // The grid: x 0..7, y -2..2.
     constexpr int ox = 30, oy = 22, cw = 24, ch = 22;
     int here = g.map;
@@ -2225,6 +2226,11 @@ void region_map_screen()
         bn::sprite_ptr c = bn::sprite_items::cell.create_sprite(sx(x + 8), sy(y + 8), frame_index);
         c.set_bg_priority(1);
         cells.push_back(c);
+        if(g.run.nuzlocke() && g.run.encounter_used.test(i) && ! used_marks.full())
+        {
+            // NUZLOCKE: this area's encounter is spent.
+            u.print(x + 6, y + 4, "x", text_color::RED, used_marks, true);
+        }
         // Each link once (to the right and down), dashed while shut.
         for(int k = 0; k < m.links_count && ! links.full(); ++k)
         {
@@ -2280,7 +2286,11 @@ void region_map_screen()
             {
                 name.append("  (cleared)");
             }
-            u.print(8, 140, name, text_color::INK, texts);
+            if(g.run.nuzlocke() && g.run.encounter_used.test(cursor))
+            {
+                name.append("  (encounter used)");
+            }
+            u.print_fit(8, 140, name, 224, text_color::INK, texts);
             redraw = false;
         }
         ++timer;

@@ -18,6 +18,10 @@ struct battle_setup
     const pr::trainer* opponent = nullptr;
     bool legendary = false;
     bool free = false;              // FREE BATTLE: no EXP, money, catching or items
+    // NUZLOCKE: whether this wild battle may still be caught from (the area's first encounter; scripted
+    // battles never). Dupes are refused one by one (dupes clause), and only one catch per battle.
+    bool nuzlocke_catch = true;
+    bool smart = false;             // CHALLENGE TOWER from rank 3: foes pick their best move and target
 };
 
 battle_report run_battle(battle_setup& setup);

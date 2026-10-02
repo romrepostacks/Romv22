@@ -196,6 +196,7 @@ namespace
         bn::optional<bn::sprite_ptr> _own_sprite;
         int _own_sprite_index = -1;
         bool _animating = false;    // a move animation is moving the sprites (no bobbing)
+        bool _nuz_caught = false;   // NUZLOCKE: this battle's one catch is made
 
         [[nodiscard]] bn::string<32> label(const fighter& f) const
         {
@@ -596,11 +597,12 @@ namespace
         ui& u = gui();
         game_state& g = state();
         bool wild = ! _s.opponent && ! _s.free;
+        bool nuz_block = wild && state().run.nuzlocke() && (! _s.nuzlocke_catch || _nuz_caught);
         int ids[items_count + 1];
         bn::string<32> labels[items_count + 1];
         bn::string_view views[items_count + 1];
         int n = 0;
-        if(wild)
+        if(wild && ! nuz_block)
         {
             ids[n] = int(item_id::POKEBALL);
             labels[n] = "POKé BALL x";
@@ -612,7 +614,8 @@ namespace
         {
             for(int i = 0; i < items_count; ++i)
             {
-                if(is_medicine(i) && g.items[i])
+                // NUZLOCKE: a fallen Pokémon stays fallen.
+                if(is_medicine(i) && g.items[i] && ! (g.run.nuzlocke() && i == int(item_id::REVIVE)))
                 {
                     ids[n] = i;
                     labels[n] = game_data::items[i].name;
@@ -624,7 +627,9 @@ namespace
             }
         }
         views[n] = "CANCEL";
-        const char* tip = wild ? (g.item_count(item_id::POKEBALL) ? "Weaken it first for a better catch rate!" :
+        const char* tip = nuz_block ? (_nuz_caught ? "NUZLOCKE: one catch per encounter." :
+                                                     "NUZLOCKE: this area's encounter is used up.") :
+                          wild ? (g.item_count(item_id::POKEBALL) ? "Weaken it first for a better catch rate!" :
                                   "Out of POKé BALLS! Restock at a POKéMON CENTER.") :
                           "There's nothing in the BAG you can use here.";
         u.show_text(tip, 112);
@@ -818,7 +823,40 @@ namespace
             choice c;
             c.kind = choice_kind::MOVE;
             c.move = r.get_int(f.m->move_count);
-            actions.push_back({ &f, &_own[targets[r.get_int(tn)]], c, false });
+            int target = targets[r.get_int(tn)];
+            if(_s.smart)
+            {
+                // The CHALLENGE TOWER's smarter foes: the move and target that hit hardest (power x type x
+                // same-type bonus, weighted to finish the weakest), a status move only on a healthy target.
+                int best = -1;
+                for(int m = 0; m < f.m->move_count; ++m)
+                {
+                    const move& mv = move_data(f.m->moves[m]);
+                    for(int k = 0; k < tn; ++k)
+                    {
+                        const mon& t = *_own[targets[k]].m;
+                        int score;
+                        if(mv.category == move_category::STATUS)
+                        {
+                            score = t.st == status::NONE && mv.inflicts != status::NONE ? 120 : 0;
+                        }
+                        else
+                        {
+                            score = mv.power * effectiveness_x4(mv.type, t) * (f.m->has_type(mv.type) ? 3 : 2) / 2;
+                            score = score * mv.accuracy / 100;
+                            score += (t.max_hp - t.hp) * 40 / bn::max(1, int(t.max_hp));
+                        }
+                        score += r.get_int(20);
+                        if(score > best)
+                        {
+                            best = score;
+                            c.move = m;
+                            target = targets[k];
+                        }
+                    }
+                }
+            }
+            actions.push_back({ &f, &_own[target], c, false });
         }
         // The BAG (medicine and POKé BALLS) first, then by speed (paralysis halves it); ties keep their order.
         auto speed = [](const action& a){ return a.user->m->st == status::PARALYSIS ? a.user->m->spe / 2 : int(a.user->m->spe); };
@@ -1150,10 +1188,22 @@ namespace
             u.say("No POKé BALLS left!");
             return;
         }
+        mon& m = *target.m;
+        if(g.run.nuzlocke() && ! _s.legendary && (_nuz_caught || g.owned.test(m.species_index)))
+        {
+            // Dupes clause: one you already have can't be caught (and the ball isn't used).
+            bn::string<64> no(_nuz_caught ? "NUZLOCKE: one catch per encounter." : "Dupes clause: you already have ");
+            if(! _nuz_caught)
+            {
+                no.append(m.species_name());
+                no.append(".");
+            }
+            u.say(no);
+            return;
+        }
         g.items[int(item_id::POKEBALL)] = uint8_t(g.items[int(item_id::POKEBALL)] - 1);
         bn::string<64> text(g.name);
         text.append(" used POKé BALL!");
-        mon& m = *target.m;
         int wobbles;
         bool caught;
         int max_hp = bn::max(1, int(m.max_hp));
@@ -1221,6 +1271,8 @@ namespace
             return;
         }
         target.caught = true;
+        _nuz_caught = true;
+        ++g.run.catches;
         audio::play(audio::sfx::CAUGHT);
         draw_hud(target);
         text = "Gotcha! ";
@@ -1392,6 +1444,12 @@ namespace
         bn::string<48> text(label(f));
         text.append(" fainted!");
         gui().say(text);
+        if(f.own && ! _s.free && state().run.nuzlocke())
+        {
+            text = f.m->name();
+            text.append(" has fallen...");
+            gui().say(text);
+        }
     }
 
     void battle::win()

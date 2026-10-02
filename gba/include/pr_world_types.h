@@ -53,7 +53,8 @@ enum class person_role : uint8_t
     NONE,
     NURSE,
     CLERK,
-    MOM
+    MOM,
+    TOWER           // the CHALLENGE TOWER's guide (ADVENTURE MODE only)
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of

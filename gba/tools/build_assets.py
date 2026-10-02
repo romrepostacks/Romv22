@@ -368,7 +368,7 @@ def build_world(exp, data, out_inc):
         rows = []
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
-            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM'}.get(n.get('role', ''), 'NONE')
+            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -457,7 +457,12 @@ def build_world(exp, data, out_inc):
         L.append('constexpr door %sdoors[] = {%s};' % (p, nonempty(', '.join(
             '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
             for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
-        people_rows(p, a['people'])
+        people = a['people']
+        if a.get('champion') and not any(n.get('role') == 'tower' for n in people):
+            # GBA only (Phase 7): the CHALLENGE TOWER's guide by the League's door; shown in ADVENTURE MODE.
+            people.append({'kind': 'gentleman', 'x': 20, 'y': 13, 'facing': 'down', 'role': 'tower', 'wander': False,
+                           'lines': ['The CHALLENGE TOWER opens to CHAMPIONS.']})
+        people_rows(p, people)
         trainer_rows(p, a['trainers'], ('area', ai), ai)
         its = []
         for k, it in enumerate(a['items']):
@@ -1146,7 +1151,7 @@ def build_narrow_font(gfx, out_inc):
     spec = importlib.util.spec_from_file_location('narrow_font', os.path.join(HERE, 'narrow_font.py'))
     nf = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(nf)
-    chars = [chr(c) for c in range(33, 127)] + ['é']
+    chars = [chr(c) for c in range(33, 127)] + ['é', 'É']
     rows = []
     widths = [nf.SPACE_WIDTH]
     for ch in chars:
@@ -1171,7 +1176,7 @@ def build_narrow_font(gfx, out_inc):
          '#ifndef PR_NARROW_FONT_H\n#define PR_NARROW_FONT_H\n',
          '#include "bn_sprite_font.h"', '#include "bn_utf8_characters_map.h"', '#include "bn_sprite_items_narrow_font.h"\n',
          'namespace pr\n{\n',
-         'constexpr bn::utf8_character narrow_font_utf8_characters[] = { "é" };',
+         'constexpr bn::utf8_character narrow_font_utf8_characters[] = { "é", "É" };',
          'constexpr int8_t narrow_font_widths[] = {%s};' % ', '.join(map(str, widths)),
          'constexpr bn::span<const bn::utf8_character> narrow_font_utf8_characters_span(narrow_font_utf8_characters);',
          'constexpr auto narrow_font_utf8_characters_map = bn::utf8_characters_map<narrow_font_utf8_characters_span>();',
@@ -1356,6 +1361,14 @@ def build_game_data(data, out_inc):
             c_text(m['n'].upper()), types.index(m['t']), m['p'], cat[m['c']], m['a'],
             STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0), 'true' if m.get('punch') else 'false'))
     L.append('constexpr move moves[] = {\n    ' + ',\n    '.join(mv) + '\n};\n')
+    # Legendary and mythical Pokémon (Phase 7: the CHALLENGE TOWER's prizes), by species index.
+    legend_nums = {144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385,
+                   386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642,
+                   643, 644, 645, 646, 647, 648, 649, 716, 717, 718, 719, 720, 721, 785, 786, 787, 788, 789, 790, 791, 792,
+                   800, 801, 802, 807, 808, 809}
+    legends = [i for i, sp in enumerate(data['species']) if sp['num'] in legend_nums]
+    L.append('constexpr uint16_t legendaries[] = {%s};' % ', '.join(map(str, legends)))
+    L.append('constexpr int legendaries_count = %d;\n' % len(legends))
     names = [s['name'] for s in data['species']]
     # Abilities, shared by name.
     abil_index = {}

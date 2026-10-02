@@ -106,6 +106,37 @@ struct bitset
     }
 };
 
+// Phase 6 and 7: how this run is played. NUZLOCKE (chosen at NEW GAME) enforces the classic rules; ADVENTURE
+// MODE follows the credits (or NEW ADVENTURE MODE) with the CHALLENGE TOWER as the goal.
+enum class run_mode : uint8_t
+{
+    NORMAL,
+    NUZLOCKE
+};
+
+constexpr int graveyard_size = 30;      // the latest who fell (the trainer card counts them all)
+
+struct run_state
+{
+    run_mode mode = run_mode::NORMAL;
+    bool skip_story = false;            // SKIP STORY TEXT: scenes and calls complete themselves
+    bool adventure = false;             // ADVENTURE MODE (never in a Nuzlocke run)
+    bool over = false;                  // NUZLOCKE: the party whited out, the run has ended
+    uint16_t deaths = 0;
+    uint16_t catches = 0;
+    bitset<64> encounter_used;          // NUZLOCKE: areas whose one encounter is spent
+    uint8_t tower_clears = 0;           // CHALLENGE TOWER: rank = clears + 1
+    uint8_t tower_best = 0;             // best streak of clears in a row
+    uint8_t tower_streak = 0;
+    uint8_t grave_next = 0;             // where the next one goes (it wraps)
+    mon graveyard[graveyard_size];
+
+    [[nodiscard]] bool nuzlocke() const
+    {
+        return mode == run_mode::NUZLOCKE;
+    }
+};
+
 struct game_state
 {
     int16_t map = 0;                    // world_data::maps index (an area or a room)
@@ -135,6 +166,7 @@ struct game_state
     bitset<1024> seen;                  // POKéDEX, by species index
     bitset<1024> owned;
     bitset<64> visited;                 // areas you've been to (the region map, the TRAINER CARD)
+    run_state run;                      // (added in save version 5; older saves get the defaults)
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1
@@ -188,6 +220,14 @@ bool load_game();
 void save_game();
 // For the CONTINUE window: the saved game's name, play time and POKéDEX count.
 bool peek_save(game_state& out);
+
+// The device unlock (partyroyale_cleared): set by the first clear of the main story on this cartridge, kept
+// apart from the save so a new game doesn't lose it. It offers NEW ADVENTURE MODE on the title.
+bool device_cleared();
+void set_device_cleared();
+
+// NUZLOCKE's level cap: the next gym leader's (the League's after the eighth badge); 100 otherwise.
+int level_cap_now();
 
 }
 

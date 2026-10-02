@@ -30,7 +30,7 @@ All names are placeholders the owner can change. Original story; Pokémon specie
      sea/surfing, caves, underwater), battle themes (wild, trainer, Gym Leader/rival, Elite/Champion, legendary),
      short jingles (victory, level up, heal, badge, evolution) and a credits theme. Crossfades between areas,
      follows the SOUND option, with a separate MUSIC volume in OPTION.
-6. **Nuzlocke mode (planned — not started).** Chosen when starting a new story (NORMAL / NUZLOCKE), plus a
+6. **Nuzlocke mode (web: planned — not started; GBA: done in 1.1).** Chosen when starting a new story (NORMAL / NUZLOCKE), plus a
    SKIP STORY TEXT option for players who already know the route:
    - Classic rules, enforced by the game: a Pokémon that faints is dead (moved to a graveyard; it can't be used
      or revived); only the first wild encounter in each area can be caught (a failed catch or a knockout uses it
@@ -39,7 +39,7 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    - A Nuzlocke HUD: encounters used per area on the map, deaths and a run summary on the trainer card.
    - Skip story text: scenes and calls fast-forward or complete themselves, and key story items (e.g. SURF, DIVE)
      are still granted at the same story points so the run can be finished.
-7. **Endgame: Adventure Mode (planned, not started).** Unlocked by the first clear of the main story (Phase 5).
+7. **Endgame: Adventure Mode (web: planned, not started; GBA: done in 1.1, the tower's guide by the League's doors).** Unlocked by the first clear of the main story (Phase 5).
    - **Continuing:** after the credits the same save carries on as ADVENTURE MODE (shown on the title and the save
      info). The whole region stays open, with the Challenge Tower as the new goal.
    - **The Challenge Tower:** repeatable Elite Four-style runs (four elite trainers and a tower master in a row, no
@@ -54,7 +54,7 @@ All names are placeholders the owner can change. Original story; Pokémon specie
      Only this mode starts at level 50 with a draft; a normal NEW GAME is unchanged.
    - **Not in Nuzlocke:** the tower and Adventure Mode are never available in a Nuzlocke run, and NEW ADVENTURE MODE
      can't be combined with Nuzlocke.
-8. **Platform-specific UI (planned — not started).** The interface adapts to the device instead of one layout for all:
+8. **Platform-specific UI (planned — not started; web only, not applicable to the GBA).** The interface adapts to the device instead of one layout for all:
    - Phone portrait: the handheld as now; phone landscape: a wide layout (screen in the middle, D-pad left, A/B right).
    - Tablet: a larger screen and controls, split layouts where there is room.
    - Desktop: keyboard-first (key hints on screen, no need for on-screen buttons), mouse support in menus.

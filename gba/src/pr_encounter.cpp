@@ -1,6 +1,12 @@
 // Who you face (the web game's startWildBattle / startTrainerBattle), and what happens if you white out
 // (sendToCenter, leagueReset).
+#include <initializer_list>
+
+#include "bn_bg_palettes.h"
 #include "bn_unique_ptr.h"
+
+#include "pr_audio.h"
+#include "pr_ui.h"
 
 #include "pr_battle.h"
 #include "pr_game_data.h"
@@ -155,14 +161,231 @@ namespace
         }
         g.facing = direction::DOWN;
     }
+
+    // The area a map belongs to (a room's is the one outside).
+    int area_of(int map)
+    {
+        const map_def& m = world_data::maps[map];
+        return m.is_room() ? m.exit_map : map;
+    }
+
+    // NUZLOCKE: the fallen leave the party for the graveyard (their last 30 kept for the TRAINER CARD).
+    void bury_fallen()
+    {
+        game_state& g = state();
+        int kept = 0;
+        for(int i = 0; i < g.party_count; ++i)
+        {
+            mon& m = g.party[i];
+            if(m.fainted())
+            {
+                g.run.graveyard[g.run.grave_next] = m;
+                g.run.grave_next = uint8_t((g.run.grave_next + 1) % graveyard_size);
+                ++g.run.deaths;
+            }
+            else
+            {
+                if(kept != i)
+                {
+                    g.party[kept] = m;
+                }
+                ++kept;
+            }
+        }
+        for(int i = kept; i < g.party_count; ++i)
+        {
+            g.party[i] = mon();
+        }
+        g.party_count = uint8_t(kept);
+    }
+
+    // A few lines on a plain screen, between battles (the CHALLENGE TOWER) or at a run's end.
+    void plain_say(std::initializer_list<const char*> lines)
+    {
+        ui& u = gui();
+        bn::bg_palettes::set_transparent_color(bn::color(3, 4, 8));
+        ui::fade_in(8);
+        for(const char* l : lines)
+        {
+            u.say(l);
+        }
+        ui::fade_out(8);
+    }
+
+    // ----- The CHALLENGE TOWER (Phase 7) -----
+    constexpr const char* tower_names[] = { "ACE TRAINER KAI", "ACE TRAINER MIRA", "VETERAN OSRIC", "VETERAN DELLA",
+                                            "COOLTRAINER RHYS", "COOLTRAINER ISLA", "EXPERT BRAM", "EXPERT NOVA",
+                                            "DRAGON TAMER VEX", "PSYCHIC LUNE", "BLACK BELT TAO", "SKY TRAINER ARIA" };
+    constexpr int tower_names_count = int(sizeof(tower_names) / sizeof(tower_names[0]));
+    constexpr uint8_t tower_trainer_id = 255;   // a beaten bit nobody else uses (cleared after each run)
+
+    BN_DATA_EWRAM_BSS trainer tower_trainers[5];
+
+    bool is_legendary(int s)
+    {
+        for(int i = 0; i < game_data::legendaries_count; ++i)
+        {
+            if(game_data::legendaries[i] == s)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // A themed team: fully evolved, non-legendary Pokémon of one type (any, if the type has too few).
+    void tower_team(battle_setup& s, int size, int level, int clears)
+    {
+        int type = rng().get_int(types_count);
+        uint16_t pool[species_count];
+        int n = 0;
+        for(int pass = 0; pass < 2 && n < size; ++pass)
+        {
+            n = 0;
+            for(int i = 0; i < species_count; ++i)
+            {
+                const species& sp = game_data::species_list[i];
+                if(sp.evolves_to >= 0 || is_legendary(i))
+                {
+                    continue;
+                }
+                if(pass == 0 && sp.type1 != type && sp.type2 != type)
+                {
+                    continue;
+                }
+                pool[n++] = uint16_t(i);
+            }
+        }
+        s.foe_count = 0;
+        while(s.foe_count < size && n)
+        {
+            int k = rng().get_int(n);
+            int sp = pool[k];
+            pool[k] = pool[--n];
+            // Held items from rank 2 (half of them), all of them from rank 4.
+            held_item item = held_item::NONE;
+            if(clears >= 3 || (clears >= 1 && rng().get_int(2)))
+            {
+                item = held_item(1 + rng().get_int(5));
+            }
+            s.foes[s.foe_count++] = mon::make(species_id(sp), level, item);
+        }
+    }
+
+    battle_report tower_run()
+    {
+        game_state& g = state();
+        int clears = g.run.tower_clears;
+        int base = bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears));
+        battle_report last;
+        for(int floor = 0; floor < 5; ++floor)
+        {
+            bool master = floor == 4;
+            trainer& t = tower_trainers[floor];
+            t = trainer{ 0, 0, person_kind::gentleman, direction::DOWN, trainer_role::ELITE,
+                         master ? "TOWER MASTER" : tower_names[rng().get_int(tower_names_count)],
+                         nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, false, tower_trainer_id, -1, 0, false };
+            bn::unique_ptr<battle_setup> s(new battle_setup());
+            s->own = g.party.data();
+            s->own_count = g.party_count;
+            s->opponent = &t;
+            s->smart = master || clears >= 2;
+            int size = master ? 6 : bn::min(6, 4 + clears / 2);
+            tower_team(*s, size, bn::min(100, base + floor / 2 + (master ? 2 : 0)), clears);
+            bn::string<48> head("CHALLENGE TOWER - FLOOR ");
+            head.append(bn::to_string<4>(floor + 1));
+            plain_say({ head.c_str() });
+            g.beaten.reset(tower_trainer_id);
+            last = run_battle(*s);
+            g.beaten.reset(tower_trainer_id);
+            if(last.outcome == battle_outcome::WHITED_OUT || last.outcome == battle_outcome::RAN)
+            {
+                g.run.tower_streak = 0;
+                plain_say({ "The challenge is over. Your streak was reset." });
+                return last;
+            }
+        }
+        g.run.tower_clears = uint8_t(bn::min(250, clears + 1));
+        g.run.tower_streak = uint8_t(bn::min(250, g.run.tower_streak + 1));
+        g.run.tower_best = bn::max(g.run.tower_best, g.run.tower_streak);
+        bn::string<64> rank("CHALLENGE TOWER cleared! RANK ");
+        rank.append(bn::to_string<4>(g.run.tower_clears + 1));
+        rank.append(" unlocked.");
+        plain_say({ rank.c_str() });
+        // The prize: a battle with a legendary still in the pool (caught ones leave it for good).
+        int left[game_data::legendaries_count];
+        int n = 0;
+        for(int i = 0; i < game_data::legendaries_count; ++i)
+        {
+            if(! g.owned.test(game_data::legendaries[i]))
+            {
+                left[n++] = game_data::legendaries[i];
+            }
+        }
+        if(! n)
+        {
+            plain_say({ "Every legendary POKéMON has been caught!" });
+            last.outcome = battle_outcome::WON;
+            return last;
+        }
+        plain_say({ "A legendary POKéMON is drawn to your strength..." });
+        bn::unique_ptr<battle_setup> s(new battle_setup());
+        s->own = g.party.data();
+        s->own_count = g.party_count;
+        s->legendary = true;
+        s->foe_count = 1;
+        s->foes[0] = mon::make(species_id(left[rng().get_int(n)]), bn::min(100, base + 5));
+        mon& m = s->foes[0];
+        int able = g.able_count();
+        if(able > 2)
+        {
+            m.max_hp = uint16_t((m.max_hp * able + 1) / 2);
+            m.hp = m.max_hp;
+        }
+        battle_report legend = run_battle(*s);
+        if(legend.outcome == battle_outcome::RAN || legend.outcome == battle_outcome::WON)
+        {
+            plain_say({ "The legendary POKéMON returned to the tower's pool." });
+        }
+        return legend;
+    }
 }
 
 battle_report battle_scene(const encounter& e)
 {
     game_state& g = state();
+    if(e.kind == encounter_kind::TOWER)
+    {
+        clear_pending_moves();
+        battle_report report = tower_run();
+        if(report.outcome == battle_outcome::WHITED_OUT)
+        {
+            clear_pending_moves();
+            send_to_center();
+        }
+        save_game();
+        return report;
+    }
     bn::unique_ptr<battle_setup> s(new battle_setup());
     s->own = g.party.data();
     s->own_count = g.party_count;
+    // NUZLOCKE: the area's first wild encounter is its only chance to catch (the guardian and the
+    // professor's ZIGZAGOON aside); one that's all dupes doesn't count (dupes clause).
+    int area = area_of(g.map);
+    bool counts = false;
+    if(g.run.nuzlocke() && e.kind != encounter_kind::TRAINER && ! e.legendary && ! e.scripted &&
+       ! g.run.encounter_used.test(area))
+    {
+        for(int i = 0; i < e.count; ++i)
+        {
+            counts |= ! g.owned.test(int(e.species[i]));
+        }
+    }
+    s->nuzlocke_catch = ! g.run.nuzlocke() || e.legendary || counts;
+    if(e.scripted && g.run.nuzlocke())
+    {
+        s->nuzlocke_catch = false;
+    }
     if(e.kind == encounter_kind::TRAINER)
     {
         const map_def& m = world_data::maps[e.map];
@@ -191,6 +414,29 @@ battle_report battle_scene(const encounter& e)
     }
     clear_pending_moves();
     battle_report report = run_battle(*s);
+    if(counts)
+    {
+        g.run.encounter_used.set(area);
+    }
+    if(g.run.nuzlocke())
+    {
+        bury_fallen();
+        if(! g.party_count)
+        {
+            // Whiting out ends a NUZLOCKE run.
+            clear_pending_moves();
+            g.run.over = true;
+            report.run_over = true;
+            save_game();
+            bn::string<64> deaths("POKéMON lost: ");
+            deaths.append(bn::to_string<6>(g.run.deaths));
+            bn::string<64> badges("Badges: ");
+            badges.append(bn::to_string<4>(g.badges()));
+            audio::play_music("credits");
+            plain_say({ "Your whole party has fallen.", "The NUZLOCKE run is over.", badges.c_str(), deaths.c_str() });
+            return report;
+        }
+    }
     if(report.outcome == battle_outcome::WHITED_OUT)
     {
         clear_pending_moves();

@@ -9,6 +9,7 @@
 #include "bn_regular_bg_ptr.h"
 #include "bn_sprite_ptr.h"
 #include "bn_string.h"
+#include "bn_unique_ptr.h"
 #include "bn_vector.h"
 
 #include "bn_regular_bg_items_intro_bg.h"
@@ -30,7 +31,7 @@ namespace pr
 namespace
 {
     constexpr int start_poke_balls = 10;     // introFinish(): items {pokeball: 10}
-    constexpr const char* build_version = "1.0";
+    constexpr const char* build_version = "1.1";
 
     BN_DATA_EWRAM_BSS game_state saved_preview;
 
@@ -47,11 +48,42 @@ namespace
         return t;
     }
 
-    void new_game()
+    // NEW GAME's choices (Phase 6): NORMAL or NUZLOCKE, then SKIP STORY TEXT. Returns false if backed out.
+    bool choose_run(run_state& run)
+    {
+        ui& u = gui();
+        bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+        ui::fade_in(8);
+        u.show_text("Which kind of adventure would you like?");
+        constexpr bn::string_view modes[] = { "NORMAL", "NUZLOCKE" };
+        int k = u.list(modes, 2);
+        u.clear_text();
+        if(k < 0)
+        {
+            ui::fade_out(8);
+            return false;
+        }
+        run.mode = k == 1 ? run_mode::NUZLOCKE : run_mode::NORMAL;
+        if(run.nuzlocke())
+        {
+            u.say("NUZLOCKE: a POKéMON that faints is gone for good. It can't be used or revived.");
+            u.say("Only the first wild POKéMON you meet in each area can be caught, and every catch gets a nickname.");
+            u.say("Ones you already have don't count (dupes clause). Your POKéMON can't level past the next GYM LEADER.");
+            u.say("If your whole party falls, the run is over. Good luck!");
+        }
+        u.show_text("SKIP STORY TEXT? Scenes and calls complete themselves.");
+        run.skip_story = u.yes_no(false);
+        u.clear_text();
+        ui::fade_out(8);
+        return true;
+    }
+
+    void new_game(const run_state& run)
     {
         ui& u = gui();
         reset_state();
         game_state& g = state();
+        g.run = run;
         const map_def& home = world_data::maps[0];
         g.map = 0;
         g.x = home.spawn_x;
@@ -74,7 +106,7 @@ namespace
             mon.set_bg_priority(2);
             ui::fade_in(16);
             constexpr int lines = int(sizeof(game_data::intro_lines) / sizeof(game_data::intro_lines[0]));
-            for(int i = 0; i < lines; ++i)
+            for(int i = 0; i < lines && ! g.run.skip_story; ++i)
             {
                 u.say(game_data::intro_lines[i]);
             }
@@ -99,22 +131,135 @@ namespace
             bn::string<96> text(g.name);
             text.append("! That's a fine name.");
             u.say(text);
-            text = g.name;
-            text.append(", your very own POKéMON adventure is about to begin!");
-            u.say(text);
-            u.say("Dreams, friendships, rivals... they're all waiting out there. I'll see you soon!");
+            if(! g.run.skip_story)
+            {
+                text = g.name;
+                text.append(", your very own POKéMON adventure is about to begin!");
+                u.say(text);
+                u.say("Dreams, friendships, rivals... they're all waiting out there. I'll see you soon!");
+            }
             ui::fade_out(20);
         }
         save_game();
     }
 
-    // WHAT'S NEW: the message of the day and the changelog, scrolled with Up/Down.
+    // NEW ADVENTURE MODE (Phase 7): no story. Your name, a draft of 6 at level 50 (the other 4 slots stay empty
+    // until you catch more), and the post-game: every gym, rival and the League beaten, SURF, DIVE and the OLD
+    // ROD in the bag, starting at the POKéMON LEAGUE with the CHALLENGE TOWER open. Returns false if backed out.
+    bool new_adventure()
+    {
+        ui& u = gui();
+        uint16_t picks[6];
+        held_item items[6];
+        bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+        ui::fade_in(8);
+        u.say("NEW ADVENTURE MODE: skip the story and start as a CHAMPION, with the CHALLENGE TOWER open.");
+        u.say("Draft a team of 6 POKéMON at level 50. Press START when your team is ready.");
+        ui::fade_out(8);
+        u.win().clear_all();
+        if(! draft_team(6, picks, items))
+        {
+            return false;
+        }
+        reset_state();
+        game_state& g = state();
+        g.run.adventure = true;
+        u.keyboard("YOUR NAME?", g.name, name_length);
+        if(! g.name[0])
+        {
+            const char* fallback = "Trainer";
+            for(int i = 0; i < 8; ++i)
+            {
+                g.name[i] = fallback[i];
+            }
+        }
+        for(int i = 0; i < 6; ++i)
+        {
+            g.party[i] = mon::make(species_id(picks[i]), 50, items[i]);
+            g.mark_owned(picks[i]);
+        }
+        g.party_count = 6;
+        g.trainer_id = uint16_t(1 + rng().get_int(65535));
+        g.story = story::STARTER | story::CALL1 | story::CALL2 | story::CALL3 | story::SCENE_TEMPEST_RUN |
+                  story::SCENE_PORTMERE | story::SCENE_HIDEOUT | story::SCENE_SHRINE | story::STORM_ENDED | story::CHAMPION;
+        for(int i = 0; i < world_data::maps_count; ++i)
+        {
+            const map_def& m = world_data::maps[i];
+            for(int k = 0; k < m.trainers_count; ++k)
+            {
+                const trainer& t = m.trainers[k];
+                if(t.role == trainer_role::LEADER || t.role == trainer_role::RIVAL || t.role == trainer_role::ELITE ||
+                   t.role == trainer_role::CHAMPION)
+                {
+                    g.beaten.set(t.id);
+                }
+            }
+        }
+        g.add_item(item_id::POKEBALL, 20);
+        g.add_item(item_id::SUPERPOTION, 10);
+        g.add_item(item_id::REVIVE, 3);
+        g.add_item(item_id::HM03, 1);
+        g.add_item(item_id::HM08, 1);
+        g.add_item(item_id::OLDROD, 1);
+        g.money = 10000;
+        for(int i = 0; i < world_data::areas_count; ++i)
+        {
+            const map_def& m = world_data::maps[i];
+            if(m.area && (m.area->flags & area_flag::CHAMPION))
+            {
+                g.map = int16_t(i);
+                g.x = m.spawn_x;
+                g.y = m.spawn_y;
+                g.last_heal = int16_t(i);
+            }
+        }
+        g.facing = direction::DOWN;
+        save_game();
+        return true;
+    }
+
+    // A finished NUZLOCKE run (title CONTINUE): its summary, then back to the menu.
+    void run_summary(const game_state& saved)
+    {
+        ui& u = gui();
+        bn::bg_palettes::set_transparent_color(bn::color(3, 4, 8));
+        ui::fade_in(8);
+        bn::string<64> text(saved.name);
+        text.append("'s NUZLOCKE run is over.");
+        u.say(text);
+        text = "Badges: ";
+        text.append(bn::to_string<4>(saved.badges()));
+        text.append("   POKéMON lost: ");
+        text.append(bn::to_string<6>(saved.run.deaths));
+        u.say(text);
+        text = "Start a NEW GAME to try again!";
+        u.say(text);
+        ui::fade_out(8);
+    }
+
+    // WHAT'S NEW: the message of the day and the changelog, wrapped to the window (nothing cut short), scrolled
+    // with Up/Down.
     void news_screen()
     {
         ui& u = gui();
         bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+        bn::unique_ptr<bn::vector<bn::string_view, 640>> rows(new bn::vector<bn::string_view, 640>());
+        for(int i = 0; i < news_data::lines_count && ! rows->full(); ++i)
+        {
+            bn::string_view parts[8];
+            int n = u.wrap_lines(news_data::lines[i], 212, true, parts, 8);
+            if(! n)
+            {
+                rows->push_back("");
+            }
+            for(int k = 0; k < n && ! rows->full(); ++k)
+            {
+                rows->push_back(parts[k]);
+            }
+        }
+        int count = rows->size();
         int top = 0;
-        constexpr int rows = 8;
+        constexpr int visible = 8;
         bool redraw = true;
         bn::vector<bn::sprite_ptr, 96> texts;
         ui::fade_in(8);
@@ -125,20 +270,9 @@ namespace
                 texts.clear();
                 u.win().box(window_style::WINDOW, 0, 0, 30, 20);
                 u.print(8, 6, "WHAT'S NEW", text_color::BLUE, texts);
-                for(int r = 0; r < rows && top + r < news_data::lines_count; ++r)
+                for(int r = 0; r < visible && top + r < count; ++r)
                 {
-                    bn::string_view line(news_data::lines[top + r]);
-                    // Long lines are cut to the window.
-                    bn::string<64> shown;
-                    for(char c : line)
-                    {
-                        if(shown.size() >= 60 || u.width(shown, true) > 212)
-                        {
-                            break;
-                        }
-                        shown.push_back(c);
-                    }
-                    u.print(10, 24 + r * 15, shown, text_color::INK, texts, true);
+                    u.print_fit(10, 24 + r * 15, (*rows)[top + r], 216, text_color::INK, texts, true);
                 }
                 u.print(150, 146, "B: back", text_color::INK, texts, true);
                 redraw = false;
@@ -148,7 +282,7 @@ namespace
             {
                 break;
             }
-            if(bn::keypad::down_held() && top + rows < news_data::lines_count)
+            if(bn::keypad::down_held() && top + visible < count)
             {
                 ++top;
                 redraw = true;
@@ -170,6 +304,7 @@ namespace
     {
         CONTINUE,
         NEW_GAME,
+        NEW_ADVENTURE,
         FREE_BATTLE,
         NEWS
     };
@@ -181,18 +316,26 @@ namespace
         ui& u = gui();
         bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
         bn::vector<bn::sprite_ptr, 40> texts;
-        title_pick picks[4];
+        bool adventure = device_cleared() || (has_save && saved.has(story::CHAMPION));
+        title_pick picks[5];
         int n = 0;
-        int y = 1;
-        int rows_y[4];
+        int y = adventure ? 0 : 1;
+        int rows_y[5];
         if(has_save)
         {
             u.win().box(window_style::WINDOW, 1, y, 28, 10);
-            u.print(24, y * 8 + 4, "CONTINUE", text_color::INK, texts);
+            u.print(24, y * 8 + 4, saved.run.over ? "RUN OVER" : "CONTINUE", saved.run.over ? text_color::RED : text_color::INK,
+                    texts);
+            // The run's mode, top right.
+            const char* mode = saved.run.nuzlocke() ? "NUZLOCKE" : saved.run.adventure ? "ADVENTURE MODE" : "";
+            if(mode[0])
+            {
+                u.print(216 - u.width(mode, true), y * 8 + 7, mode, text_color::RED, texts, true);
+            }
             auto row = [&](int i, const char* label, const bn::string_view& value)
             {
-                u.print(32, y * 8 + 22 + i * 15, label, text_color::BLUE, texts);
-                u.print(208 - u.width(value), y * 8 + 22 + i * 15, value, text_color::BLUE, texts);
+                u.print(32, y * 8 + 20 + i * 14, label, text_color::BLUE, texts);
+                u.print(208 - u.width(value), y * 8 + 20 + i * 14, value, text_color::BLUE, texts);
             };
             row(0, "PLAYER", saved.name);
             row(1, "TIME", play_time(saved.play_frames));
@@ -202,10 +345,18 @@ namespace
             picks[n++] = title_pick::CONTINUE;
             y += 10;
         }
-        constexpr const char* names[] = { "NEW GAME", "FREE BATTLE", "WHAT'S NEW" };
-        constexpr title_pick kinds[] = { title_pick::NEW_GAME, title_pick::FREE_BATTLE, title_pick::NEWS };
-        u.win().box(window_style::WINDOW, 1, y, 28, 2 + 3 * 2);
-        for(int i = 0; i < 3; ++i)
+        const char* names[4];
+        title_pick kinds[4];
+        int m = 0;
+        names[m] = "NEW GAME"; kinds[m++] = title_pick::NEW_GAME;
+        if(adventure)
+        {
+            names[m] = "NEW ADVENTURE MODE"; kinds[m++] = title_pick::NEW_ADVENTURE;
+        }
+        names[m] = "FREE BATTLE"; kinds[m++] = title_pick::FREE_BATTLE;
+        names[m] = "WHAT'S NEW"; kinds[m++] = title_pick::NEWS;
+        u.win().box(window_style::WINDOW, 1, y, 28, 2 + m * 2);
+        for(int i = 0; i < m; ++i)
         {
             u.print(24, y * 8 + 4 + i * 16, names[i], text_color::INK, texts);
             rows_y[n] = y * 8 + 4 + i * 16;
@@ -297,7 +448,16 @@ bool title_scene()
     while(true)
     {
         bool has = peek_save(saved_preview);
+        if(has && saved_preview.has(story::CHAMPION) && ! device_cleared())
+        {
+            set_device_cleared();       // a game cleared before this version
+        }
         title_pick pick = main_menu(has, saved_preview);
+        if(pick == title_pick::CONTINUE && has && saved_preview.run.over)
+        {
+            run_summary(saved_preview);
+            continue;
+        }
         if(pick == title_pick::CONTINUE && load_game())
         {
             set_game_active(true);
@@ -314,9 +474,9 @@ bool title_scene()
             free_battle_scene();
             return false;
         }
-        if(pick == title_pick::NEW_GAME)
+        if(pick == title_pick::NEW_GAME || pick == title_pick::NEW_ADVENTURE)
         {
-            if(has)
+            if(has && ! saved_preview.run.over)
             {
                 // newAdventurePrompt(): this overwrites the saved game.
                 bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
@@ -330,7 +490,22 @@ bool title_scene()
                     continue;
                 }
             }
-            new_game();
+            if(pick == title_pick::NEW_ADVENTURE)
+            {
+                if(! new_adventure())
+                {
+                    continue;
+                }
+                set_game_active(true);
+                set_just_loaded();
+                return true;
+            }
+            run_state run;
+            if(! choose_run(run))
+            {
+                continue;
+            }
+            new_game(run);
             set_game_active(true);
             set_new_game_started();
             return true;

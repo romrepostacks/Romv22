@@ -37,6 +37,7 @@ namespace
         int type_filter = -1;
         int sort = 0;               // 0 dex (pool) order, 1 name, 2 total stats
         bn::string<16> search;
+        bool adventure = false;     // NEW ADVENTURE MODE's draft: START begins the adventure
     };
 
     int total_stats(int s)
@@ -231,7 +232,8 @@ namespace
                 counter.append(bn::to_string<4>(d.need_a));
                 counter.append(")");
                 u.print(8, 4, counter, text_color::INK, texts, true);
-                u.print(150, 13, "START: battle", text_color::BLUE, texts, true);
+                const char* start_label = d.adventure ? "START: go" : "START: battle";
+                u.print(234 - u.width(start_label, true), 13, start_label, text_color::BLUE, texts, true);
                 u.win().box(window_style::WINDOW, 0, 3, 30, 14);
                 if(index < top)
                 {
@@ -292,19 +294,10 @@ namespace
                 if(index >= header && index - header < d.shown_count)
                 {
                     const species& sp = game_data::species_list[d.shown[index - header]];
-                    bn::string<96> ab(sp.abil.name);
+                    bn::string<160> ab(sp.abil.name);
                     ab.append(" - ");
                     ab.append(sp.abil.desc);
-                    bn::string<64> shown;
-                    for(char c : ab)
-                    {
-                        if(u.width(shown, true) > 220)
-                        {
-                            break;
-                        }
-                        shown.push_back(c);
-                    }
-                    u.print(8, 142, shown, text_color::INK, texts, true);
+                    u.print_wrapped_fit(8, 139, 224, ab, 2, 9, text_color::INK, texts, true);
                 }
                 else
                 {
@@ -416,6 +409,25 @@ namespace
             redraw = true;
         }
     }
+}
+
+// NEW ADVENTURE MODE's draft (Phase 7): the same screen, `count` Pokémon with their items. False if B backs out.
+bool draft_team(int count, uint16_t* species_out, held_item* items_out)
+{
+    bn::unique_ptr<draft> d(new draft());
+    d->need_a = count;
+    d->adventure = true;
+    bn::bg_palettes::set_transparent_color(bn::color(7, 15, 21));
+    if(! draft_list(*d))
+    {
+        return false;
+    }
+    for(int i = 0; i < d->picked_count; ++i)
+    {
+        species_out[i] = uint16_t(d->picked[i]);
+        items_out[i] = d->items[i];
+    }
+    return true;
 }
 
 void free_battle_scene()

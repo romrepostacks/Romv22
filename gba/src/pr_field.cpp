@@ -265,6 +265,9 @@ void overworld::talk_to(int index)
     case person_role::CLERK:
         clerk();
         break;
+    case person_role::TOWER:
+        tower_guide();
+        break;
     default:
         for(int i = 0; i < p.lines_count; ++i)
         {
@@ -860,6 +863,43 @@ void overworld::mart()
 }
 
 // ----- The PC (usePC): SOMEONE'S PC (the boxes), your own (item storage), LOG OFF -----
+// NUZLOCKE's graveyard: the fallen (the latest 30), three to a line.
+void overworld::graveyard()
+{
+    game_state& g = state();
+    bn::string<64> text("POKéMON lost: ");
+    text.append(bn::to_string<6>(g.run.deaths));
+    say(text);
+    int shown = 0;
+    text.clear();
+    for(int k = 0; k < graveyard_size; ++k)
+    {
+        // Oldest first: the ring starts at grave_next.
+        const mon& m = g.run.graveyard[(g.run.grave_next + k) % graveyard_size];
+        if(m.empty())
+        {
+            continue;
+        }
+        if(! text.empty())
+        {
+            text.append(", ");
+        }
+        text.append(m.name());
+        text.append(" Lv");
+        text.append(bn::to_string<4>(m.level));
+        if(++shown % 3 == 0)
+        {
+            say(text);
+            text.clear();
+        }
+    }
+    if(! text.empty())
+    {
+        say(text);
+    }
+    say("May they rest in peace.");
+}
+
 void overworld::use_pc()
 {
     game_state& g = state();
@@ -875,9 +915,16 @@ void overworld::use_pc()
         u.show_text("Which PC should be accessed?");
         bn::string<24> mine(g.name);
         mine.append("'s PC");
-        bn::string_view options[] = { "SOMEONE'S PC", mine, "LOG OFF" };
-        int k = u.list_top_left(options, 3);
+        // NUZLOCKE: the graveyard, once someone has fallen.
+        bool grave = g.run.nuzlocke() && g.run.deaths;
+        bn::string_view options[] = { "SOMEONE'S PC", mine, grave ? "GRAVEYARD" : "LOG OFF", "LOG OFF" };
+        int k = u.list_top_left(options, grave ? 4 : 3);
         u.clear_text();
+        if(grave && k == 2)
+        {
+            graveyard();
+            continue;
+        }
         if(k == 1)
         {
             audio::play(audio::sfx::PC_LOGIN);
@@ -1081,7 +1128,7 @@ void overworld::starter_event()
         }
     }
     int back = open_run(*this, sxp, syp, direction::RIGHT, 8);
-    say("H-help me!");
+    story_say("H-help me!");
     int prof = add_temp_actor(person_kind::prof, sxp + back, syp, direction::LEFT);
     // The ZIGZAGOON on his heels.
     const species& zig = game_data::species_list[int(species_id::ZIGZAGOON)];
@@ -1116,8 +1163,8 @@ void overworld::starter_event()
     tick();
     bn::string<96> text(game_data::prof_name);
     text.append(": Hello! You over there! Please! Help me!");
-    say(text);
-    say("A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!");
+    story_say(text);
+    story_say("A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!");
     chaser.set_visible(false);
     suspend();
     int pick = starter_bag();
@@ -1132,10 +1179,11 @@ void overworld::starter_event()
     text.append(" chose ");
     text.append(partner.name());
     text.append("!");
-    say(text);
+    story_say(text);
     save_game();
     // ...and straight into battle with the ZIGZAGOON (Lv2).
     fixed_battle(species_id::ZIGZAGOON, 2);
+    _battle->scripted = true;
 }
 
 // Emerald's bag screen: three POKé BALLS; Left/Right to choose, A to look.
@@ -1216,13 +1264,13 @@ void overworld::starter_thanks()
     tick();
     bn::string<128> text(game_data::prof_name);
     text.append(": Whew... I went into the tall grass to look at wild POKéMON, and it jumped me!");
-    say(text);
-    say("You saved me. Thanks a lot!");
+    story_say(text);
+    story_say("You saved me. Thanks a lot!");
     text = "That ";
     upper(text, g.party_count ? g.party[0].species_name() : "POKéMON");
     text.append(" seems to like you. Please, keep it!");
-    say(text);
-    say("Travel with it and fill up your POKéDEX. I'll be watching your progress!");
+    story_say(text);
+    story_say("Travel with it and fill up your POKéDEX. I'll be watching your progress!");
     // He runs off and fades out.
     direction d = tx >= g.x ? direction::RIGHT : direction::LEFT;
     int n = open_run(*this, tx, ty, d, 6);
@@ -1255,7 +1303,7 @@ void overworld::rival_leaves()
     }
     for(int i = 0; i < _actors[index].tr->after_count; ++i)
     {
-        say(_actors[index].tr->after[i]);
+        story_say(_actors[index].tr->after[i]);
     }
     actor& r = _actors[index];
     direction d = r.x > g.x ? direction::RIGHT : r.x < g.x ? direction::LEFT : r.y > g.y ? direction::DOWN : direction::UP;
@@ -1294,10 +1342,10 @@ void overworld::story_enter()
             bn::string<80> text("Beep beep beep! Incoming call from ");
             text.append(game_data::prof_name);
             text.append("...");
-            say(text);
+            story_say(text);
             for(int i = 0; i < game_data::prof_call_lines[k]; ++i)
             {
-                say(game_data::prof_calls[k][i]);
+                story_say(game_data::prof_calls[k][i]);
             }
             return;
         }
@@ -1320,7 +1368,7 @@ bool overworld::play_scene()
         int grunt = scene_npc(person_kind::grunt, 5, 3);
         if(grunt < 0)
         {
-            say("Somewhere up the pass, someone shouts: \"Move it! TEAM TEMPEST has business on the coast!\"");
+            story_say("Somewhere up the pass, someone shouts: \"Move it! TEAM TEMPEST has business on the coast!\"");
             return true;
         }
         // It runs at you (fading in), shouts, and runs back the way it came (fading out).
@@ -1329,8 +1377,8 @@ bool overworld::play_scene()
         int dist = bn::abs(gr.x - g.x) + bn::abs(gr.y - g.y) - 1;
         gr.fade = -24;
         walk_actor(grunt, d, dist, true);
-        say("TEMPEST GRUNT: Hey! Outta the way, kid!");
-        say("TEMPEST GRUNT: TEAM TEMPEST has business on the coast. Don't you dare follow me!");
+        story_say("TEMPEST GRUNT: Hey! Outta the way, kid!");
+        story_say("TEMPEST GRUNT: TEAM TEMPEST has business on the coast. Don't you dare follow me!");
         direction back = opposite(d);
         int n = open_run(*this, _actors[grunt].x, _actors[grunt].y, back, 6);
         _actors[grunt].fade = 24 + n * run_frames;
@@ -1370,16 +1418,16 @@ bool overworld::play_scene()
                                          _actors[admin].facing == direction::UP ? 3 : 6);
         _actors[admin].sprite->set_horizontal_flip(_actors[admin].facing == direction::RIGHT);
         tick();
-        say("ADMIN VESPER: The TIDEWARDENS' shrine lies somewhere beneath these very waves.");
-        say("ADMIN VESPER: Once we can reach it, the guardian of the sea and sky will answer to TEAM TEMPEST!");
-        say("TEMPEST GRUNT: Storms for the skies! Tempest rises!");
+        story_say("ADMIN VESPER: The TIDEWARDENS' shrine lies somewhere beneath these very waves.");
+        story_say("ADMIN VESPER: Once we can reach it, the guardian of the sea and sky will answer to TEAM TEMPEST!");
+        story_say("TEMPEST GRUNT: Storms for the skies! Tempest rises!");
         _actors[admin].facing = toward(_actors[admin].x, _actors[admin].y, g.x, g.y);
         _actors[admin].sprite->set_tiles(person_sprites[int(person_kind::admin)]->tiles_item(), _actors[admin].facing == direction::DOWN ? 0 :
                                          _actors[admin].facing == direction::UP ? 3 : 6);
         _actors[admin].sprite->set_horizontal_flip(_actors[admin].facing == direction::RIGHT);
         tick();
-        say("ADMIN VESPER: ...A child? You've been trailing my grunts since MARROW PASS, haven't you?");
-        say("ADMIN VESPER: How tiresome. Grunt, make sure this one stays on dry land.");
+        story_say("ADMIN VESPER: ...A child? You've been trailing my grunts since MARROW PASS, haven't you?");
+        story_say("ADMIN VESPER: How tiresome. Grunt, make sure this one stays on dry land.");
         direction d = g.facing;
         int n = open_run(*this, _actors[admin].x, _actors[admin].y, d, 6);
         _actors[admin].fade = 24 + n * walk_frames;
@@ -1402,20 +1450,20 @@ bool overworld::play_scene()
     if(scene == "hideout" && ! g.has(story::SCENE_HIDEOUT))
     {
         g.story |= story::SCENE_HIDEOUT;
-        say("Voices echo from deeper in the cave...");
-        say("ADMIN VESPER: \"The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!\"");
-        say("ADMIN VESPER: \"WREN. Our little shadow has followed us here. Prove you're one of us.\"");
+        story_say("Voices echo from deeper in the cave...");
+        story_say("ADMIN VESPER: \"The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!\"");
+        story_say("ADMIN VESPER: \"WREN. Our little shadow has followed us here. Prove you're one of us.\"");
         return true;
     }
     if(scene == "shrine" && ! g.has(story::SCENE_SHRINE))
     {
         g.story |= story::SCENE_SHRINE;
-        say("WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"");
-        say("WREN: \"Here, let me patch up your team first.\"");
+        story_say("WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"");
+        story_say("WREN: \"Here, let me patch up your team first.\"");
         g.heal_party();
         audio::play(audio::sfx::HEAL);
-        say("Your POKéMON were fully healed!");
-        say("WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\"");
+        story_say("Your POKéMON were fully healed!");
+        story_say("WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\"");
         return true;
     }
     return false;
@@ -1529,26 +1577,46 @@ void overworld::nickname_prompts()
         {
             continue;
         }
-        bn::string<64> text("Give a nickname to the caught ");
-        upper(text, m.species_name());
-        text.append("?");
-        u.show_text(text);
-        bool yes = u.yes_no();
-        u.clear_text();
-        if(! yes)
+        bool must = g.run.nuzlocke();     // NUZLOCKE: every catch is nicknamed
+        bn::string<64> text;
+        if(must)
         {
-            continue;
+            text = "NUZLOCKE: give the caught ";
+            upper(text, m.species_name());
+            text.append(" a nickname.");
+            say(text);
+        }
+        else
+        {
+            text = "Give a nickname to the caught ";
+            upper(text, m.species_name());
+            text.append("?");
+            u.show_text(text);
+            bool yes = u.yes_no();
+            u.clear_text();
+            if(! yes)
+            {
+                continue;
+            }
         }
         suspend();
         bn::string<32> title;
         upper(title, m.species_name());
         title.append("'s nickname?");
         char nick[nick_length + 1];
-        if(u.keyboard(title, nick, nick_length, m.species_name()) && nick[0])
+        while(true)
         {
-            for(int i = 0; i <= nick_length; ++i)
+            bool ok = u.keyboard(title, nick, nick_length, must ? "" : m.species_name()) && nick[0];
+            if(ok)
             {
-                m.nick[i] = nick[i];
+                for(int i = 0; i <= nick_length; ++i)
+                {
+                    m.nick[i] = nick[i];
+                }
+            }
+            if(ok || ! must)
+            {
+                break;
             }
         }
         resume();
@@ -1604,7 +1672,7 @@ void overworld::after_story()
         just_loaded = false;
         bn::string<160> text(game_data::prof_name);
         text.append(" went out toward ROUTE 1 to study wild POKéMON.");
-        say(text);
+        story_say(text);
         const char* way = "Follow the road to the right!";
         const char* compass = "east";
         for(int i = 0; i < _map->links_count; ++i)
@@ -1621,7 +1689,7 @@ void overworld::after_story()
         text.append(compass);
         text.append(" of town. ");
         text.append(way);
-        say(text);
+        story_say(text);
         return;
     }
     if(just_loaded)
@@ -1660,10 +1728,10 @@ void overworld::after_story()
         g.story &= ~story::DIVE_GIFT;
         g.add_item(item_id::HM08, 1);
         save_game();
-        say("HALE: \"The ice keeps old secrets, and so does the sea. Take this.\"");
+        story_say("HALE: \"The ice keeps old secrets, and so does the sea. Take this.\"");
         obtain_named("HM08 DIVE", 1, "TMs & HMs");
-        say("HALE: \"Look for dark, deep water while you SURF, and press A there to DIVE.\"");
-        say("HALE: \"They say the TIDEWARDENS' shrine lies somewhere beneath the GLIMMER SEA.\"");
+        story_say("HALE: \"Look for dark, deep water while you SURF, and press A there to DIVE.\"");
+        story_say("HALE: \"They say the TIDEWARDENS' shrine lies somewhere beneath the GLIMMER SEA.\"");
     }
     if(g.has(story::LEGEND_FIGHT))
     {
@@ -1699,9 +1767,9 @@ void overworld::after_story()
         }
         if(first)
         {
-            say("Far above, the storm clouds over VELLORIN begin to break apart.");
-            say("WREN: \"You did it... The storms are clearing!\"");
-            say("WREN: \"VESPER's gone, and TEAM TEMPEST with her. See you at the top!\"");
+            story_say("Far above, the storm clouds over VELLORIN begin to break apart.");
+            story_say("WREN: \"You did it... The storms are clearing!\"");
+            story_say("WREN: \"VESPER's gone, and TEAM TEMPEST with her. See you at the top!\"");
         }
     }
     if(g.has(story::SURF_GIFT))
@@ -1709,10 +1777,10 @@ void overworld::after_story()
         g.story &= ~story::SURF_GIFT;
         g.add_item(item_id::HM03, 1);
         save_game();
-        say("SABLE: \"The sea chose well today. Take this as well.\"");
+        story_say("SABLE: \"The sea chose well today. Take this as well.\"");
         obtain_named("HM03 SURF", 1, "TMs & HMs");
-        say("SABLE: \"With SURF, a POKéMON can carry you across the water.\"");
-        say("SABLE: \"Face the water and press A. The sea is wider than you think!\"");
+        story_say("SABLE: \"With SURF, a POKéMON can carry you across the water.\"");
+        story_say("SABLE: \"Face the water and press A. The sea is wider than you think!\"");
     }
     if(g.walk_off >= 0)
     {
@@ -1756,12 +1824,74 @@ void overworld::credits()
     _player.reset();
     load_map(0);
     ui::fade_in(16);
-    say("Back home in DUSKMERE HOLLOW...");
+    story_say("Back home in DUSKMERE HOLLOW...");
     bn::string<96> text("MOM: \"");
     text.append(g.name);
     text.append("! The CHAMPION! I'm so proud of you!\"");
+    story_say(text);
+    adventure_begins();
+}
+
+// The first clear (Phase 7): the cartridge's unlock (NEW ADVENTURE MODE on the title) and, outside a
+// NUZLOCKE run, this save carries on as ADVENTURE MODE with the CHALLENGE TOWER at the POKéMON LEAGUE.
+void overworld::adventure_begins()
+{
+    game_state& g = state();
+    set_device_cleared();
+    if(g.run.nuzlocke())
+    {
+        say("Your NUZLOCKE run is complete. Congratulations, CHAMPION!");
+        bn::string<64> text("POKéMON lost along the way: ");
+        text.append(bn::to_string<6>(g.run.deaths));
+        say(text);
+        say("NEW ADVENTURE MODE is now on the title screen.");
+        save_game();
+        return;
+    }
+    g.run.adventure = true;
+    save_game();
+    say("Your adventure continues in ADVENTURE MODE!");
+    say("The CHALLENGE TOWER has opened at the POKéMON LEAGUE. Its guide waits by the League's doors.");
+    say("NEW ADVENTURE MODE is now on the title screen, too.");
+}
+
+// The CHALLENGE TOWER's guide: rank, best streak and legendaries left, then the challenge.
+void overworld::tower_guide()
+{
+    game_state& g = state();
+    ui& u = gui();
+    int left = 0;
+    for(int i = 0; i < game_data::legendaries_count; ++i)
+    {
+        left += ! g.owned.test(game_data::legendaries[i]);
+    }
+    say("Welcome to the CHALLENGE TOWER! Four elite trainers and the TOWER MASTER, one after another.");
+    say("There's no healing between battles, only what you carry. Clear it, and a legendary POKéMON appears!");
+    bn::string<96> text("RANK ");
+    text.append(bn::to_string<4>(g.run.tower_clears + 1));
+    text.append("   BEST STREAK ");
+    text.append(bn::to_string<4>(g.run.tower_best));
+    text.append("   LEGENDARIES LEFT ");
+    text.append(bn::to_string<4>(left));
     say(text);
-    say("Your adventure continues. ADVENTURE MODE is coming in a future update!");
+    if(! g.able_count())
+    {
+        say("Your POKéMON can't battle! Rest them first.");
+        return;
+    }
+    u.show_text("Take on the CHALLENGE TOWER? Your POKéMON will be healed first.");
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        say("Come back when you're ready.");
+        return;
+    }
+    g.heal_party();
+    audio::play(audio::sfx::HEAL);
+    say("Your POKéMON were fully healed! Good luck!");
+    save_game();
+    tower_battle();
 }
 
 // ----- START -----

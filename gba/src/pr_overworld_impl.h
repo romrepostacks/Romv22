@@ -151,6 +151,7 @@ public:
     void start_trainer_battle(int index);
     void wild_battle(bool water);
     void fixed_battle(species_id s, int level, bool legendary = false);
+    void tower_battle();
     void hold_until_released();
 
     // ----- Field (pr_field.cpp) -----
@@ -192,6 +193,11 @@ public:
     void start_menu();
     void save_menu();
     void say(const bn::string_view& text);
+    // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.
+    void story_say(const bn::string_view& text);
+    void tower_guide();
+    void graveyard();
+    void adventure_begins();
 
     // ----- Data -----
     const map_def* _map = nullptr;
