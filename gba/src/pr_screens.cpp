@@ -223,6 +223,7 @@ namespace
                 u.win().box(style, r.tx, r.ty, r.tw, r.th);
                 int x = r.tx * 8, y = r.ty * 8;
                 bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(x + (k ? 10 : 14)), sy(y + (k ? 8 : 12)));
+                apply_shiny(icon, m, mon_view::ICON);
                 icon.set_bg_priority(0);
                 icon.set_z_order(1);        // under the name's text
                 _icons.push_back(icon);
@@ -447,11 +448,16 @@ void summary_screen(const mon* mons, int count, int index)
                 u.print(8, 1, titles[page], text_color::WHITE, texts);
                 u.print(196, 4, "< PAGE >", text_color::WHITE, texts, true);
                 mon_sprite = m.data().front.create_sprite(sx(44), sy(56));
+                apply_shiny(*mon_sprite, m, mon_view::FRONT);
                 mon_sprite->set_bg_priority(1);
                 u.print_fit(6, 92, m.name(), 76, text_color::INK, texts);
                 bn::string<16> lv("Lv");
                 lv.append(bn::to_string<4>(m.level));
                 u.print(6, 108, lv, text_color::INK, texts);
+                if(m.shiny())
+                {
+                    u.print(44, 111, "SHINY", text_color::RED, texts, true);
+                }
                 draw_hp_bar(bar, 14, 128, 8, m.hp, m.max_hp);
                 bn::string<32> row;
                 auto line = [&](int i, const char* label, const bn::string_view& value)
@@ -876,6 +882,7 @@ namespace
                 {
                     const mon& m = g.party[i];
                     bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(tx * 8 + 10), sy(ty * 8 + 10));
+                    apply_shiny(icon, m, mon_view::ICON);
                     icon.set_scale(bn::fixed(0.75));
                     icon.set_bg_priority(0);
                     _party_icons.push_back(icon);
@@ -903,6 +910,7 @@ namespace
                 }
                 int x = 92 + (s % 6) * 24 + 12, y = 26 + (s / 6) * 22 + 11;
                 bn::sprite_ptr icon = icon_item(m.species_index).create_sprite(sx(x), sy(y));
+                apply_shiny(icon, m, mon_view::ICON);
                 icon.set_bg_priority(1);
                 _icons.push_back(icon);
             }
@@ -917,6 +925,7 @@ namespace
                     if(i < g.party_count)
                     {
                         bn::sprite_ptr icon = icon_item(g.party[i].species_index).create_sprite(sx(x + 20), sy(y + 7));
+                        apply_shiny(icon, g.party[i], mon_view::ICON);
                         icon.set_scale(bn::fixed(0.5));
                         icon.set_bg_priority(0);
                         _party_icons.push_back(icon);
@@ -940,6 +949,7 @@ namespace
         if(shown)
         {
             _big = shown->data().front.create_sprite(sx(43), sy(48));
+            apply_shiny(*_big, *shown, mon_view::FRONT);
             _big->set_bg_priority(1);
         }
         else
@@ -1020,6 +1030,7 @@ namespace
             if(! _held_icon)
             {
                 _held_icon = icon_item(_held->species_index).create_sprite(0, 0);
+                apply_shiny(*_held_icon, *_held, mon_view::ICON);
                 _held_icon->set_bg_priority(0);
                 _held_icon->set_z_order(-5);
             }
@@ -2358,6 +2369,7 @@ void credits_screen()
             const mon& m = g.party[i];
             int x = 120 + (2 * i - (n - 1)) * 19;
             bn::sprite_ptr s = m.data().front.create_sprite(sx(x), sy(62));
+            apply_shiny(s, m, mon_view::FRONT);
             s.set_scale(bn::fixed(0.6));
             s.set_bg_priority(1);
             hof.push_back(s);

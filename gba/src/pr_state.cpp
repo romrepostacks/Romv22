@@ -13,9 +13,11 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 5;
+    constexpr int save_version = 6;
     constexpr int v4_game_size = 20324;     // game_state up to `visited` (save version 4: GBA 1.0)
+    constexpr int v5_game_size = 21724;     // ...and `run` (save version 5: GBA 1.1)
     static_assert(offsetof(game_state, run) == v4_game_size, "save version 4 must be game_state's prefix");
+    static_assert(offsetof(game_state, tower) == v5_game_size, "save version 5 must be game_state's prefix");
 
     struct save_block
     {
@@ -54,11 +56,12 @@ namespace
                 return false;
             }
         }
-        if(block.version == 4 && block.size == v4_game_size)
+        if((block.version == 4 && block.size == v4_game_size) || (block.version == 5 && block.size == v5_game_size))
         {
-            // GBA 1.0's save: the same game_state without `run`, its checksum right after it.
+            // An older save: the same game_state without what came later, its checksum right after it.
+            int old_size = block.size;
             const auto* bytes = reinterpret_cast<const uint8_t*>(&block);
-            int length = int(offsetof(save_block, game)) + v4_game_size;
+            int length = int(offsetof(save_block, game)) + old_size;
             uint32_t sum = 0x1234;
             for(int i = 0; i < length; ++i)
             {
@@ -70,7 +73,17 @@ namespace
             {
                 return false;
             }
-            block.game.run = run_state();
+            if(old_size < v5_game_size)
+            {
+                block.game.run = run_state();
+            }
+            block.game.tower = tower_state();
+            // SPIRECREST TOWN came in as area 34, so every room moved up one.
+            constexpr int old_areas_count = 34;
+            if(block.game.map >= old_areas_count)
+            {
+                block.game.map = int16_t(block.game.map + 1);
+            }
             block.version = save_version;
             block.size = int(sizeof(game_state));
             return true;
@@ -113,6 +126,7 @@ void reset_state()
     current.opt = options();
     current.starter_trio = 2;
     current.run = run_state();
+    current.tower = tower_state();
 }
 
 bool game_active()
@@ -279,6 +293,14 @@ void set_device_cleared()
     m.cleared = 1;
     m.check = 0x5eed1234u;
     bn::sram::write_offset(m, clear_mark_offset);
+}
+
+bool roll_shiny()
+{
+    // Out of 16384: 4 (1/4096), 8 in ADVENTURE MODE, 5 in a NUZLOCKE run.
+    const run_state& run = state().run;
+    int chances = run.adventure ? 8 : run.nuzlocke() ? 5 : 4;
+    return rng().get_int(16384) < chances;
 }
 
 int level_cap_now()

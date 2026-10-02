@@ -137,6 +137,14 @@ struct run_state
     }
 };
 
+// The CHALLENGE TOWER run in progress (save version 6).
+struct tower_state
+{
+    bool active = false;                // inside, on a challenge (healing only from the bag)
+    bool legend_shiny = false;          // the summoned legendary's shiny roll
+    int16_t legend = -1;                // the species the SUMMONING STONE called, waiting in its chamber
+};
+
 struct game_state
 {
     int16_t map = 0;                    // world_data::maps index (an area or a room)
@@ -167,6 +175,7 @@ struct game_state
     bitset<1024> owned;
     bitset<64> visited;                 // areas you've been to (the region map, the TRAINER CARD)
     run_state run;                      // (added in save version 5; older saves get the defaults)
+    tower_state tower;                  // (added in save version 6)
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1
@@ -228,6 +237,9 @@ void set_device_cleared();
 
 // NUZLOCKE's level cap: the next gym leader's (the League's after the eighth badge); 100 otherwise.
 int level_cap_now();
+
+// A wild (or summoned) Pokémon's shiny roll: 1 in 4096, x2 in ADVENTURE MODE, x1.25 in a NUZLOCKE run.
+bool roll_shiny();
 
 }
 

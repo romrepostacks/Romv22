@@ -213,13 +213,37 @@ namespace
     }
 
     // ----- The CHALLENGE TOWER (Phase 7) -----
-    constexpr const char* tower_names[] = { "ACE TRAINER KAI", "ACE TRAINER MIRA", "VETERAN OSRIC", "VETERAN DELLA",
-                                            "COOLTRAINER RHYS", "COOLTRAINER ISLA", "EXPERT BRAM", "EXPERT NOVA",
-                                            "DRAGON TAMER VEX", "PSYCHIC LUNE", "BLACK BELT TAO", "SKY TRAINER ARIA" };
-    constexpr int tower_names_count = int(sizeof(tower_names) / sizeof(tower_names[0]));
-    constexpr uint8_t tower_trainer_id = 255;   // a beaten bit nobody else uses (cleared after each run)
+    // The CHALLENGE TOWER's floors, in order: their theme's type (the floor trainer's team).
+    constexpr const char* floor_types[] = { "FIRE", "WATER", "ELECTRIC", "GHOST", "DRAGON" };
 
-    BN_DATA_EWRAM_BSS trainer tower_trainers[5];
+    int type_index(const char* name)
+    {
+        for(int i = 0; i < types_count; ++i)
+        {
+            if(bn::string_view(game_data::type_names[i]) == bn::string_view(name))
+            {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    void tower_team(battle_setup& s, int type, int size, int level, int clears);
+
+    // A tower floor's trainer: a team of the floor's type, bigger and stronger with each rank (the tower's
+    // clears), held items from rank 2, smarter from rank 3; the TOWER MASTER brings six.
+    void tower_floor_team(battle_setup& s, const trainer& t)
+    {
+        game_state& g = state();
+        int floor = bn::clamp(int(t.elite), 0, 4);
+        int clears = g.run.tower_clears;
+        bool master = floor == 4;
+        int base = bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears));
+        int size = master ? 6 : bn::min(6, 3 + (floor + 1) / 2 + clears / 2);
+        tower_team(s, type_index(floor_types[floor]), size, bn::min(100, base + floor + (master ? 2 : 0)), clears);
+        s.smart = master || clears >= 2;
+        s.opponent = &t;
+    }
 
     bool is_legendary(int s)
     {
@@ -234,9 +258,8 @@ namespace
     }
 
     // A themed team: fully evolved, non-legendary Pokémon of one type (any, if the type has too few).
-    void tower_team(battle_setup& s, int size, int level, int clears)
+    void tower_team(battle_setup& s, int type, int size, int level, int clears)
     {
-        int type = rng().get_int(types_count);
         uint16_t pool[species_count];
         int n = 0;
         for(int pass = 0; pass < 2 && n < size; ++pass)
@@ -272,100 +295,11 @@ namespace
         }
     }
 
-    battle_report tower_run()
-    {
-        game_state& g = state();
-        int clears = g.run.tower_clears;
-        int base = bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears));
-        battle_report last;
-        for(int floor = 0; floor < 5; ++floor)
-        {
-            bool master = floor == 4;
-            trainer& t = tower_trainers[floor];
-            t = trainer{ 0, 0, person_kind::gentleman, direction::DOWN, trainer_role::ELITE,
-                         master ? "TOWER MASTER" : tower_names[rng().get_int(tower_names_count)],
-                         nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0, false, tower_trainer_id, -1, 0, false };
-            bn::unique_ptr<battle_setup> s(new battle_setup());
-            s->own = g.party.data();
-            s->own_count = g.party_count;
-            s->opponent = &t;
-            s->smart = master || clears >= 2;
-            int size = master ? 6 : bn::min(6, 4 + clears / 2);
-            tower_team(*s, size, bn::min(100, base + floor / 2 + (master ? 2 : 0)), clears);
-            bn::string<48> head("CHALLENGE TOWER - FLOOR ");
-            head.append(bn::to_string<4>(floor + 1));
-            plain_say({ head.c_str() });
-            g.beaten.reset(tower_trainer_id);
-            last = run_battle(*s);
-            g.beaten.reset(tower_trainer_id);
-            if(last.outcome == battle_outcome::WHITED_OUT || last.outcome == battle_outcome::RAN)
-            {
-                g.run.tower_streak = 0;
-                plain_say({ "The challenge is over. Your streak was reset." });
-                return last;
-            }
-        }
-        g.run.tower_clears = uint8_t(bn::min(250, clears + 1));
-        g.run.tower_streak = uint8_t(bn::min(250, g.run.tower_streak + 1));
-        g.run.tower_best = bn::max(g.run.tower_best, g.run.tower_streak);
-        bn::string<64> rank("CHALLENGE TOWER cleared! RANK ");
-        rank.append(bn::to_string<4>(g.run.tower_clears + 1));
-        rank.append(" unlocked.");
-        plain_say({ rank.c_str() });
-        // The prize: a battle with a legendary still in the pool (caught ones leave it for good).
-        int left[game_data::legendaries_count];
-        int n = 0;
-        for(int i = 0; i < game_data::legendaries_count; ++i)
-        {
-            if(! g.owned.test(game_data::legendaries[i]))
-            {
-                left[n++] = game_data::legendaries[i];
-            }
-        }
-        if(! n)
-        {
-            plain_say({ "Every legendary POKéMON has been caught!" });
-            last.outcome = battle_outcome::WON;
-            return last;
-        }
-        plain_say({ "A legendary POKéMON is drawn to your strength..." });
-        bn::unique_ptr<battle_setup> s(new battle_setup());
-        s->own = g.party.data();
-        s->own_count = g.party_count;
-        s->legendary = true;
-        s->foe_count = 1;
-        s->foes[0] = mon::make(species_id(left[rng().get_int(n)]), bn::min(100, base + 5));
-        mon& m = s->foes[0];
-        int able = g.able_count();
-        if(able > 2)
-        {
-            m.max_hp = uint16_t((m.max_hp * able + 1) / 2);
-            m.hp = m.max_hp;
-        }
-        battle_report legend = run_battle(*s);
-        if(legend.outcome == battle_outcome::RAN || legend.outcome == battle_outcome::WON)
-        {
-            plain_say({ "The legendary POKéMON returned to the tower's pool." });
-        }
-        return legend;
-    }
 }
 
 battle_report battle_scene(const encounter& e)
 {
     game_state& g = state();
-    if(e.kind == encounter_kind::TOWER)
-    {
-        clear_pending_moves();
-        battle_report report = tower_run();
-        if(report.outcome == battle_outcome::WHITED_OUT)
-        {
-            clear_pending_moves();
-            send_to_center();
-        }
-        save_game();
-        return report;
-    }
     bn::unique_ptr<battle_setup> s(new battle_setup());
     s->own = g.party.data();
     s->own_count = g.party_count;
@@ -389,7 +323,15 @@ battle_report battle_scene(const encounter& e)
     if(e.kind == encounter_kind::TRAINER)
     {
         const map_def& m = world_data::maps[e.map];
-        trainer_team(*s, m.trainers[e.trainer_index]);
+        const trainer& t = m.trainers[e.trainer_index];
+        if(t.role == trainer_role::TOWER)
+        {
+            tower_floor_team(*s, t);
+        }
+        else
+        {
+            trainer_team(*s, t);
+        }
     }
     else
     {
@@ -397,6 +339,12 @@ battle_report battle_scene(const encounter& e)
         for(int i = 0; i < e.count; ++i)
         {
             s->foes[i] = mon::make(e.species[i], e.level);
+            // Shiny odds (roll_shiny: x2 in ADVENTURE MODE, x1.25 in NUZLOCKE); never the professor's ZIGZAGOON.
+            // The tower's summoned legendary was rolled at the stone.
+            if(e.tower_legend ? g.tower.legend_shiny : (! e.scripted && roll_shiny()))
+            {
+                s->foes[i].traits |= mon_trait::SHINY;
+            }
         }
         s->legendary = e.legendary;
         if(e.legendary)
@@ -440,6 +388,12 @@ battle_report battle_scene(const encounter& e)
     if(report.outcome == battle_outcome::WHITED_OUT)
     {
         clear_pending_moves();
+        if(g.tower.active)
+        {
+            // Out of the CHALLENGE TOWER: the challenge is over, the streak with it.
+            g.tower = tower_state();
+            g.run.tower_streak = 0;
+        }
         send_to_center();
     }
     save_game();

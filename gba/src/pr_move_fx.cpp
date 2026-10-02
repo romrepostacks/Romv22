@@ -17,6 +17,7 @@
 #include "bn_sprites.h"
 #include "bn_vector.h"
 
+#include "pr_audio.h"
 #include "pr_fx_data.h"
 #include "pr_game_data.h"
 #include "pr_state.h"
@@ -914,6 +915,20 @@ namespace
             }
         }
     };
+}
+
+void play_shiny_sparkle(const fx_body& who)
+{
+    engine e;
+    e.A = who;
+    e.T = who;
+    fx_data::fx_step star{ fx_data::fx_kind::BURST, int8_t(fx_shape::STAR), 10, false, false, true, false, false, true,
+                           bn::color(31, 29, 8), bn::color(31, 31, 31) };
+    audio::play(audio::sfx::SPOT);
+    e.play(star);
+    e.wait_ms(100);
+    e.play(star);
+    e.finish();
 }
 
 void play_move_fx(int move_index, const fx_body& from, const fx_body& to)

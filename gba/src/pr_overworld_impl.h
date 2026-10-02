@@ -71,7 +71,8 @@ struct actor
     bool wander = false;
     bool event = false;            // put there by a scene (the professor, a grunt)
     bool neighbour = false;        // standing in a connected area: drawn, but not here to talk to
-    bool legend = false;           // the guardian of the Sunken Shrine
+    bool legend = false;           // the guardian of the Sunken Shrine (or the tower's summoned legendary)
+    bool legend_shiny = false;
     species_id legend_species = species_id(0);
     int move_frames = 0;           // > 0 while stepping
     int step_length = walk_frames;
@@ -151,7 +152,7 @@ public:
     void start_trainer_battle(int index);
     void wild_battle(bool water);
     void fixed_battle(species_id s, int level, bool legendary = false);
-    void tower_battle();
+    void tower_legend_battle(species_id s, int level);
     void hold_until_released();
 
     // ----- Field (pr_field.cpp) -----
@@ -196,6 +197,15 @@ public:
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.
     void story_say(const bn::string_view& text);
     void tower_guide();
+    // The CHALLENGE TOWER (SPIRECREST TOWN): in at the door, up floor by floor, the SUMMONING STONE at the
+    // summit, the legendary in its chamber, and out again.
+    bool tower_door(const door& d);
+    void tower_after_battle();
+    void tower_offer_up(int floor);
+    void tower_stone();
+    bool tower_leave();
+    void tower_end(bool keep_streak);
+    void warp_to_room(int map_index);
     void graveyard();
     void adventure_begins();
 

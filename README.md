@@ -76,7 +76,7 @@ stick with it, or use Export/Import Save Code to move a save between them).
 ## Game Boy Advance version
 
 `gba/` builds a real GBA ROM (for Delta, mGBA or a flash cart) from this game's own maps, art and
-Pokémon data. Version 1.1 is the whole game: every area, the story through the Elite Four and the
+Pokémon data. Version 1.2 is the whole game: every area, the story through the Elite Four and the
 Hall of Fame, party battles with move animations, catching, field moves, the POKéDEX, PC boxes, music and
-saving, plus NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER (STORY.md phases 6 and 7, so far
-only on the GBA). See `gba/README.md`.
+saving, plus NUZLOCKE mode, ADVENTURE MODE with the CHALLENGE TOWER in its own town, and shiny Pokémon
+(STORY.md phases 6 and 7, so far only on the GBA). See `gba/README.md`.

@@ -458,9 +458,11 @@ def build_world(exp, data, out_inc):
             '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
             for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
         people = a['people']
-        if a.get('champion') and not any(n.get('role') == 'tower' for n in people):
-            # GBA only (Phase 7): the CHALLENGE TOWER's guide by the League's door; shown in ADVENTURE MODE.
-            people.append({'kind': 'gentleman', 'x': 20, 'y': 13, 'facing': 'down', 'role': 'tower', 'wander': False,
+        tower_door = [d for d in a['doors'] if d['kind'] == 'tower']
+        if tower_door and not any(n.get('role') == 'tower' for n in people):
+            # GBA only (Phase 7): the CHALLENGE TOWER's guide beside its door in SPIRECREST TOWN.
+            d = tower_door[0]
+            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'left', 'role': 'tower', 'wander': False,
                            'lines': ['The CHALLENGE TOWER opens to CHAMPIONS.']})
         people_rows(p, people)
         trainer_rows(p, a['trainers'], ('area', ai), ai)
@@ -499,6 +501,7 @@ def build_world(exp, data, out_inc):
         if a['league']: flags.append('area_flag::LEAGUE')
         if a['champion']: flags.append('area_flag::CHAMPION')
         if a['kind'] == 'boss': flags.append('area_flag::BOSS')
+        if a.get('tower_town'): flags.append('area_flag::TOWER_TOWN')
         legend = a['legend']
         if a['own_pool']:
             flags.append('area_flag::OWN_POOL')
@@ -530,12 +533,14 @@ def build_world(exp, data, out_inc):
         L.append('constexpr thing %sthings[] = {%s};' % (p, nonempty(', '.join(things), '{0, 0, nullptr, 0}')))
         gates = ['{%d, %d, %d, %d}' % (g['y'], g['x0'], g['x1'], g['elite']) for g in r['gates']]
         L.append('constexpr league_gate %sgates[] = {%s};\n' % (p, nonempty(', '.join(gates), '{0, 0, 0, 0}')))
-        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART', 'gym': 'POKéMON GYM', 'league': 'POKéMON LEAGUE'}.get(r['kind'], 'HOUSE')
+        name = {'center': 'POKéMON CENTER', 'mart': 'POKé MART', 'gym': 'POKéMON GYM', 'league': 'POKéMON LEAGUE',
+                'tower': 'CHALLENGE TOWER', 'summit': 'TOWER SUMMIT', 'chamber': 'SUMMONING CHAMBER'}.get(r['kind'], 'HOUSE')
         gym = r.get('gym') or {}
-        kind = {'center': 'CENTER', 'mart': 'MART', 'gym': 'GYM', 'league': 'LEAGUE', 'house': 'HOUSE'}[r['kind']]
-        theme = (r.get('theme') or '').upper() or 'NONE'
-        L.append('constexpr room_info %sroom = {room_kind::%s, gym_theme::%s, %sgates, %d, %d, %s};' % (
-            p, kind, theme, p, len(r['gates']), info['gate_meta'], 'true' if r['home'] else 'false'))
+        kind = {'center': 'CENTER', 'mart': 'MART', 'gym': 'GYM', 'league': 'LEAGUE', 'house': 'HOUSE', 'tower': 'TOWER',
+                'summit': 'SUMMIT', 'chamber': 'CHAMBER'}[r['kind']]
+        theme = (r.get('theme') or '').upper() or ('LEAGUE' if r['kind'] in ('summit', 'chamber') else 'NONE')
+        L.append('constexpr room_info %sroom = {room_kind::%s, gym_theme::%s, %sgates, %d, %d, %s, %d};' % (
+            p, kind, theme, p, len(r['gates']), info['gate_meta'], 'true' if r['home'] else 'false', r.get('floor', -1)))
         map_rows.append('{%s, %d, %d, %d, %s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
                         '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d, %d, gate_kind::NONE, %s, %s, nullptr, nullptr, nullptr, "", &%sroom}' % (
             c_text(name), info['ts'], r['w'], r['h'], 'room_' + r['art'], p, p, len(r['people']), p, len(r['trainers']),
@@ -721,10 +726,11 @@ def build_music(data, out_inc):
     L.append('}\n\n#endif')
     write_if_changed(os.path.join(out_inc, 'pr_music_data.h'), '\n'.join(L))
 
-def mon_sprite(path):
-    """A 96x96 sprite cropped to the 64x64 GBA frame: centred on its content, feet at the bottom."""
+def mon_sprite(path, box_of=None):
+    """A 96x96 sprite cropped to the 64x64 GBA frame: centred on its content, feet at the bottom. box_of: crop
+    by another picture's content instead (a shiny sprite lines up with its normal one)."""
     img = Image.open(path).convert('RGBA')
-    box = img.getbbox() or (0, 0, 96, 96)
+    box = (Image.open(box_of).convert('RGBA') if box_of else img).getbbox() or (0, 0, 96, 96)
     w, h = box[2] - box[0], box[3] - box[1]
     if w > 64 or h > 64:
         s = 64 / max(w, h)
@@ -734,6 +740,27 @@ def mon_sprite(path):
     out = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
     out.alpha_composite(img.crop(box), ((64 - w) // 2, 64 - h - 2 if h < 62 else 0))
     return out
+
+def shiny_palette(pal, idx, shiny, alpha_from=None):
+    """The shiny colours for a sprite's palette: for each colour slot, the commonest colour the shiny sprite
+    has where the normal one uses that slot (slots with nothing under them keep their colour)."""
+    px = shiny.load()
+    counts = [dict() for _ in range(len(pal) + 1)]
+    for y, row in enumerate(idx):
+        for x, k in enumerate(row):
+            if not k:
+                continue
+            p = px[x, y]
+            if len(p) == 4 and p[3] < 128:
+                continue
+            c = rgb555(p[:3])
+            counts[k][c] = counts[k].get(c, 0) + 1
+    out = []
+    for k in range(1, len(pal) + 1):
+        out.append(max(counts[k].items(), key=lambda kv: kv[1])[0] if counts[k] else pal[k - 1])
+    return out
+
+SHINY = {'front': [], 'back': [], 'icon': []}
 
 def build_mons(data, gfx):
     for s in data['species']:
@@ -745,6 +772,12 @@ def build_mons(data, gfx):
             pal, idx = quantize_rgba(img, 15)
             save_indexed_bmp(os.path.join(gfx, 'mon_%s_%d.bmp' % (side, s['num'])), pal, idx,
                              {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+            # Its shiny colours (sprites/pokemon/[back/]shiny/, from PokeAPI), slot for slot.
+            spath = os.path.join(ROOT, 'sprites', 'pokemon', sub + 'shiny', '%d.png' % s['num'])
+            if not os.path.exists(spath):
+                spath = os.path.join(ROOT, 'sprites', 'pokemon', 'shiny', '%d.png' % s['num'])
+            shiny = mon_sprite(spath, box_of=path) if os.path.exists(spath) else img
+            SHINY[side].append(shiny_palette(pal, idx, shiny))
             if side == 'front':
                 # A 32x32 icon (the party screen, the PC's boxes): the front sprite at half size.
                 small = img.resize((32, 32), Image.LANCZOS)
@@ -756,6 +789,21 @@ def build_mons(data, gfx):
                 pal, idx = quantize_rgba(small, 15)
                 save_indexed_bmp(os.path.join(gfx, 'mon_icon_%d.bmp' % s['num']), pal, idx,
                                  {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+                SHINY['icon'].append(shiny_palette(pal, idx, shiny.resize((32, 32), Image.LANCZOS)))
+
+def write_shiny(out_inc):
+    L = ['// Generated by tools/build_assets.py from sprites/pokemon/shiny; do not edit.',
+         '#ifndef PR_SHINY_DATA_H\n#define PR_SHINY_DATA_H\n', '#include "bn_color.h"\n',
+         'namespace pr::shiny_data\n{\n',
+         '// Per species (species_list order): the shiny palette of its front, back and icon sprites (slot 0 unused).']
+    for side in ('front', 'back', 'icon'):
+        rows = []
+        for pal in SHINY[side]:
+            cols = ['bn::color(31, 0, 31)'] + [c_color(c) for c in pal] + ['bn::color(0, 0, 0)'] * (15 - len(pal))
+            rows.append('{' + ', '.join(cols) + '}')
+        L.append('constexpr bn::color %s[][16] = {\n    %s\n};\n' % (side, ',\n    '.join(rows)))
+    L.append('}\n\n#endif\n')
+    write_if_changed(os.path.join(out_inc, 'pr_shiny_data.h'), '\n'.join(L))
 
 # ---------------------------------------------------------------------------------------------------
 # UI: 9-slice window styles (8x8 corners, edges and fill), all in one 15-colour palette bank, after the
@@ -1515,6 +1563,7 @@ def main():
     build_ui_tiles(inc)
     build_people(data, gfx)
     build_mons(data, gfx)
+    write_shiny(inc)
     BALL.extend(data['ball'])
     build_small_sprites(gfx)
     build_plank(gfx)

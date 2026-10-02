@@ -39,7 +39,7 @@ All names are placeholders the owner can change. Original story; Pokémon specie
    - A Nuzlocke HUD: encounters used per area on the map, deaths and a run summary on the trainer card.
    - Skip story text: scenes and calls fast-forward or complete themselves, and key story items (e.g. SURF, DIVE)
      are still granted at the same story points so the run can be finished.
-7. **Endgame: Adventure Mode (web: planned, not started; GBA: done in 1.1, the tower's guide by the League's doors).** Unlocked by the first clear of the main story (Phase 5).
+7. **Endgame: Adventure Mode (web: planned, not started; GBA: done in 1.1, and in 1.2 the tower is its own building in SPIRECREST TOWN, south of Duskmere Hollow, with themed floors, a SUMMONING STONE and a themed legendary chamber; shinies added too).** Unlocked by the first clear of the main story (Phase 5).
    - **Continuing:** after the credits the same save carries on as ADVENTURE MODE (shown on the title and the save
      info). The whole region stays open, with the Challenge Tower as the new goal.
    - **The Challenge Tower:** repeatable Elite Four-style runs (four elite trainers and a tower master in a row, no

@@ -6,6 +6,8 @@ placeholder, so it's safe to fill these in gradually.
 
 - `pokemon/<num>.png` — used for enemy sprites and menu/list icons
 - `pokemon/back/<num>.png` — used for your own party's sprite during battle (over-the-shoulder view)
+- `pokemon/shiny/<num>.png` and `pokemon/back/shiny/<num>.png` — the shiny versions (from PokeAPI). The GBA
+  build takes each shiny Pokémon's colours from these.
 
 ## Numbering
 

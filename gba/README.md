@@ -3,9 +3,10 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.1**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
+Version **1.2**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
 own data, plus the two story phases planned after it (STORY.md phases 6 and 7): NUZLOCKE mode and ADVENTURE
-MODE with the CHALLENGE TOWER. The web game doesn't have these yet; the GBA builds them from the plan.
+MODE with the CHALLENGE TOWER, and shiny Pokémon. The web game doesn't have these yet; the GBA builds them
+from the plan.
 
 ## What's in it
 
@@ -34,19 +35,26 @@ MODE with the CHALLENGE TOWER. The web game doesn't have these yet; the GBA buil
   only the first wild encounter in each area can be caught, and one already owned doesn't count (dupes
   clause); every catch is nicknamed; your Pokémon can't level past the next GYM LEADER; whiting out ends the
   run. The region map marks spent areas, the TRAINER CARD's back keeps deaths, catches and encounters, and
-  the PC has a GRAVEYARD. (The game has no shiny Pokémon, so the shiny clause doesn't come up.)
-- **ADVENTURE MODE (phase 7):** after the credits a normal save carries on as ADVENTURE MODE. The CHALLENGE
-  TOWER's guide waits by the POKéMON LEAGUE's doors: four elite trainers and the TOWER MASTER in a row, no
-  healing between them. Each clear raises the rank (higher levels, bigger teams, held items, smarter foes)
-  and earns a battle with a legendary from the tower's pool of 68; a caught one leaves the pool for good.
-  The first clear also unlocks NEW ADVENTURE MODE on the title: skip the story, draft 6 Pokémon at level 50
-  (the FREE BATTLE draft) and start at the League as CHAMPION. Neither is offered in a NUZLOCKE run.
+  the PC has a GRAVEYARD.
+- **ADVENTURE MODE (phase 7):** after the credits a normal save carries on as ADVENTURE MODE, and the road
+  south of DUSKMERE HOLLOW opens (it's gated until you're CHAMPION) to SPIRECREST TOWN, with its own
+  POKéMON CENTER, MART and the CHALLENGE TOWER. Inside, five themed floors (Fire, Water, Electric, Ghost,
+  and the TOWER MASTER's Dragon floor) each hold one trainer with a team of the floor's type; there's no
+  healing inside but what you carry, and leaving ends the challenge. Each clear raises the rank (higher
+  levels, bigger teams, held items, smarter foes). At the summit, the SUMMONING STONE calls a legendary
+  from the pool of 68 into a chamber themed for its type; a caught one leaves the pool for good. The first
+  clear also unlocks NEW ADVENTURE MODE on the title: skip the story, draft 6 Pokémon at level 50 (the FREE
+  BATTLE draft) and start in SPIRECREST TOWN as CHAMPION. Neither is offered in a NUZLOCKE run.
+- **Shiny Pokémon:** any wild Pokémon (and your starter, and the tower's legendary) can be shiny: 1 in
+  4096, twice that in ADVENTURE MODE and 1.25 times in a NUZLOCKE run. Shinies use their real shiny colours
+  (from PokeAPI's sprites, in sprites/pokemon/shiny) in battle, the party, the PC and the summary (marked
+  SHINY), and sparkle when they appear. In a NUZLOCKE run, a shiny can always be caught (the shiny clause).
 - **Skip story text:** scenes, the professor's calls and the rivals' goodbyes complete themselves; SURF,
   DIVE and the other story rewards still come at the same points.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 saves
-  load in 1.1 (as NORMAL runs); saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 and 1.1
+  saves load in 1.2; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) is for the web app only: a GBA has one screen and one set of
 buttons.

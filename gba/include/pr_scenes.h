@@ -12,8 +12,7 @@ enum class encounter_kind : uint8_t
 {
     WILD,           // a pack from the tall grass, a cave floor or the water (startWildBattle)
     FIXED,          // a scripted wild Pokémon: the professor's ZIGZAGOON, a bite on the line, the guardian
-    TRAINER,        // a trainer, rival, Gym Leader, Elite Four or Champion (startTrainerBattle)
-    TOWER           // a CHALLENGE TOWER run: five trainers in a row, then a legendary (ADVENTURE MODE)
+    TRAINER         // a trainer, rival, Gym Leader, Elite Four, Champion or CHALLENGE TOWER floor
 };
 
 // What the overworld hands to a battle.
@@ -28,6 +27,7 @@ struct encounter
     bool legendary = false;         // the guardian: tougher, harder to catch (state.legendary)
     bool water = false;
     bool scripted = false;          // the professor's ZIGZAGOON: never a NUZLOCKE encounter
+    bool tower_legend = false;      // the CHALLENGE TOWER's summoned legendary (shiny as rolled at the stone)
 };
 
 enum class battle_outcome

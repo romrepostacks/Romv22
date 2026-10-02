@@ -31,7 +31,7 @@ namespace pr
 namespace
 {
     constexpr int start_poke_balls = 10;     // introFinish(): items {pokeball: 10}
-    constexpr const char* build_version = "1.1";
+    constexpr const char* build_version = "1.2";
 
     BN_DATA_EWRAM_BSS game_state saved_preview;
 
@@ -145,7 +145,7 @@ namespace
 
     // NEW ADVENTURE MODE (Phase 7): no story. Your name, a draft of 6 at level 50 (the other 4 slots stay empty
     // until you catch more), and the post-game: every gym, rival and the League beaten, SURF, DIVE and the OLD
-    // ROD in the bag, starting at the POKéMON LEAGUE with the CHALLENGE TOWER open. Returns false if backed out.
+    // ROD in the bag, starting in SPIRECREST TOWN by the CHALLENGE TOWER. Returns false if backed out.
     bool new_adventure()
     {
         ui& u = gui();
@@ -205,7 +205,7 @@ namespace
         for(int i = 0; i < world_data::areas_count; ++i)
         {
             const map_def& m = world_data::maps[i];
-            if(m.area && (m.area->flags & area_flag::CHAMPION))
+            if(m.area && (m.area->flags & area_flag::TOWER_TOWN))
             {
                 g.map = int16_t(i);
                 g.x = m.spawn_x;

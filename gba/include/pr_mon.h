@@ -23,6 +23,12 @@ namespace mon_flag
     constexpr uint8_t BERRY_USED = 8;
 }
 
+// Kept for good (in the save).
+namespace mon_trait
+{
+    constexpr uint8_t SHINY = 1;
+}
+
 struct mon
 {
     uint16_t species_index = 0;
@@ -42,7 +48,7 @@ struct mon
     uint16_t spe = 0;
     uint16_t xp = 0;
     char nick[nick_length + 1] = {};
-    uint8_t padding = 0;
+    uint8_t traits = 0;                 // mon_trait bits (this byte was always-0 padding in older saves)
 
     [[nodiscard]] static mon make(species_id id, int level, held_item item = held_item::NONE);
 
@@ -54,6 +60,10 @@ struct mon
     // dname(): the nickname, else the species' name.
     [[nodiscard]] const char* name() const;
     [[nodiscard]] const char* species_name() const;
+    [[nodiscard]] bool shiny() const
+    {
+        return traits & mon_trait::SHINY;
+    }
     [[nodiscard]] bool fainted() const
     {
         return hp == 0;

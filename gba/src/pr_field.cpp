@@ -110,6 +110,62 @@ void set_new_game_started()
     new_game_started = true;
 }
 
+namespace
+{
+    // The CHALLENGE TOWER's rooms.
+    int tower_room(room_kind kind, int floor = -1, gym_theme theme = gym_theme::NONE)
+    {
+        for(int i = wd::areas_count; i < wd::maps_count; ++i)
+        {
+            const room_info* r = wd::maps[i].room;
+            if(r && r->kind == kind && (floor < 0 || r->floor == floor) && (kind != room_kind::CHAMBER || r->theme == theme))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // Where a legendary waits: the chamber themed for its (first) type.
+    gym_theme chamber_theme(int species)
+    {
+        bn::string_view t(game_data::type_names[game_data::species_list[species].type1]);
+        if(t == "FIRE") return gym_theme::FIRE;
+        if(t == "WATER") return gym_theme::WATER;
+        if(t == "ELECTRIC") return gym_theme::ELECTRIC;
+        if(t == "GRASS" || t == "BUG") return gym_theme::GRASS;
+        if(t == "ICE") return gym_theme::ICE;
+        if(t == "GHOST" || t == "PSYCHIC" || t == "DARK" || t == "POISON" || t == "FAIRY") return gym_theme::GHOST;
+        if(t == "DRAGON" || t == "FLYING") return gym_theme::DRAGON;
+        if(t == "GROUND" || t == "ROCK" || t == "STEEL" || t == "FIGHTING") return gym_theme::GROUND;
+        return gym_theme::LEAGUE;
+    }
+
+    // Every tower floor's trainer stands ready again.
+    void reset_tower_trainers()
+    {
+        game_state& g = state();
+        for(int i = wd::areas_count; i < wd::maps_count; ++i)
+        {
+            const map_def& m = wd::maps[i];
+            for(int k = 0; k < m.trainers_count; ++k)
+            {
+                if(m.trainers[k].role == trainer_role::TOWER)
+                {
+                    g.beaten.reset(m.trainers[k].id);
+                }
+            }
+        }
+    }
+
+    int tower_level()
+    {
+        game_state& g = state();
+        int clears = bn::max(0, g.run.tower_clears - 1);
+        return bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
+    }
+}
+
 // ----- Talking, signs and things (owInteract) -----
 void overworld::interact()
 {
@@ -183,6 +239,11 @@ void overworld::interact()
         water_action(tx, ty);
         return;
     }
+    if(b == behaviour::STATUE && ! (_map->room && _map->room->kind == room_kind::GYM))
+    {
+        say("A statue of a great trainer of old.");
+        return;
+    }
     if(b == behaviour::STATUE)
     {
         // "CINDERGATE TOWN POKéMON GYM / Leader: Rell / Winning trainers: ..."
@@ -200,6 +261,11 @@ void overworld::interact()
     }
     for(int i = 0; i < _map->things_count; ++i)
     {
+        if(_map->things[i].x == tx && _map->things[i].y == ty && _map->room && _map->room->kind == room_kind::SUMMIT)
+        {
+            tower_stone();
+            return;
+        }
         if(_map->things[i].x == tx && _map->things[i].y == ty)
         {
             for(int k = 0; k < _map->things[i].lines_count; ++k)
@@ -246,6 +312,10 @@ void overworld::talk_to(int index)
         for(int i = 0; i < a.tr->after_count; ++i)
         {
             say(a.tr->after[i]);
+        }
+        if(a.tr->role == trainer_role::TOWER)
+        {
+            tower_offer_up(a.tr->elite);
         }
         return;
     }
@@ -298,6 +368,15 @@ void overworld::legend_talk(int index)
         return;
     }
     species_id legend = _actors[index].legend_species;
+    if(_map->room && _map->room->kind == room_kind::CHAMBER)
+    {
+        bn::string<64> call;
+        upper(call, game_data::species_list[int(legend)].name);
+        call.append(" looks down at you, waiting...");
+        say(call);
+        tower_legend_battle(legend, tower_level());
+        return;
+    }
     bn::string<64> text("The great ");
     text.append(game_data::species_list[int(legend)].name);
     text.append(" is stirring...");
@@ -1171,6 +1250,10 @@ void overworld::starter_event()
     resume();
     species_id chosen = game_data::starter_trios[g.starter_trio][pick];
     mon partner = mon::make(chosen, 5);
+    if(roll_shiny())
+    {
+        partner.traits |= mon_trait::SHINY;
+    }
     int slot;
     g.add_mon(partner, slot);
     g.mark_owned(partner.species_index);
@@ -1793,6 +1876,7 @@ void overworld::after_story()
     dex_registration();
     nickname_prompts();
     save_game();
+    tower_after_battle();
 }
 
 // The Hall of Fame, the credits, then home (playCredits).
@@ -1851,22 +1935,23 @@ void overworld::adventure_begins()
     g.run.adventure = true;
     save_game();
     say("Your adventure continues in ADVENTURE MODE!");
-    say("The CHALLENGE TOWER has opened at the POKéMON LEAGUE. Its guide waits by the League's doors.");
+    say("The road south of DUSKMERE HOLLOW is open: SPIRECREST TOWN and its CHALLENGE TOWER await you!");
     say("NEW ADVENTURE MODE is now on the title screen, too.");
 }
 
-// The CHALLENGE TOWER's guide: rank, best streak and legendaries left, then the challenge.
+// The CHALLENGE TOWER's guide, by its door: what the tower is, your rank, best streak and the legendaries
+// still in the stone.
 void overworld::tower_guide()
 {
     game_state& g = state();
-    ui& u = gui();
     int left = 0;
     for(int i = 0; i < game_data::legendaries_count; ++i)
     {
         left += ! g.owned.test(game_data::legendaries[i]);
     }
-    say("Welcome to the CHALLENGE TOWER! Four elite trainers and the TOWER MASTER, one after another.");
-    say("There's no healing between battles, only what you carry. Clear it, and a legendary POKéMON appears!");
+    say("Welcome to SPIRECREST TOWN, CHAMPION. Behind me stands the CHALLENGE TOWER.");
+    say("Five floors, five themes, one trainer on each. No healing inside but what you carry.");
+    say("Reach the summit and touch the SUMMONING STONE. A legendary POKéMON will answer!");
     bn::string<96> text("RANK ");
     text.append(bn::to_string<4>(g.run.tower_clears + 1));
     text.append("   BEST STREAK ");
@@ -1874,24 +1959,244 @@ void overworld::tower_guide()
     text.append("   LEGENDARIES LEFT ");
     text.append(bn::to_string<4>(left));
     say(text);
+    if(g.run.nuzlocke())
+    {
+        say("...But the tower doesn't take NUZLOCKE challengers, I'm afraid.");
+    }
+}
+
+
+void overworld::warp_to_room(int map_index)
+{
+    game_state& g = state();
+    audio::play(audio::sfx::DOOR);
+    ui::fade_out(12);
+    const map_def& room = wd::maps[map_index];
+    g.x = room.spawn_x;
+    g.y = room.spawn_y;
+    g.facing = direction::UP;
+    _player.reset();
+    load_map(map_index);
+    ui::fade_in(12);
+    _fresh_press = true;
+    save_game();
+}
+
+// The tower's door: in ADVENTURE MODE, healed, for a fresh challenge.
+bool overworld::tower_door(const door&)
+{
+    game_state& g = state();
+    ui& u = gui();
+    set_player_frame(0);
+    if(g.run.nuzlocke() || ! g.run.adventure)
+    {
+        say(g.run.nuzlocke() ? "The CHALLENGE TOWER's doors stay shut to NUZLOCKE challengers."
+                             : "The CHALLENGE TOWER's doors are shut.");
+        hold_until_released();
+        return false;
+    }
     if(! g.able_count())
     {
-        say("Your POKéMON can't battle! Rest them first.");
-        return;
+        say("Your POKéMON can't battle! Rest them at the POKéMON CENTER first.");
+        hold_until_released();
+        return false;
     }
-    u.show_text("Take on the CHALLENGE TOWER? Your POKéMON will be healed first.");
+    u.show_text("Enter the CHALLENGE TOWER? Your POKéMON will be healed.");
     bool yes = u.yes_no();
     u.clear_text();
     if(! yes)
     {
-        say("Come back when you're ready.");
-        return;
+        hold_until_released();
+        return false;
     }
     g.heal_party();
     audio::play(audio::sfx::HEAL);
-    say("Your POKéMON were fully healed! Good luck!");
+    reset_tower_trainers();
+    g.tower = tower_state();
+    g.tower.active = true;
+    return true;
+}
+
+// The challenge ends (left early, or done): the floors reset, and a challenge left early ends the streak.
+void overworld::tower_end(bool keep_streak)
+{
+    game_state& g = state();
+    g.tower = tower_state();
+    reset_tower_trainers();
+    if(! keep_streak)
+    {
+        g.run.tower_streak = 0;
+    }
     save_game();
-    tower_battle();
+}
+
+// The mat on a tower floor: leaving mid-challenge ends it. False keeps you inside.
+bool overworld::tower_leave()
+{
+    game_state& g = state();
+    const room_info* r = _map->room;
+    bool tower = r && (r->kind == room_kind::TOWER || r->kind == room_kind::SUMMIT || r->kind == room_kind::CHAMBER);
+    if(! tower || ! g.tower.active)
+    {
+        return true;
+    }
+    ui& u = gui();
+    set_player_frame(0);
+    u.show_text("Leave the CHALLENGE TOWER? Your challenge will end.");
+    bool yes = u.yes_no(false);
+    u.clear_text();
+    if(yes)
+    {
+        tower_end(false);
+        return true;
+    }
+    // Back off the mat.
+    g.y = int16_t(g.y - 1);
+    g.facing = direction::UP;
+    _player.reset();
+    load_map(_map_index);
+    hold_until_released();
+    return false;
+}
+
+// "Up you go": the next floor, or the summit after the TOWER MASTER.
+void overworld::tower_offer_up(int floor)
+{
+    game_state& g = state();
+    ui& u = gui();
+    if(! g.tower.active)
+    {
+        return;
+    }
+    bool summit = floor >= 4;
+    bn::string<64> text(summit ? "Climb to the SUMMIT?" : "Go up to FLOOR ");
+    if(! summit)
+    {
+        text.append(bn::to_string<4>(floor + 2));
+        text.append("?");
+    }
+    u.show_text(text);
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    int next = summit ? tower_room(room_kind::SUMMIT) : tower_room(room_kind::TOWER, floor + 1);
+    if(next >= 0)
+    {
+        warp_to_room(next);
+        bn::string<48> where;
+        if(summit)
+        {
+            where = "TOWER SUMMIT";
+        }
+        else
+        {
+            where = "CHALLENGE TOWER - FLOOR ";
+            where.append(bn::to_string<4>(floor + 2));
+        }
+        gui().show_place(where);
+    }
+}
+
+// After a battle in the tower: a floor cleared (the TOWER MASTER's raises your rank), or the legendary met.
+void overworld::tower_after_battle()
+{
+    game_state& g = state();
+    const room_info* r = _map->room;
+    if(! _last || ! r || ! g.tower.active)
+    {
+        return;
+    }
+    if(r->kind == room_kind::TOWER && _last->trainer_beaten)
+    {
+        int floor = r->floor;
+        if(floor >= 4)
+        {
+            g.run.tower_clears = uint8_t(bn::min(250, g.run.tower_clears + 1));
+            g.run.tower_streak = uint8_t(bn::min(250, g.run.tower_streak + 1));
+            g.run.tower_best = bn::max(g.run.tower_best, g.run.tower_streak);
+            save_game();
+            audio::play(audio::sfx::OBTAIN);
+            say("You've conquered the CHALLENGE TOWER!");
+            bn::string<48> text("RANK ");
+            text.append(bn::to_string<4>(g.run.tower_clears + 1));
+            text.append(" reached. The SUMMIT awaits.");
+            say(text);
+        }
+        else
+        {
+            bn::string<48> text("FLOOR ");
+            text.append(bn::to_string<4>(floor + 1));
+            text.append(" cleared!");
+            say(text);
+        }
+        tower_offer_up(floor);
+        return;
+    }
+    if(r->kind == room_kind::CHAMBER && g.tower.legend >= 0)
+    {
+        bn::string<64> text(game_data::species_list[g.tower.legend].name);
+        if(_last->outcome == battle_outcome::CAUGHT)
+        {
+            text.append(" is yours! It leaves the stone for good.");
+        }
+        else
+        {
+            text.append(" faded back into the SUMMONING STONE...");
+        }
+        say(text);
+        say("The challenge is complete. Well done!");
+        tower_end(true);
+        leave_room();
+    }
+}
+
+// The SUMMONING STONE: a legendary still in the stone answers, and waits in the chamber of its type.
+void overworld::tower_stone()
+{
+    game_state& g = state();
+    if(! g.tower.active)
+    {
+        say("A SUMMONING STONE. It's cold and silent.");
+        return;
+    }
+    if(g.tower.legend < 0)
+    {
+        int left[game_data::legendaries_count];
+        int n = 0;
+        for(int i = 0; i < game_data::legendaries_count; ++i)
+        {
+            if(! g.owned.test(game_data::legendaries[i]))
+            {
+                left[n++] = game_data::legendaries[i];
+            }
+        }
+        if(! n)
+        {
+            say("The SUMMONING STONE is silent. Every legendary POKéMON has already been caught!");
+            tower_end(true);
+            leave_room();
+            return;
+        }
+        g.tower.legend = int16_t(left[rng().get_int(n)]);
+        g.tower.legend_shiny = roll_shiny();
+        save_game();
+    }
+    say("You place your hand on the SUMMONING STONE...");
+    audio::play(audio::sfx::SPOT);
+    bn::string<64> text("It blazes with light! ");
+    upper(text, game_data::species_list[g.tower.legend].name);
+    text.append(" answers the call!");
+    say(text);
+    int chamber = tower_room(room_kind::CHAMBER, -1, chamber_theme(g.tower.legend));
+    if(chamber < 0)
+    {
+        chamber = tower_room(room_kind::CHAMBER, -1, gym_theme::LEAGUE);
+    }
+    warp_to_room(chamber);
+    gui().show_place("SUMMONING CHAMBER");
 }
 
 // ----- START -----

@@ -30,6 +30,37 @@ vm.runInContext(src + `
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
   setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
+// ---------- GBA only: SPIRECREST TOWN and the CHALLENGE TOWER ----------
+// A town south of Duskmere Hollow, home of the CHALLENGE TOWER (ADVENTURE MODE). The way in stays shut until
+// you're CHAMPION (the GBA checks that). It's built like the League's town (a big building beside the
+// POKéMON CENTER), with the building made the TOWER.
+const TOWER_TOWN = {type:'town', name:'Spirecrest Town', at:[0,1], tier:25, center:true, league:true,
+  desc:"A quiet town in the shadow of the CHALLENGE TOWER. Only POKéMON LEAGUE CHAMPIONS may pass its gate."};
+const TOWER_INDEX = G.LOCATIONS.length;
+G.LOCATIONS.push(TOWER_TOWN);
+G.LOCATIONS[0].links.push({dir:'down', to:TOWER_INDEX, gate:false});
+TOWER_TOWN.links = [{dir:'up', to:0, gate:false}];
+G.getMap(TOWER_TOWN);
+delete TOWER_TOWN.league;
+for(const b of G.getMap(TOWER_TOWN).buildings) if(b.kind==='league') b.kind = 'tower';
+// The tower's rooms: five themed floors with one trainer each, the summit with the SUMMONING STONE, and a
+// chamber per theme where the summoned legendary waits (the GBA picks the chamber by its type).
+const TOWER_FLOORS = [
+  {theme:'fire', kind:'boy', title:'KINDLER BLAZE', team:['Arcanine']},
+  {theme:'water', kind:'lass', title:'SWIMMER MARINA', team:['Gyarados']},
+  {theme:'electric', kind:'girl', title:'GUITARIST VOLTA', team:['Raichu']},
+  {theme:'ghost', kind:'oldwoman', title:'HEX MANIAC WISP', team:['Gengar']},
+  {theme:'dragon', kind:'gentleman', title:'TOWER MASTER DRACO', team:['Dragonite']}];
+const TOWER_INTROS = ["Welcome to the CHALLENGE TOWER! Let's see what you've got!", "The water up here runs deep. Can you keep afloat?",
+  "Feel the current! This floor is charged!", "Few climb this high... fewer climb higher.", "I am the master of this tower. Come, show me a CHAMPION's strength!"];
+const CHAMBER_THEMES = ['fire', 'water', 'ground', 'ghost', 'electric', 'grass', 'ice', 'dragon', 'league'];
+const TOWER_ROOMS = {
+  floor:['###############','###############','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#',
+         '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____ooo_____#','#######M#######'],
+  summit:['###############','###############','#u___________u#','#_____________#','#_____________#','#______^______#','#_____________#',
+          '#u___________u#','#_____________#','#_____________#','#_____________#','#_____________#','#######M#######'],
+  chamber:['###############','###############','#u___________u#','#_____________#','#u___________u#','#_____ooo_____#','#u____ooo____u#',
+           '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____________#','#######M#######']};
 const AREAS = AREAS_ARG.length ? AREAS_ARG : G.LOCATIONS.map((l,i)=>i);
 
 // ---------- Pixels ----------
@@ -156,9 +187,9 @@ function drawArea(map, view, opts={}){
   }
   // Buildings (as buildingHtml lays them out).
   for(const b of map.buildings){
-    const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' || b.kind==='league' ? 'slate'
+    const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' || b.kind==='league' || b.kind==='tower' ? 'slate'
       : G.HOUSE_ROOF_NAMES[G.HOUSE_ROOFS.indexOf(b.roof)] || 'green';
-    const wall = b.kind==='gym' || b.kind==='league' ? 'grey' : 'cream';
+    const wall = b.kind==='gym' || b.kind==='league' || b.kind==='tower' ? 'grey' : 'cream';
     const piece = name=>{ const a = G.TILE_ART[name], r = G.ROOF_SWAP[roof], w = G.WALL_SWAP[wall];
       return artPixels(name, {...a.pal, 1:r[0], 2:r[1], 3:r[2], 4:r[3], A:w[0], B:w[1], C:w[2]}); };
     const dc = b.door.x - b.x, cell = (name, col, row, tall)=>c.draw(piece(name), (b.x+col)*16, (b.y+row)*16 - (tall ? 8 : 0));
@@ -174,7 +205,8 @@ function drawArea(map, view, opts={}){
     if(b.kind==='house') cell('chimney', Math.min(2, b.w-1), 0, true);
     // Name plates on the lower roof row, centred (.plate: POKéMON on red, MART on blue, GYM / LEAGUE on gold).
     const plate = {center:['POKEMON', [0xe0,0x50,0x50], [0xf8,0xf8,0xf8]], mart:['MART', [0x38,0x68,0xc8], [0xf8,0xf8,0xf8]],
-      gym:['GYM', [0xe8,0xb8,0x30], [0x30,0x28,0x30]], league:['LEAGUE', [0xe8,0xb8,0x30], [0x30,0x28,0x30]]}[b.kind];
+      gym:['GYM', [0xe8,0xb8,0x30], [0x30,0x28,0x30]], league:['LEAGUE', [0xe8,0xb8,0x30], [0x30,0x28,0x30]],
+      tower:['TOWER', [0x90,0x60,0xd0], [0xf8,0xf8,0xf8]]}[b.kind];
     if(plate){
       const [text, bg, fg] = plate, w = text.length*4 + 3, hh = 9;
       const x0 = Math.round(b.x*16 + b.w*8 - w/2), y0 = b.y*16 + 24 - 4;
@@ -209,7 +241,8 @@ function contrast(p, k){ return p.map(q=>(q-127.5)*k+127.5); }
 const PLATE_FONT = {P:['111','101','111','100','100'], O:['111','101','101','101','111'], K:['101','110','100','110','101'],
   E:['111','100','110','100','111'], M:['101','111','111','101','101'], N:['111','101','101','101','101'],
   A:['010','101','111','101','101'], R:['110','101','110','101','101'], T:['111','010','010','010','010'],
-  G:['111','100','101','101','111'], Y:['101','101','010','010','010'], L:['100','100','100','100','111'], U:['101','101','101','101','111']};
+  G:['111','100','101','101','111'], Y:['101','101','010','010','010'], L:['100','100','100','100','111'], U:['101','101','101','101','111'],
+  W:['101','101','111','111','101']};
 function plateLetters(c, x, y, text, col=[0xf8,0xf8,0xf8]){
   [...text].forEach((ch,i)=>PLATE_FONT[ch].forEach((row,yy)=>[...row].forEach((b,xx)=>{ if(b==='1') c.set(x+i*4+xx, y+yy, col); })));
 }
@@ -224,7 +257,8 @@ const TALL_PIECES = new Set(['bookshelf', 'plant', 'shelf', 'healer', 'pc']);
 // it, plain painted walls, a rug and the exit mat.
 const GYM_WALL = {fire:['#e08858','#b05830'], water:['#a8d8f8','#6098d0'], ground:['#c8a060','#987038'], ghost:['#786098','#503870'],
   electric:['#f8e890','#b09020'], grass:['#a8d880','#488830'], ice:['#e8f8ff','#88c0e0'], dragon:['#8870a8','#4c3868']};
-const GYM_RUG = {fire:'#f8c048', water:'#f8f8f8', ground:'#98b050', ghost:'#9870c8', electric:'#3868d0', grass:'#f0e0a0', ice:'#4890c8', dragon:'#e0a030'};
+const GYM_RUG = {fire:'#f8c048', water:'#f8f8f8', ground:'#98b050', ghost:'#9870c8', electric:'#3868d0', grass:'#f0e0a0', ice:'#4890c8', dragon:'#e0a030',
+  league:'#9080c0'};
 const GYM_FLOOR = {electric:['#f0d860','#c8a830'], grass:['#78b858','#58983c'], ice:['#d8f0f8','#a8d8f0'], dragon:['#685088','#4c3868']};
 // The four newer gyms have no floor or wall art, only the stylesheet's patterns (.gym-electric etc.).
 function gymFloorPattern(theme){
@@ -259,7 +293,7 @@ function drawGym(room, opts={}){
   const at = (x,y)=>room.tiles[y] ? room.tiles[y][x] : '#';
   const floor = league ? null : G.TILE_ART['gymfloor_' + theme] ? artPixels('gymfloor_' + theme) : gymFloorPattern(theme);
   const wallArt = G.TILE_ART['gymwall_' + theme] ? artPixels('gymwall_' + theme) : GYMWALL_CSS[theme] ? gymWallPattern(...GYMWALL_CSS[theme]) : null;
-  const statues = [];
+  const statues = [], stones = [];
   for(let y=0; y<room.h; y++) for(let x=0; x<room.w; x++){
     const ch = at(x,y), X = x*16, Y = y*16;
     if(ch==='#'){
@@ -268,7 +302,7 @@ function drawGym(room, opts={}){
         c.rect(X, Y, 16, cut, hex(w1)); c.rect(X, Y+cut-1, 16, 13-cut+1, hex(w2)); c.rect(X, Y+13, 16, 3, hex(base)); }
       continue;   // the League's wall faces have no colour of their own: black
     }
-    if(league){ if(ch==='_' || ch==='x') c.rect(X, Y, 16, 16, hex('#c0b8d8')); }
+    if(league){ if(ch==='_' || ch==='x' || ch==='^' || ch==='o' || (ch==='u' && room.tower)) c.rect(X, Y, 16, 16, hex('#c0b8d8')); }
     else c.draw(floor, X, Y);
     if(ch==='x' && wallArt) c.draw(wallArt, X, Y);
     else if(ch==='x') c.rect(X, Y, 16, 16, hex(GYM_FLOOR[theme] ? GYM_FLOOR[theme][1] : '#a8a8b8'));
@@ -276,8 +310,11 @@ function drawGym(room, opts={}){
     else if(ch==='o') c.rect(X, Y, 16, 16, hex(GYM_RUG[theme]));
     else if(ch==='M'){ for(let xx=0; xx<16; xx++) c.rect(X+xx, Y, 1, 16, hex(Math.floor(xx/2)%2 ? '#a03030' : '#c04848')); c.rect(X, Y, 16, 1, hex('#702020')); c.rect(X, Y+15, 16, 1, hex('#702020')); }
     else if(ch==='u') statues.push([X, Y]);
+    if(ch==='^') stones.push([X, Y]);
   }
   for(const [X, Y] of statues) c.draw(artPixels('statue'), X, Y - 8);
+  // The CHALLENGE TOWER's SUMMONING STONE (a TIDEWARDEN tablet).
+  for(const [X, Y] of stones) c.draw(artPixels('tablet'), X, Y - 8);
   return c;
 }
 // A League gate tile, open: the floor.
@@ -332,6 +369,38 @@ function trainerOut(n, loc){
     vanish:!!n.vanish};
 }
 
+// The CHALLENGE TOWER's rooms (all left by the mat to the tower's door). Floors and chambers are drawn like
+// gyms in their theme, the summit (and the plain chamber) like the League.
+function towerRoom(li, building, kind, theme, rows, b, npcs, things){
+  const tiles = rows.map(r=>r.split('')), h = tiles.length, w = tiles[0].length, matX = rows[h-1].indexOf('M');
+  const league = theme==='league';
+  const room = {w, h, tiles, buildings:[], npcs, exits:[], signs:[], interior:league ? 'league' : 'gym', theme:league ? null : theme,
+    spawn:{x:matX, y:h-2}, mat:{x:matX, y:h-1}, tower:true};
+  const art = kind + '_' + theme;
+  if(!roomArts.has(art)) roomArts.set(art, {area:li, building, room});
+  for(const n of npcs) peopleKinds.add(n.kind);
+  const trainers = npcs.filter(n=>n.trainer).map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:'tower', elite:n.floor,
+    title:n.title, team:n.team, intro:[`${n.title}: "${n.intro}"`], after:[`${n.title}: "${n.after}"`], vanish:false}));
+  for(const t of trainers) t.team.forEach(s=>trainerSpecies.add(s));
+  rooms.push({area:li, building, kind, art, theme:league ? null : theme, home:false, w, h, tiles:rows,
+    trainers, gym:null, behaviour:tiles.map(r=>r.map(behaviour)), spawn:room.spawn, door:{x:b.door.x, y:b.door.y},
+    people:[], things, gates:[], floor:npcs.length ? npcs[0].floor : -1});
+  return rooms.length - 1;
+}
+function towerRooms(li, bi, b){
+  let first = -1;
+  TOWER_FLOORS.forEach((f, k)=>{
+    const npc = {kind:f.kind, x:7, y:2, facing:'down', trainer:true, floor:k, title:f.title, team:f.team, intro:TOWER_INTROS[k],
+      after:k===4 ? "The summit is yours. Go, and see what answers the stone." : "Up you go. The next floor won't be so kind."};
+    const r = towerRoom(li, k ? `${bi}/floor${k}` : bi, 'tower', f.theme, TOWER_ROOMS.floor, b, [npc], []);
+    if(!k) first = r;
+  });
+  towerRoom(li, `${bi}/summit`, 'summit', 'league', TOWER_ROOMS.summit, b, [],
+    [{x:7, y:5, text:['A SUMMONING STONE. It hums faintly.']}]);
+  for(const t of CHAMBER_THEMES) towerRoom(li, `${bi}/chamber_${t}`, 'chamber', t, TOWER_ROOMS.chamber, b, [], []);
+  return {x:b.door.x, y:b.door.y, kind:'tower', room:first};
+}
+
 fs.mkdirSync(OUT, {recursive:true});
 G.setAdv({cleared:{}, picked:{}, story:{}, items:{}, party:[], box:[]});   // the League's gates start shut
 const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival', 'grunt', 'admin']);
@@ -372,6 +441,7 @@ for(const li of AREAS){
     return {...r, items:its};
   });
   const doors = map.buildings.map((b, bi)=>{
+    if(b.kind==='tower') return towerRooms(li, bi, b);
     const room = G.getInterior(loc, bi);
     const art = room.interior==='gym' ? 'gym_' + room.theme : room.interior;
     if(!roomArts.has(art)) roomArts.set(art, {area:li, building:bi});
@@ -406,12 +476,12 @@ for(const li of AREAS){
     spawn:map.spawn, pool:loc.pool || [], area_pool:G.areaPool(loc), water:G.waterPool(loc), fish:G.fishPool(loc), tier:loc.tier ?? li,
     theme:loc.theme || 'plain', weather:map.weather || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
-    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion,
+    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN,
     leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});
   if(legend) trainerSpecies.add(legend.legend);
 }
-for(const [art, {area, building}] of roomArts){
-  const room = G.getInterior(G.LOCATIONS[area], building);
+for(const [art, {area, building, room:own}] of roomArts){
+  const room = own || G.getInterior(G.LOCATIONS[area], building);
   savePng(`room_${art}.png`, drawRoom(room));
   savePng(`room_${art}_b.png`, drawRoom(room, {frameB:true}));
 }

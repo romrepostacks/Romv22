@@ -19,6 +19,7 @@
 
 #include "pr_audio.h"
 #include "pr_battle.h"
+#include "pr_icons.h"
 #include "pr_move_fx.h"
 #include "pr_game_data.h"
 #include "pr_scenes.h"
@@ -139,6 +140,12 @@ namespace
         switch(t.role)
         {
         case trainer_role::CHAMPION: return "champion";
+        case trainer_role::TOWER:
+        {
+            // The CHALLENGE TOWER: each floor its gym theme's music, the TOWER MASTER the Champion's.
+            constexpr const char* themes[] = { "g_fire", "g_water", "g_electric", "g_ghost", "champion" };
+            return themes[bn::clamp(int(t.elite), 0, 4)];
+        }
         case trainer_role::ELITE:
         {
             constexpr const char* themes[] = { "e_dark", "e_fight", "e_steel", "e_psy" };
@@ -327,6 +334,7 @@ namespace
         {
             _own_sprite_index = index;
             _own_sprite = f.m->data().back.create_sprite(sx(56), sy(80));
+            apply_shiny(*_own_sprite, *f.m, mon_view::BACK);
             _own_sprite->set_bg_priority(2);
             _own_sprite->set_z_order(-80);
         }
@@ -345,6 +353,7 @@ namespace
     {
         const species& s = f.m->data();
         f.sprite = s.front.create_sprite(sx(f.base_x), sy(f.base_y));
+        apply_shiny(*f.sprite, *f.m, mon_view::FRONT);
         f.sprite->set_bg_priority(2);
         int scale = foe_scale_x100[bn::min(_foe_count, 6) - 1];
         f.scale = bn::fixed(scale) / 100;
@@ -597,7 +606,13 @@ namespace
         ui& u = gui();
         game_state& g = state();
         bool wild = ! _s.opponent && ! _s.free;
-        bool nuz_block = wild && state().run.nuzlocke() && (! _s.nuzlocke_catch || _nuz_caught);
+        // (The shiny clause: a shiny one can always be caught.)
+        bool any_shiny = false;
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            any_shiny |= ! _foes[i].out() && _foes[i].m->shiny();
+        }
+        bool nuz_block = wild && state().run.nuzlocke() && (! _s.nuzlocke_catch || _nuz_caught) && ! any_shiny;
         int ids[items_count + 1];
         bn::string<32> labels[items_count + 1];
         bn::string_view views[items_count + 1];
@@ -1189,11 +1204,13 @@ namespace
             return;
         }
         mon& m = *target.m;
-        if(g.run.nuzlocke() && ! _s.legendary && (_nuz_caught || g.owned.test(m.species_index)))
+        if(g.run.nuzlocke() && ! _s.legendary && ! m.shiny() &&
+           (_nuz_caught || ! _s.nuzlocke_catch || g.owned.test(m.species_index)))
         {
             // Dupes clause: one you already have can't be caught (and the ball isn't used).
-            bn::string<64> no(_nuz_caught ? "NUZLOCKE: one catch per encounter." : "Dupes clause: you already have ");
-            if(! _nuz_caught)
+            bn::string<64> no(_nuz_caught ? "NUZLOCKE: one catch per encounter." :
+                              ! _s.nuzlocke_catch ? "NUZLOCKE: this area's encounter is used up." : "Dupes clause: you already have ");
+            if(! _nuz_caught && _s.nuzlocke_catch)
             {
                 no.append(m.species_name());
                 no.append(".");
@@ -1461,7 +1478,8 @@ namespace
         // level x 20 (route trainers, gym juniors, the Elite Four), x 60 (rivals, the Champion) or x 100
         // (Gym Leaders).
         bool leader = t && t->role == trainer_role::LEADER;
-        bool route = t && (t->role == trainer_role::ROUTE || t->role == trainer_role::JUNIOR || t->role == trainer_role::ELITE);
+        bool route = t && (t->role == trainer_role::ROUTE || t->role == trainer_role::JUNIOR || t->role == trainer_role::ELITE ||
+                           t->role == trainer_role::TOWER);
         int xp = ! t ? 18 * _foe_count : leader ? 60 : 35;
         bn::string<128> text;
         if(t)
@@ -1625,6 +1643,17 @@ namespace
             text.append(" appeared!");
         }
         u.say(text);
+        // A shiny one sparkles.
+        for(int i = 0; i < _foe_count; ++i)
+        {
+            if(_s.foes[i].shiny() && _foes[i].sprite)
+            {
+                play_shiny_sparkle(body_of(_foes[i]));
+                bn::string<64> shiny(label(_foes[i]));
+                shiny.append(" is SHINY!");
+                u.say(shiny);
+            }
+        }
         // Your party: every HP box, and the first who can fight on screen.
         for(int i = 0; i < _own_count; ++i)
         {

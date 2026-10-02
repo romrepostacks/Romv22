@@ -44,7 +44,8 @@ enum class door_kind : uint8_t
     CENTER,
     MART,
     GYM,
-    LEAGUE
+    LEAGUE,
+    TOWER           // the CHALLENGE TOWER (SPIRECREST TOWN)
 };
 
 // People with a job in the web game's rooms (getInterior / talkTo).
@@ -110,7 +111,8 @@ enum class trainer_role : uint8_t
     LEADER,
     RIVAL,
     ELITE,
-    CHAMPION
+    CHAMPION,
+    TOWER           // a CHALLENGE TOWER floor's trainer (their team is made for each run)
 };
 
 // A trainer: watches up to 5 tiles ahead and battles you when they see you.
@@ -231,6 +233,7 @@ namespace area_flag
     constexpr uint8_t CHAMPION = 4;
     constexpr uint8_t BOSS = 8;
     constexpr uint8_t OWN_POOL = 16;      // its own wild Pokémon (the POKéDEX's AREA), not a neighbour's
+    constexpr uint8_t TOWER_TOWN = 32;    // SPIRECREST TOWN: shut until you're CHAMPION
 }
 
 // What an area is (LOCATIONS): its kind, look and weather, where it sits on the region map, the layer
@@ -265,7 +268,10 @@ enum class room_kind : uint8_t
     MART,
     HOUSE,
     GYM,
-    LEAGUE
+    LEAGUE,
+    TOWER,          // a CHALLENGE TOWER floor (one trainer)
+    SUMMIT,         // the tower's top: the SUMMONING STONE
+    CHAMBER         // where the summoned legendary waits (one per theme)
 };
 
 enum class gym_theme : uint8_t
@@ -278,7 +284,8 @@ enum class gym_theme : uint8_t
     ELECTRIC,
     GRASS,
     ICE,
-    DRAGON
+    DRAGON,
+    LEAGUE          // (a tower room in the League's look)
 };
 
 // A League gate: tiles x0..x1 of row y, open once that Elite Four trainer is beaten.
@@ -298,6 +305,7 @@ struct room_info
     int8_t gates_count;
     int16_t gate_metatile;          // the floor shown in an open gate
     bool home;
+    int8_t floor;                   // CHALLENGE TOWER floors: 0-4, else -1
 };
 
 // An area or a room.

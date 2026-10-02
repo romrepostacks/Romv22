@@ -18,6 +18,9 @@ struct fx_body
 // step). Returns when it's done.
 void play_move_fx(int move_index, const fx_body& from, const fx_body& to);
 
+// A shiny Pokémon's entrance: stars burst around it, twice.
+void play_shiny_sparkle(const fx_body& who);
+
 }
 
 #endif

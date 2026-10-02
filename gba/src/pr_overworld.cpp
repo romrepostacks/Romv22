@@ -40,6 +40,7 @@
 
 #include "pr_audio.h"
 #include "pr_game_data.h"
+#include "pr_icons.h"
 #include "pr_overworld_impl.h"
 #include "pr_people_sprites.h"
 #include "pr_ui.h"
@@ -465,6 +466,7 @@ void overworld::make_sprite(actor& a)
     {
         const species& s = game_data::species_list[int(a.legend_species)];
         a.sprite = s.front.create_sprite(0, 0);
+        apply_shiny(*a.sprite, int(a.legend_species), a.legend_shiny, mon_view::FRONT);
         a.sprite->set_bg_priority(1);
         return;
     }
@@ -524,6 +526,17 @@ void overworld::load_actors()
         a.legend_species = _map->area->legend;
         a.x = a.home_x = _map->area->legend_x;
         a.y = a.home_y = _map->area->legend_y;
+        _actors.push_back(a);
+    }
+    // The CHALLENGE TOWER's summoned legendary, waiting in its chamber.
+    if(_map->room && _map->room->kind == room_kind::CHAMBER && g.tower.active && g.tower.legend >= 0 && ! _actors.full())
+    {
+        actor a;
+        a.legend = true;
+        a.legend_species = species_id(g.tower.legend);
+        a.legend_shiny = g.tower.legend_shiny;
+        a.x = a.home_x = 7;
+        a.y = a.home_y = 3;
         _actors.push_back(a);
     }
     // People in the connected areas, standing where they are (nbNpcs).
@@ -779,7 +792,7 @@ void overworld::update_weather()
     if(_map->is_room())
     {
         // The Ghost gym: dark but for a circle around you that grows with every junior beaten.
-        if(_map->room && _map->room->theme == gym_theme::GHOST)
+        if(_map->room && _map->room->kind == room_kind::GYM && _map->room->theme == gym_theme::GHOST)
         {
             kind = WX_GHOST;
             int beaten = 0;
@@ -1170,6 +1183,15 @@ void overworld::step(direction want)
             hold_until_released();
             return;
         }
+        // SPIRECREST TOWN (the CHALLENGE TOWER) opens to CHAMPIONS.
+        if(target_place.map >= 0 && wd::maps[target_place.map].area &&
+           (wd::maps[target_place.map].area->flags & area_flag::TOWER_TOWN) && ! g.has(story::CHAMPION))
+        {
+            set_player_frame(0);
+            say("A gate blocks the road. Its sign reads: \"SPIRECREST TOWN - CHALLENGE TOWER. CHAMPIONS ONLY.\"");
+            hold_until_released();
+            return;
+        }
         // The way on is shut until this place's rival or Gym Leader is beaten (linkAreas gate).
         if(l.gate && _map->leader_id >= 0 && ! g.beaten.test(_map->leader_id))
         {
@@ -1392,6 +1414,10 @@ void overworld::arrive()
         {
             if(_map->doors[i].x == g.x && _map->doors[i].y == g.y)
             {
+                if(_map->doors[i].kind == door_kind::TOWER && ! tower_door(_map->doors[i]))
+                {
+                    return;
+                }
                 enter_room(_map->doors[i]);
                 return;
             }
@@ -1399,7 +1425,10 @@ void overworld::arrive()
     }
     if(b == behaviour::MAT && _map->is_room())
     {
-        leave_room();
+        if(tower_leave())
+        {
+            leave_room();
+        }
         return;
     }
     bool can_fight = g.first_able() >= 0;
@@ -1518,12 +1547,10 @@ void overworld::fixed_battle(species_id s, int level, bool legendary)
     _start_battle = true;
 }
 
-void overworld::tower_battle()
+void overworld::tower_legend_battle(species_id s, int level)
 {
-    encounter& e = *_battle;
-    e = encounter();
-    e.kind = encounter_kind::TOWER;
-    _start_battle = true;
+    fixed_battle(s, level, true);
+    _battle->tower_legend = true;
 }
 
 // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between; they see
