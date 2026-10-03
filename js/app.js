@@ -669,11 +669,20 @@ const EVOLUTIONS = {
 function recalcStats(mon){
   const b = mon.dex.base, hpFrac = mon.maxhp ? mon.hp/mon.maxhp : 1;
   mon.maxhp = statCalc(b.hp,true,mon.level);
-  mon.hp = mon.fainted ? 0 : Math.max(1, Math.round(hpFrac*mon.maxhp));
   mon.atk = statCalc(b.atk,false,mon.level); mon.def = statCalc(b.def,false,mon.level);
   mon.spa = statCalc(b.spa,false,mon.level); mon.spd = statCalc(b.spd,false,mon.level);
   mon.spe = statCalc(b.spe,false,mon.level);
+  // Hand-set stats (the hidden editor) keep their place between this level's Gen 3 min and max.
+  if(mon.statPos) for(const k of STAT_ROWS) if(mon.statPos[k]!=null){
+    const base = b[k==='maxhp' ? 'hp' : k], lo = statMin(base, k==='maxhp', mon.level), hi = statMax(base, k==='maxhp', mon.level);
+    mon[k] = Math.round(lo + (hi - lo)*mon.statPos[k]);
+  }
+  mon.hp = mon.fainted ? 0 : Math.max(1, Math.round(hpFrac*mon.maxhp));
 }
+// Gen 3's range for a stat at a level: IV 0-31, EV 0-252 and a nature's x0.9-x1.1 (HP has no nature).
+const STAT_ROWS = ['maxhp', 'atk', 'def', 'spa', 'spd', 'spe'];
+function statMin(base, isHp, level){ return isHp ? (base===1 ? 1 : Math.floor(2*base*level/100) + level + 10) : Math.floor((Math.floor(2*base*level/100) + 5)*9/10); }
+function statMax(base, isHp, level){ return isHp ? (base===1 ? 1 : Math.floor((2*base + 94)*level/100) + level + 10) : Math.floor((Math.floor((2*base + 94)*level/100) + 5)*11/10); }
 // Evolution: real level-up evolutions from the data; the old hand-written table still covers
 // stone/trade/friendship evolutions (at a stand-in level) since there are no items for those yet.
 function tryEvolve(mon){
@@ -2216,11 +2225,12 @@ function owArrive(ch, endedAt){
   if(!keepWalking || ch!==':' && ch!=='.' && ch!=='_') saveAdv();
   if(ch==='D'){ const bi = map.buildings.findIndex(b=>b.door.x===adv.pos.x && b.door.y===adv.pos.y); if(bi>=0) return enterBuilding(bi); }
   if(ch==='M') return leaveBuilding();
-  if(ch==='"'){
+  const wildOn = !adv.cheatNoWild;
+  if(ch==='"' && wildOn){
     if(Math.random()<0.08){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
   }
-  if(ch==='.' && map.cave && Math.random()<0.05){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
-  if(ch==='~' && adv.surfing && !adv.surfFresh && Math.random()<0.05){ held.length = 0; saveAdv(); startWildBattle(null, 'water'); return; }
+  if(ch==='.' && map.cave && wildOn && Math.random()<0.05){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
+  if(ch==='~' && adv.surfing && !adv.surfFresh && wildOn && Math.random()<0.05){ held.length = 0; saveAdv(); startWildBattle(null, 'water'); return; }
   adv.surfFresh = false;
   // Trainers spot you when you walk into their line of sight (up to 5 tiles, nothing in between).
   for(const n of curNpcs()){
@@ -2339,6 +2349,7 @@ const THING_TEXT = {
   seat:["A soft, round cushion seat."], glasstable:["A glass table. There's a POKéMON magazine on it."]};
 function owInteract(){
   if(!owActive() || owMoving) return;
+  if(editorCombo()) return secretEditor();
   const loc = LOCATIONS[adv.loc], map = curMap(), here = adv.pos.x+','+adv.pos.y;
   if(!map.interior && adv.surfing && map.diveSpots && map.diveSpots.has(here)) return diveAction();
   if(!map.interior && map.shafts && map.shafts.has(here)) return surfaceAction();
@@ -2632,6 +2643,7 @@ let startQueued = false;
 function startMenu(){
   if(owMoving && owActive() && !uiMenus.length){ startQueued = true; held.length = 0; return; }   // open when this step lands
   if(!owActive() || owMoving || uiMenus.length) return;
+  if(cheatCode()) return cheatMenu();
   owBusy = true; held.length = 0;
   const name = adv.playerName.toUpperCase();
   // POKéDEX shows up once you've seen something.
@@ -3529,6 +3541,12 @@ function uiKeyInner(k){
 
 // ---------- Input ----------
 if(typeof document.addEventListener==='function'){
+  // Every button press, for the hidden codes (keyLog).
+  document.addEventListener('keydown', e=>{
+    if(e.repeat || (e.target.closest && e.target.closest('.fb'))) return;
+    const k = e.key.toLowerCase();
+    logKey({arrowleft:'L', a:'L', arrowright:'R', d:'R', x:'B', escape:'B', backspace:'B', z:'A', ' ':'A', enter:'S'}[k] || (KEYDIR[k] ? 'x' : null));
+  }, true);
   document.addEventListener('keydown', e=>{
     if(e.target.closest && e.target.closest('.fb')) return;   // typing feedback
     const box = document.getElementById('msgBox');
@@ -3574,7 +3592,7 @@ if(typeof document.addEventListener==='function'){
   // On-screen D-pad (hold to walk), A (read / talk / advance text) and B (hold to run).
   if(typeof document.querySelectorAll==='function') document.querySelectorAll('.gb-controls [data-dir]').forEach(btn=>{
     const d = btn.dataset.dir;
-    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); try{ btn.setPointerCapture(e.pointerId); }catch(_){}   /* capture can fail (no active pointer); never lose the press */ if(uiKey(d) || offWorldButton(d) || owTextOpen()) return; pressDir(d); });
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); logKey({left:'L', right:'R'}[d] || 'x'); try{ btn.setPointerCapture(e.pointerId); }catch(_){}   /* capture can fail (no active pointer); never lose the press */ if(uiKey(d) || offWorldButton(d) || owTextOpen()) return; pressDir(d); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>btn.addEventListener(ev, ()=>releaseDir(d)));
   });
   // iPhone: cancelling pointer events doesn't stop a held touch selecting text, showing the loupe or the
@@ -3586,16 +3604,16 @@ if(typeof document.addEventListener==='function'){
     pad.addEventListener('contextmenu', e=>e.preventDefault());
   }
   const sBtn = document.getElementById('btnStart');
-  if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiMenus.length) uiKey('b'); else if(offWorldButton('start')) return; else if(!owTextOpen()) startMenu(); });
+  if(sBtn) sBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); logKey('S'); if(uiMenus.length) uiKey('b'); else if(offWorldButton('start')) return; else if(!owTextOpen()) startMenu(); });
   // SELECT: a shortcut to the POKéNAV map (Emerald uses it for a registered key item; there are none here).
   const fbBtn = document.getElementById('btnFeedback');
   if(fbBtn) fbBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); sfx('open'); feedbackOpen(); });
   const selBtn = document.getElementById('btnSelect');
   if(selBtn) selBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(mapOpen) return offWorldButton('select'); if(uiMenus.length || owTextOpen() || !owActive()) return; sfx('open'); openMap(false); });
   const aBtn = document.getElementById('btnA'), bBtn = document.getElementById('btnB');
-  if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('a') || offWorldButton('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
+  if(aBtn) aBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); logKey('A'); if(uiKey('a') || offWorldButton('a')) return; if(owTextOpen()){ if(!owHold) sfx('select'); owAdvance(); } else owInteract(); });
   if(bBtn){
-    bBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); if(uiKey('b') || offWorldButton('b')) return; owRun = true; if(owTextOpen()) owAdvance(); });
+    bBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); logKey('B'); if(uiKey('b') || offWorldButton('b')) return; owRun = true; if(owTextOpen()) owAdvance(); });
     ['pointerup','pointercancel','pointerleave'].forEach(ev=>bBtn.addEventListener(ev, ()=>{ owRun = false; }));
   }
 }
@@ -4165,6 +4183,124 @@ function continueStory(){
   afterStory();
 }
 // "X wants to learn Y. However, X already knows four moves. Should a move be forgotten...?"
+// ---------- The hidden menus (first built for the GBA) ----------
+// keyLog: the last buttons pressed (L, R, A, B, S for START, x for anything else), and where you stood.
+const keyLog = [];
+function logKey(k){
+  if(!k) return;
+  keyLog.push({k, at: adv && adv.inside!=null && adv.pos ? `${adv.loc}:${adv.inside}:${adv.pos.x},${adv.pos.y}:${adv.facing}` : ''});
+  if(keyLog.length > 12) keyLog.shift();
+}
+function keysEnd(code){ return keyLog.length >= code.length && keyLog.slice(-code.length).map(e=>e.k).join('')===code; }
+// LEFT, RIGHT, LEFT, RIGHT, B, A, START on the field: the cheat menu.
+function cheatCode(){ if(!keysEnd('LRLRBAS')) return false; keyLog.length = 0; return true; }
+function cheatMenu(){
+  const view = document.getElementById('owView');
+  let last = 0;
+  const show = ()=>{
+    owBusy = true;
+    const items = [`WILD ENCOUNTERS: ${adv.cheatNoWild ? 'OFF' : 'ON'}`, 'HEAL PARTY POKéMON', 'ADD 20 POKé BALLS', 'ADD MASTER BALL', 'ADD ₽1000',
+      `PERFECT CAPTURE: ${adv.cheatPerfect ? 'ON' : 'OFF'}`, 'EXIT'];
+    const m = uiMenu(view, items, k=>{
+      owBusy = false;
+      if(k<0 || k===6){ saveAdv(); return; }
+      last = k;
+      if(k===0){ adv.cheatNoWild = !adv.cheatNoWild; return show(); }
+      if(k===5){ adv.cheatPerfect = !adv.cheatPerfect; return show(); }
+      if(k===1){ healParty(); sfx('heal'); saveAdv(); return owSay(['Your POKéMON were fully healed!'], show); }
+      if(k===2){ adv.items.pokeball = (adv.items.pokeball||0) + 20; saveAdv(); return owSay(['20 POKé BALLS were put in the BAG.'], show); }
+      if(k===3){ adv.items.masterball = (adv.items.masterball||0) + 1; saveAdv(); return owSay(['A MASTER BALL was put in the BAG.'], show); }
+      if(k===4){ adv.money = Math.min(999999, (adv.money ?? 3000) + 1000); saveAdv(); return owSay(['₽1000 was added to your money.'], show); }
+    }, 'gm-start');
+    m.i = last; uiMenuDraw(m);
+  };
+  sfx('spot'); show();
+}
+// In any POKéMON CENTER, in the bottom-left corner (1, 7), facing the wall: LEFT, LEFT, A, B, A opens the editor.
+function editorCombo(){
+  if(adv.inside==null || adv.pos.x!==1 || adv.pos.y!==7 || adv.facing!=='left') return false;
+  const b = getMap(LOCATIONS[adv.loc]).buildings[adv.inside];
+  if(!b || b.kind!=='center' || !keysEnd('LLABA')) return false;
+  const spot = keyLog[keyLog.length-1].at;
+  if(!keyLog.slice(-5).every(e=>e.at.split(':').slice(0,3).join(':')===spot.split(':').slice(0,3).join(':'))) return false;
+  keyLog.length = 0;
+  return true;
+}
+// The editor: level, shiny, each stat (within Gen 3's legal range for its level), and moves from its learnset.
+// One Pokémon after another until CANCEL.
+function secretEditor(){
+  const view = document.getElementById('owView');
+  sfx('spot');
+  const pick = ()=>{
+    owBusy = true; owPrompt('Edit which POKéMON?');
+    uiMenu(view, adv.party.map(m=>`${dname(m)} Lv${m.level}`).concat('CANCEL'), k=>{
+      owPromptClose();
+      const m = adv.party[k]; if(!m) return;
+      editOne(m, pick);
+    }, 'gm-br');
+  };
+  pick();
+}
+const EDIT_ROWS = ['LEVEL', 'SHINY', 'HP', 'ATTACK', 'DEFENSE', 'SP. ATK', 'SP. DEF', 'SPEED', 'MOVES', 'DONE'];
+function editOne(m, back){
+  const b = m.dex.base, w = {level:m.level, shiny:!!m.shiny, moves:m.moves.slice()};
+  for(const k of STAT_ROWS) w[k] = m[k];
+  const range = k=>[statMin(b[k==='maxhp' ? 'hp' : k], k==='maxhp', w.level), statMax(b[k==='maxhp' ? 'hp' : k], k==='maxhp', w.level)];
+  const clampAll = ()=>{ for(const k of STAT_ROWS){ const [lo, hi] = range(k); w[k] = Math.max(lo, Math.min(hi, w[k])); } };
+  let row = 0, step = 1;
+  const close = ()=>{ uiScr.el.remove(); uiScr = null; owBusy = false; back(); };
+  const draw = ()=>{
+    s.el.innerHTML = `<div class="ed-title">EDITOR — ${dname(m).toUpperCase()}${m.nick ? ` (${m.name})` : ''}</div>
+      <div class="ed-rows">${EDIT_ROWS.map((r,i)=>{
+        const k = STAT_ROWS[i-2];
+        const val = i===0 ? `‹${w.level}›` : i===1 ? `‹${w.shiny ? 'YES' : 'NO'}›` : k ? `‹${w[k]}›` : i===8 ? 'EDIT' : '';
+        const rng = i===0 ? '1–100' : k ? range(k).join('–') : '';
+        return `<div class="${i===row ? 'on' : ''}"><span>${r}</span><b>${val}</b><small>${rng}</small></div>`; }).join('')}</div>
+      <div class="ed-moves">${w.moves.map(mv=>mv.n.toUpperCase()).join('<br>')}</div>
+      <div class="ed-help">←/→ change (by ${step}) · A on a number: step 1/10 · B: leave</div>`;
+  };
+  const s = scrOpen('bag ed', k=>{
+    if(k==='up' || k==='down'){ row = (row + (k==='up' ? EDIT_ROWS.length-1 : 1)) % EDIT_ROWS.length; return draw(); }
+    if(k==='left' || k==='right'){
+      const d = (k==='right' ? 1 : -1)*step, key = STAT_ROWS[row-2];
+      if(row===0){ w.level = Math.max(1, Math.min(100, w.level + d)); clampAll(); }
+      else if(row===1) w.shiny = !w.shiny;
+      else if(key){ const [lo, hi] = range(key); w[key] = Math.max(lo, Math.min(hi, w[key] + d)); }
+      return draw();
+    }
+    if(k==='b') return showConfirm('Leave without saving the changes?', ok=>{ if(ok) close(); });
+    if(k!=='a') return;
+    if(row===1){ w.shiny = !w.shiny; return draw(); }
+    if(row<8){ step = step===1 ? 10 : 1; return draw(); }
+    if(row===8) return editMoves(m, w, s.el, draw);
+    // DONE: the new level and stats (each remembered as its place in the range, so it keeps it on level-ups).
+    m.level = w.level; m.xp = 0; m.xpNext = m.level*8;
+    m.statPos = {};
+    for(const key of STAT_ROWS){ const [lo, hi] = range(key); m.statPos[key] = hi>lo ? (w[key]-lo)/(hi-lo) : 0.5; }
+    m.shiny = w.shiny; m.moves = w.moves;
+    recalcStats(m); saveAdv(); sfx('save');
+    close();
+  });
+  draw();
+}
+// A slot, then a move from its learnset (and what it knows), or (none) to clear it; at least one stays.
+function editMoves(m, w, host, done){
+  const slots = [0,1,2,3].map(i=>w.moves[i] ? w.moves[i].n.toUpperCase() : '-');
+  uiMenu(host, slots.concat('CANCEL'), si=>{
+    if(si<0 || si>3) return done();
+    const pool = [...new Set((m.dex.learnAll || m.dex.learn || []).map(([lv, mi])=>moveByIndex(mi)).concat(m.dex.moves || [], w.moves))].filter(Boolean);
+    const names = pool.map(mv=>mv.n.toUpperCase()).concat(['(none)', 'CANCEL']);
+    uiMenu(host, names, mi=>{
+      if(mi<0 || mi>pool.length) return done();
+      if(mi===pool.length){ if(w.moves.length>1 && si<w.moves.length) w.moves.splice(si, 1); return done(); }
+      const mv = pool[mi];
+      if(w.moves.some((x,i)=>x.n===mv.n && i!==si)) return done();
+      if(si<w.moves.length) w.moves[si] = mv; else w.moves.push(mv);
+      done();
+    }, 'gm-br ed-list');
+  }, 'gm-br');
+}
+
 // ---------- The SAFARI ZONE's gate and TRADEWIND VILLAGE's TRADER (first built for the GBA) ----------
 function owYesNo(text, cb){
   owBusy = true; owPrompt(text);
@@ -5513,7 +5649,7 @@ function submitTurn(){
       const statusBonus = act.target.status ? 1.5 : 1;
       // GREAT BALL x1.5, ULTRA BALL x2; the MASTER BALL never fails.
       const chance = Math.min(1, Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus * (state.legendary ? 0.35 : 1) * BALL_BONUS[ball]);
-      let shakes = 0; while(shakes<3 && (ball==='masterball' || Math.random() < Math.pow(chance, 1/3))) shakes++;
+      let shakes = 0; while(shakes<3 && (ball==='masterball' || adv.cheatPerfect || Math.random() < Math.pow(chance, 1/3))) shakes++;
       addLog(`${adv.playerName} used ${bname}!`);
       addFx({ball:'B'+state.sideB.indexOf(act.target), shakes, kind:ball});
       if(shakes===3){

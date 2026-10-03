@@ -1204,3 +1204,13 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .rm-cell{cursor:pointer;}
 .rm-foot{display:flex; justify-content:space-between; margin-top:8px; padding:6px 10px; background:#f8f8f8; border:2px solid #40485a; border-radius:6px; font-weight:bold;}
 .rm-foot b{color:#3058b0;}
+/* The hidden editor's page. */
+.bag.ed{background:#283040; color:#f8f8f8; font-size:14px;}
+.ed-title{position:absolute; left:10px; top:8px; right:10px; padding:4px 8px; background:#f8f8f8; color:#c03028; border-radius:6px; font-weight:bold;}
+.ed-rows{position:absolute; left:150px; top:40px; right:10px;}
+.ed-rows div{display:grid; grid-template-columns:96px 70px 1fr; padding:2px 6px;}
+.ed-rows div.on{background:#f8f8f8; color:#283040; border-radius:4px;}
+.ed-rows small{opacity:.75;}
+.ed-moves{position:absolute; left:10px; top:44px; width:134px; font-size:12px; line-height:1.6;}
+.ed-help{position:absolute; left:10px; right:10px; bottom:6px; font-size:12px; opacity:.85;}
+.gm-br.ed-list{max-height:70%; overflow-y:auto;}
