@@ -30,38 +30,13 @@ vm.runInContext(src + `
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
   setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
-// ---------- GBA only: SPIRECREST TOWN and the CHALLENGE TOWER ----------
-// A town south of Duskmere Hollow, home of the CHALLENGE TOWER (ADVENTURE MODE). The way in stays shut until
-// you're CHAMPION (the GBA checks that). It's built like the League's town (a big building beside the
-// POKéMON CENTER), with the building made the TOWER.
-const TOWER_TOWN = {type:'town', name:'Spirecrest Town', at:[0,1], tier:25, center:true, league:true,
-  desc:"A quiet town in the shadow of the CHALLENGE TOWER. Only POKéMON LEAGUE CHAMPIONS may pass its gate."};
-const TOWER_INDEX = G.LOCATIONS.length;
-G.LOCATIONS.push(TOWER_TOWN);
-G.LOCATIONS[0].links.push({dir:'down', to:TOWER_INDEX, gate:false});
-TOWER_TOWN.links = [{dir:'up', to:0, gate:false}];
-G.getMap(TOWER_TOWN);
-delete TOWER_TOWN.league;
-for(const b of G.getMap(TOWER_TOWN).buildings) if(b.kind==='league') b.kind = 'tower';
-// ---------- GBA only: TRADEWIND VILLAGE and the SAFARI ZONE ----------
-// TRADEWIND VILLAGE sits below WISPGATE CITY (the 4th gym), its road open once ISKA is beaten; its TRADER swaps
-// a Pokémon for a random one of about the same level. The SAFARI ZONE, above PORTMERE HARBOUR, charges $5000 to
-// enter (the GBA asks), and every species is as likely there as any other. Neither has trainers (their ids
-// would shift every room's). They come after every older area, so the older areas keep their indices.
-const TRADE_TOWN = {type:'town', name:'Tradewind Village', at:[3,3], tier:12, center:true,
-  desc:"A breezy market village where TRAINERS from all over come to swap POKéMON."};
-const TRADE_INDEX = G.LOCATIONS.length;
-G.LOCATIONS.push(TRADE_TOWN);
-G.LOCATIONS[11].links.push({dir:'down', to:TRADE_INDEX, gate:true});
-TRADE_TOWN.links = [{dir:'up', to:11, gate:false}];
-G.getMap(TRADE_TOWN);
-const SAFARI = {type:'route', name:'Safari Zone', at:[5,1], tier:16, theme:'forest',
-  desc:"A vast wild preserve. Any POKéMON at all might turn up in its grass. Entry: $5000."};
-const SAFARI_INDEX = G.LOCATIONS.length;
-G.LOCATIONS.push(SAFARI);
-G.LOCATIONS[13].links.push({dir:'up', to:SAFARI_INDEX, gate:false});
-SAFARI.links = [{dir:'down', to:13, gate:false}];
-G.getMap(SAFARI);
+// ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
+// The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
+// building is the CHALLENGE TOWER, TRADEWIND VILLAGE has its TRADER (the GBA places its own) and neither of the
+// other two has trainers.
+const TOWER_TOWN = G.LOCATIONS.find(l=>l.name==='Spirecrest Town');
+const TRADE_TOWN = G.LOCATIONS.find(l=>l.name==='Tradewind Village');
+const SAFARI = G.LOCATIONS.find(l=>l.name==='Safari Zone');
 // The tower's rooms: five themed floors with one trainer each, the summit with the SUMMONING STONE, and a
 // chamber per theme where the summoned legendary waits (the GBA picks the chamber by its type).
 const TOWER_FLOORS = [
@@ -487,7 +462,7 @@ for(const li of AREAS){
     gate_kind:loc.type==='gym' ? 'gym' : loc.type==='trainer' ? 'rival' : '', leader_name:loc.leaderName || '',
     signs:map.signs.map(s=>({x:s.x, y:s.y, text:s.text || '', route:!!s.route, lines:s.lines || null})),
     doors, items,
-    people:people.map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
+    people:people.filter(n=>n.role!=='trader').map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
     trainers:(loc===TRADE_TOWN || loc===SAFARI ? [] : trainers).map(n=>trainerOut(n, loc)).concat(loc.scene==='portmere' ? [{kind:'grunt', x:0, y:0, facing:'down', role:'route',
       title:'TEMPEST GRUNT', team:['Poochyena','Carvanha','Zubat'], scene:true, vanish:false,
       intro:['TEMPEST GRUNT: "The Admin said nobody gets past. That means you!"'],

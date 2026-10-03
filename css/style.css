@@ -1190,3 +1190,17 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .minfo .pp-out{color:#e03830;}
 .bmon.picking{animation:pickblink .6s steps(2,start) infinite;}
 @keyframes pickblink{50%{opacity:.25;}}
+/* The better balls: the POKé BALL's red half recoloured (GREAT blue, ULTRA dark gold, MASTER purple). */
+.bs-ball[data-kind=greatball] svg{filter:hue-rotate(215deg);}
+.bs-ball[data-kind=ultraball] svg{filter:sepia(1) saturate(5) hue-rotate(5deg) brightness(.85);}
+.bs-ball[data-kind=masterball] svg{filter:hue-rotate(265deg) saturate(1.3);}
+/* A hidden item's glint: a small white star, a moment every few seconds. */
+.ow-glint{position:absolute; width:32px; height:32px; pointer-events:none; opacity:0; animation:owglint 3.4s infinite;}
+.ow-glint::before,.ow-glint::after{content:''; position:absolute; left:15px; top:9px; width:2px; height:14px; background:#fff; box-shadow:0 0 2px #f8e880;}
+.ow-glint::after{left:9px; top:15px; width:14px; height:2px;}
+@keyframes owglint{0%,86%{opacity:0; transform:scale(.4);} 90%{opacity:1; transform:scale(1);} 95%{opacity:.9; transform:scale(.7);} 100%{opacity:0;}}
+/* Fast travel: the map's cursor, and the place under it. */
+.rm-cell.cursor{outline:3px solid #e03830; outline-offset:1px; cursor:pointer;}
+.rm-cell{cursor:pointer;}
+.rm-foot{display:flex; justify-content:space-between; margin-top:8px; padding:6px 10px; background:#f8f8f8; border:2px solid #40485a; border-radius:6px; font-weight:bold;}
+.rm-foot b{color:#3058b0;}

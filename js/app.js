@@ -1761,8 +1761,9 @@ function bldPiece(name, roof, wall){
   return cls;
 }
 function buildingHtml(b, ox=0, oy=0, bi=null){
-  const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : b.kind==='gym' || b.kind==='league' ? 'slate' : HOUSE_ROOF_NAMES[HOUSE_ROOFS.indexOf(b.roof)] || 'green';
-  const wall = b.kind==='gym' || b.kind==='league' ? 'grey' : 'cream';
+  const big = b.kind==='gym' || b.kind==='league' || b.kind==='tower';
+  const roof = b.kind==='center' ? 'red' : b.kind==='mart' ? 'blue' : big ? 'slate' : HOUSE_ROOF_NAMES[HOUSE_ROOFS.indexOf(b.roof)] || 'green';
+  const wall = big ? 'grey' : 'cream';
   const dc = b.door.x - b.x, cell = (name, c, r, tall)=>`<div class="bp ${bldPiece(name, roof, wall)}${tall ? ' tall' : ''}" style="left:${c*T}px; top:${r*T - (tall ? 16 : 0)}px"></div>`;
   let html = '';
   for(let c=0; c<b.w; c++){
@@ -1777,7 +1778,8 @@ function buildingHtml(b, ox=0, oy=0, bi=null){
   if(b.kind==='house') html += cell('chimney', Math.min(2, b.w-1), 0, true);
   const plate = b.kind==='center' ? '<div class="plate plate-center"><span class="pc-ball"></span>POKéMON</div>'
     : b.kind==='mart' ? '<div class="plate plate-mart">MART</div>'
-    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : b.kind==='league' ? '<div class="plate plate-gym">LEAGUE</div>' : '';
+    : b.kind==='gym' ? '<div class="plate plate-gym">GYM</div>' : b.kind==='league' ? '<div class="plate plate-gym">LEAGUE</div>'
+    : b.kind==='tower' ? '<div class="plate plate-gym">TOWER</div>' : '';
   return `<div class="bld bld-${b.kind}"${bi!=null ? ` data-bi="${bi}"` : ''} style="left:${(b.x+ox)*T}px; top:${(b.y+oy)*T}px; width:${b.w*T}px; height:${b.h*T}px">
     ${html}${plate}<div class="door door-${b.kind}" style="left:${dc*T}px; top:${(b.h-1)*T}px"></div></div>`;
 }
@@ -1930,7 +1932,12 @@ function renderTiles(cx, cy, inc){
   const map = curMap();
   let blds = map.buildings.map((b,i)=>buildingHtml(b, 0, 0, i)).join('');
   if(!map.interior) for(const n of neighbours(adv.loc)) blds += n.map.buildings.map(b=>buildingHtml(b, n.ox, n.oy)).join('');
-  layer.innerHTML = html + fronts + blds;
+  layer.innerHTML = html + fronts + blds + (map.interior ? '' : hiddenHere().map(h=>
+    `<div class="ow-glint" style="left:${h.x*T}px; top:${h.y*T}px; z-index:${21+2*h.y}"></div>`).join(''));
+}
+// Hidden items (first built for the GBA): a glint now and then; A facing the spot finds it.
+function hiddenHere(){
+  return typeof HIDDEN_ITEMS==='undefined' || !adv ? [] : HIDDEN_ITEMS.filter(h=>h.loc===adv.loc && !(adv.hiddenFound||{})[h.id]);
 }
 function keepTilesAround(){
   if(Math.abs(adv.pos.x-owTileCenter.x)>=3 || Math.abs(adv.pos.y-owTileCenter.y)>=3) renderTiles(adv.pos.x, adv.pos.y, true);
@@ -2070,6 +2077,11 @@ function owTryStep(startAt, chained){
     drawPlayer(0);
     return owSay(["It's dangerous to go out without POKéMON!", `${PROF} went toward ROUTE 1...`]);
   }
+  // SPIRECREST TOWN opens to CHAMPIONS; the SAFARI ZONE takes $5000 at the gate, each time in.
+  if(cross && LOCATIONS[cross.exit.to].towerTown && !(adv.story && adv.story.champion)){
+    drawPlayer(0); return owSay(['A gate blocks the road. Its sign reads: "SPIRECREST TOWN - CHALLENGE TOWER. CHAMPIONS ONLY."']);
+  }
+  if(cross && LOCATIONS[cross.exit.to].safari && !loc.safari && !adv.safariPass){ drawPlayer(0); return safariGate(); }
   const needBadges = cross && LOCATIONS[cross.exit.to].badges;
   if(needBadges && badgeCount() < needBadges){ drawPlayer(0); return owSay([`Only trainers with all ${needBadges} badges may pass beyond this point.`]); }
   if(cross && cross.exit.gate && !adv.cleared[loc.name]){
@@ -2189,6 +2201,7 @@ function owFrame(t){
 function crossArea(){
   const n = nbAt(adv.pos.x, adv.pos.y);
   adv.loc = n.exit.to;
+  if(LOCATIONS[adv.loc].safari) delete adv.safariPass;   // the SAFARI ZONE's pass is good for one way in
   adv.pos = {x:adv.pos.x - n.ox, y:adv.pos.y - n.oy};
   adv.visited[LOCATIONS[adv.loc].name] = true;
   saveAdv();
@@ -2236,6 +2249,9 @@ function owFade(fn){
 }
 // The door opens (3 steps of 4 frames), you vanish through it, then the fade.
 function enterBuilding(bi){
+  const kind = getMap(LOCATIONS[adv.loc]).buildings[bi].kind;
+  if(kind==='tower' && typeof towerDoor==='function') return towerDoor(bi);
+  if(kind==='tower') return owSay(["The CHALLENGE TOWER's doors are shut."]);
   owBusy = true; held.length = 0;
   const bld = document.querySelector(`#owTiles .bld[data-bi="${bi}"]`), door = bld && bld.querySelector('.door');
   if(door) door.classList.add('open');
@@ -2333,6 +2349,14 @@ function owInteract(){
   if(npc) return talkTo(npc);
   const sign = map.signs.find(s=>s.x===tx && s.y===ty);
   if(sign) return owSay(sign.lines || (sign.route ? [sign.text] : [sign.text, loc.desc.replace(/\s*"[^"]*"\s*/g,' ').trim()]));
+  const hidden = !map.interior && hiddenHere().find(h=>h.x===tx && h.y===ty);
+  if(hidden){
+    (adv.hiddenFound ||= {})[hidden.id] = true;
+    adv.items[hidden.item] = (adv.items[hidden.item]||0) + hidden.count;
+    saveAdv(); renderTiles(adv.pos.x, adv.pos.y);
+    const it = ITEM_INFO[hidden.item];
+    return owSay(["There's something here!"], ()=>obtainItem(hidden.count>1 ? it.name+'S' : it.name, hidden.count, it.pocket===1 ? 'POKé BALLS' : 'ITEMS', ()=>renderAdventure()));
+  }
   const ch = tileAt(map, adv.pos.x+dx, adv.pos.y+dy);
   if(ch==='P') return usePC();
   // An item ball: take it (Emerald: "Obtained ..." then "put away ... in the ... POCKET.").
@@ -2391,6 +2415,11 @@ function surfaceAction(){
 function legendTalk(n){
   const loc = LOCATIONS[adv.loc];
   if(!adv.cleared[loc.name]) return owSay([`${loc.leaderName.toUpperCase()}: "Get away from the guardian! You'll have to go through me!"`], ()=>startTrainerBattle());
+  if(!(adv.story||{}).masterGift && ![...adv.party, ...adv.box].some(m=>m && m.name===n.legend)){
+    // (A save already past WREN at the door: the MASTER BALL waits at the guardian's feet.)
+    (adv.story ||= {}).masterGift = true; adv.items.masterball = (adv.items.masterball||0) + 1; saveAdv();
+    return owSay(["Something glints at the guardian's feet..."], ()=>obtainItem('MASTER BALL', 1, 'POKé BALLS', ()=>legendTalk(n)));
+  }
   owSay([`The great ${n.legend.toUpperCase()} is stirring...`, 'Gyaaaoooh!'], ()=>{
     (adv.story ||= {}).legendFight = n.legend; saveAdv();
     startWildBattle({names:[n.legend], level:50, legendary:true});
@@ -2451,6 +2480,7 @@ function talkTo(n){
   if(n.gymLeader) return owSay([`${loc.leaderName}: "You've already beaten me. The road ahead is waiting for you!"`]);
   if(n.role==='nurse') return nurseTalk(n);
   if(n.role==='mom') return momTalk();
+  if(n.role==='trader') return traderTalk();
   if(n.role==='clerk'){
     if(adv.restockedLoc !== adv.loc){
       adv.restockedLoc = adv.loc; adv.items.pokeball = (adv.items.pokeball||0) + 5; saveAdv();
@@ -2902,7 +2932,14 @@ const ITEM_INFO = {pokeball:{name:'POKé BALL', pocket:1, desc:'A tool for catch
   fullrestore:{name:'FULL RESTORE', pocket:0, desc:'Fully restores the HP and status of a POKéMON.', price:3000, full:true},
   hm03:{name:'HM03 SURF', pocket:2, desc:'Lets a POKéMON carry you across water. Face the water and press A.'},
   hm08:{name:'HM08 DIVE', pocket:2, desc:'Lets a POKéMON take you underwater. Use it on dark, deep water while you SURF.'},
-  oldrod:{name:'OLD ROD', pocket:4, desc:'An old fishing rod. Face the water and press A to fish.'}};
+  oldrod:{name:'OLD ROD', pocket:4, desc:'An old fishing rod. Face the water and press A to fish.'},
+  // Better POKé BALLS and the RARE CANDY (hidden items, the MART), and the MASTER BALL (WREN, at the Sunken Shrine).
+  greatball:{name:'GREAT BALL', pocket:1, desc:'A good ball, with a higher catch rate than a POKé BALL.', price:600},
+  ultraball:{name:'ULTRA BALL', pocket:1, desc:'A very good ball, with a higher catch rate than a GREAT BALL.', price:1200},
+  rarecandy:{name:'RARE CANDY', pocket:0, desc:'A candy packed with energy. It raises a POKéMON by one level.', price:4800},
+  masterball:{name:'MASTER BALL', pocket:1, desc:'The best ball there is. It catches any wild POKéMON without fail.', price:0}};
+const BALLS = ['pokeball', 'greatball', 'ultraball', 'masterball'];
+const BALL_BONUS = {pokeball:1, greatball:1.5, ultraball:2, masterball:1};
 const CURED = {psn:'poisoning', par:'paralysis', slp:'sleep', brn:'its burn'};
 // POTION heals 20 HP (not a fainted Pokémon). Returns the message, or null if it would do nothing.
 // Use a medicine on m. Returns the message, or null if it would do nothing (nothing is used up).
@@ -2928,10 +2965,18 @@ let bagPocket = 1;
 function bagOpen(){
   const s = scrOpen('bag', k=>{
     const list = bagList();
-    if(k==='b' || k==='a' && s.i===list.length) return scrClose();
+    if(k==='b' || k==='a' && s.i===list.length){
+      // A RARE CANDY's new moves wait for the bag to close.
+      if(pendingMoves.length){ uiScr.el.remove(); uiScr = null; return movePromptNext(()=>{ owBusy = false; }); }
+      return scrClose();
+    }
     if(k==='a'){
       const it = list[s.i];
-      if(!it || !isMedicine(it.id)) return;   // only medicine works from the field
+      if(it && it.id==='rarecandy') return uiMenu(s.el, adv.party.map(m=>`${dname(m)} Lv${m.level}`).concat('CANCEL'), p=>{
+        const m = adv.party[p]; if(!m) return;
+        s.msg = rareCandy(m) || "It won't have any effect."; saveAdv(); bagDraw();
+      }, 'gm-br');
+      if(!it || !isMedicine(it.id)) return;   // only medicine (and the RARE CANDY) works from the field
       return uiMenu(s.el, adv.party.map(m=>`${dname(m)} ${Math.max(0,m.hp)}/${m.maxhp}`).concat('CANCEL'), p=>{
         const m = adv.party[p]; if(!m) return;
         const said = useItem(it.id, m);
@@ -2942,6 +2987,16 @@ function bagOpen(){
     if(k==='up' || k==='down'){ s.i = (s.i + (k==='up' ? list.length : 1)) % (list.length+1); bagDraw('shake'); }
   });
   s.i = 0; bagDraw();
+}
+// A RARE CANDY: one level (grantXp's level-up, with new moves and evolution); not past a NUZLOCKE cap.
+function rareCandy(m){
+  if(m.fainted || m.level>=100 || (typeof levelCapNow==='function' && m.level>=levelCapNow())) return null;
+  const was = state; state = {log:[], sideA:[], sideB:[]};
+  adv.items.rarecandy--;
+  grantXp(m, Math.max(1, m.xpNext - (m.xp||0)));
+  const said = state.log.join(' ');
+  state = was;
+  return said;
 }
 function bagList(){ return Object.entries(adv.items).filter(([id,n])=>n>0 && ITEM_INFO[id] && ITEM_INFO[id].pocket===bagPocket).map(([id,n])=>({...ITEM_INFO[id], id, n})); }
 function bagDraw(anim){
@@ -3095,7 +3150,7 @@ function martOpen(){
     }, 'gm-br');
   };
   const badges = LOCATIONS.filter(l=>l.type==='gym' && adv.cleared[l.name]).length;
-  const stock = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening'].concat(badges>=2 ? ['superpotion', 'burnheal'] : [], badges>=5 ? ['hyperpotion', 'revive'] : [], badges>=8 ? ['fullrestore'] : []);
+  const stock = ['pokeball', 'potion', 'antidote', 'parlyzheal', 'awakening'].concat(badges>=2 ? ['greatball', 'superpotion', 'burnheal'] : [], badges>=5 ? ['ultraball', 'hyperpotion', 'revive'] : [], badges>=8 ? ['fullrestore'] : []);
   const list = ()=>{
     owPrompt('What would you like?');
     uiMenu(view, stock.map(id=>`${ITEM_INFO[id].name}  ₽${ITEM_INFO[id].price}`).concat('CANCEL'), k=>{
@@ -3495,7 +3550,12 @@ if(typeof document.addEventListener==='function'){
       return;
     }
     if(k==='shift'){ owRun = true; return; }
-    if(mapOpen && adv){ if(['x','escape','backspace','enter'].includes(k)){ e.preventDefault(); closeMap(); } return; }
+    if(mapOpen && adv){
+      if(['x','escape','backspace'].includes(k)){ e.preventDefault(); closeMap(); }
+      else if(KEYDIR[k]){ e.preventDefault(); mapMove(KEYDIR[k]); }
+      else if(['z','enter',' '].includes(k)){ e.preventDefault(); if(!e.repeat) mapPick(mapCursor); }
+      return;
+    }
     if(onTitle){ const t = {enter:'start', ' ':'a', z:'a'}[k]; if(t && !e.repeat){ e.preventDefault(); titleKey(t); } return; }
     if(!owActive()) return;
     if(KEYDIR[k]){ e.preventDefault(); if(!e.repeat) pressDir(KEYDIR[k]); }
@@ -3550,7 +3610,12 @@ function offWorldButton(k){
     else if(k==='a' || k==='b' || k==='start') newsClose();
     return true;
   }
-  if(mapOpen && adv){ if(k==='b' || k==='start' || k==='select') closeMap(); return true; }
+  if(mapOpen && adv){
+    if(k==='b' || k==='start' || k==='select') closeMap();
+    else if(['up','down','left','right'].includes(k)) mapMove(k);
+    else if(k==='a') mapPick(mapCursor);
+    return true;
+  }
   if(onTitle){ titleKey(k); return true; }
   for(const id of ['setup', 'draft']) if(visible(id)){
     const el = document.getElementById(id);
@@ -3782,7 +3847,12 @@ const SCENES = {
   shrine(){ owSay(["WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"", "WREN: \"Here, let me patch up your team first.\""], ()=>{
       for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.ppUsed = {}; }
       saveAdv(); sfx('heal');
-      owSay(['Your POKéMON were fully healed!', "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]);
+      // WREN's MASTER BALL, for the guardian.
+      owSay(['Your POKéMON were fully healed!', "WREN: \"And take this. My mom gave it to me for something special... I think this is it.\""], ()=>{
+        (adv.story ||= {}).masterGift = true;
+        adv.items.masterball = (adv.items.masterball||0) + 1; saveAdv();
+        obtainItem('MASTER BALL', 1, 'POKé BALLS', ()=>owSay(["WREN: \"A MASTER BALL never misses. Save it for the guardian!\"", "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]));
+      });
     }); },
   hideout(){ owSay(["Voices echo from deeper in the cave...", `${ADMIN}: "The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!"`,
     `${ADMIN}: "WREN. Our little shadow has followed us here. Prove you're one of us."`]); },
@@ -3906,7 +3976,50 @@ function healParty(){
 
 let mapOpen = false;
 let mapFromStart = false;
-function openMap(fromStart){ mapFromStart = !!fromStart; mapOpen = true; owBusy = true; held.length = 0; renderMap(); }
+function openMap(fromStart){ mapFromStart = !!fromStart; mapOpen = true; owBusy = true; held.length = 0; mapCursor = adv.loc; renderMap(); }
+// Fast travel (first built for the GBA): move the cursor (arrows, or click) to any town or route you've been
+// to and press A to go: to the door of its POKéMON CENTER, else where the place is entered, on open ground. Not
+// from inside the CHALLENGE TOWER or the POKéMON LEAGUE; the SAFARI ZONE takes its fee.
+let mapCursor = 0;
+function canTravel(){ const loc = LOCATIONS[adv.loc]; return !adv.tower && !(adv.inside!=null && getMap(loc).buildings[adv.inside] && getMap(loc).buildings[adv.inside].kind==='league'); }
+function mapMove(dir){
+  const [dx, dy] = DIRS[dir], c = LOCATIONS[mapCursor].at;
+  let best = -1, bestD = Infinity;
+  LOCATIONS.forEach((l,i)=>{
+    if(l.deep || i===mapCursor) return;
+    const ddx = l.at[0]-c[0], ddy = l.at[1]-c[1];
+    if((dx && ddx*dx<=0) || (dy && ddy*dy<=0)) return;
+    const d = dx ? Math.abs(ddx)*2 + Math.abs(ddy)*5 : Math.abs(ddy)*2 + Math.abs(ddx)*5;
+    if(d < bestD){ bestD = d; best = i; }
+  });
+  if(best>=0){ mapCursor = best; sfx('select'); renderMap(); }
+}
+function mapPick(i){
+  const loc = LOCATIONS[i];
+  mapCursor = i; renderMap();
+  if(i===adv.loc || !adv.visited[loc.name] || !canTravel()) return;
+  showConfirm(`Travel to ${loc.name.toUpperCase()}?`, ok=>{
+    if(!ok) return;
+    mapFromStart = false; closeMap();
+    if(loc.safari && !LOCATIONS[adv.loc].safari) return safariGate(paid=>{ if(paid){ delete adv.safariPass; fastTravel(i); } });
+    fastTravel(i);
+  });
+}
+function fastTravel(li){
+  owFade(()=>{
+    const map = getMap(LOCATIONS[li]), c = map.buildings.find(b=>b.kind==='center');
+    let {x, y} = c ? {x:c.door.x, y:c.door.y+1} : map.spawn;
+    const open = (x, y)=>x>=0 && y>=0 && x<map.w && y<map.h && ['.',':','E','D'].includes(map.tiles[y][x]) && !map.npcs.some(n=>n.x===x && n.y===y);
+    for(let r=0; r<40 && !open(x, y); r++){
+      let found = null;
+      for(let dy=-r; dy<=r && !found; dy++) for(let dx=-r; dx<=r && !found; dx++) if((Math.abs(dx)===r || Math.abs(dy)===r) && open(x+dx, y+dy)) found = {x:x+dx, y:y+dy};
+      if(found){ ({x, y} = found); break; }
+    }
+    adv.loc = li; adv.inside = null; adv.surfing = false;
+    adv.pos = {x, y}; adv.facing = 'down';
+    adv.visited[LOCATIONS[li].name] = true;
+  });
+}
 function closeMap(){
   mapOpen = false; owBusy = false; renderMap();
   if(mapFromStart){ mapFromStart = false; startMenu(); }
@@ -3927,14 +4040,16 @@ function renderMap(){
     const seen = adv.visited[loc.name] || i===adv.loc;
     const icon = loc.type==='gym'?'🥊':loc.type==='trainer'?'🧑':loc.type==='route'?'🌿':'🏘️';
     const done = (loc.type==='gym'||loc.type==='trainer') && adv.cleared[loc.name];
-    cells += `<div class="rm-cell ${i===adv.loc?'current':''} ${seen?'':'unseen'} rm-${loc.type}" style="grid-column:${gx}; grid-row:${gy}">
+    cells += `<div class="rm-cell ${i===adv.loc?'current':''} ${i===mapCursor?'cursor':''} ${seen?'':'unseen'} rm-${loc.type}" style="grid-column:${gx}; grid-row:${gy}" onclick="mapPick(${i})">
       <span>${seen?icon:'❔'}</span><small>${seen ? loc.name.replace(/^Route (\d+):.*/, 'Route $1') : '???'}${done?' ✓':''}</small></div>`;
     for(const l of loc.links){
       if(l.dir!=='right' && l.dir!=='down') continue;   // draw each link once
       cells += `<div class="rm-link ${l.dir==='right'?'h':'v'} ${l.gate&&!adv.cleared[loc.name]?'locked':''}" style="grid-column:${gx+(l.dir==='right'?1:0)}; grid-row:${gy+(l.dir==='down'?1:0)}"></div>`;
     }
   });
-  el.innerHTML = `<div class="region-map" style="grid-template-columns:repeat(${cols}, minmax(0,1fr) 10px); grid-template-rows:repeat(${rows}, auto 10px)">${cells}</div>`;
+  const cur = LOCATIONS[mapCursor], go = mapCursor!==adv.loc && adv.visited[cur.name] && canTravel();
+  el.innerHTML = `<div class="region-map" style="grid-template-columns:repeat(${cols}, minmax(0,1fr) 10px); grid-template-rows:repeat(${rows}, auto 10px)">${cells}</div>
+    <div class="rm-foot"><span>${adv.visited[cur.name] || mapCursor===adv.loc ? cur.name : '???'}</span>${go ? '<b>A: TRAVEL</b>' : ''}</div>`;
 }
 
 function renderAdventure(){
@@ -3991,7 +4106,9 @@ function startWildBattle(fixed, where){
   const n = 1 + Math.floor(Math.random()*Math.min(4, Math.ceil(alive(adv.party).length/2)));
   const outdoors = where!=='water' && !loc.deep && loc.theme!=='cave';
   const pool = where==='water' ? waterPool(loc) : areaPool(loc).concat(outdoors && timeOfDay()==='night' && Math.random() < 0.25 ? [NIGHT_VISITORS[Math.floor(Math.random()*NIGHT_VISITORS.length)]] : []);
-  const picks = fixed ? fixed.names : timePicks(pool, n);
+  // The SAFARI ZONE: every species as likely as any other, legendaries and all.
+  const safariPicks = ()=>{ const out = []; while(out.length < n){ const d = DEX[Math.floor(Math.random()*DEX.length)]; if(!out.includes(d.name)) out.push(d.name); } return out; };
+  const picks = fixed ? fixed.names : loc.safari && where!=='water' ? safariPicks() : timePicks(pool, n);
   let id=9000;
   const wild = picks.map(n=>makeMon(dexByName(n), id++, 'none', fixed ? fixed.level : wildLevel()));
   wild.forEach(markSeen);
@@ -4048,6 +4165,52 @@ function continueStory(){
   afterStory();
 }
 // "X wants to learn Y. However, X already knows four moves. Should a move be forgotten...?"
+// ---------- The SAFARI ZONE's gate and TRADEWIND VILLAGE's TRADER (first built for the GBA) ----------
+function owYesNo(text, cb){
+  owBusy = true; owPrompt(text);
+  uiMenu(document.getElementById('owView'), ['YES', 'NO'], k=>{ owPromptClose(); cb(k===0); }, 'gm-yesno');
+}
+// $5000 at the gate, each time in: the pass it gives is used up on the way in.
+function safariGate(after){
+  owSay(['Welcome to the SAFARI ZONE! Any POKéMON at all could be waiting in its grass.'], ()=>{
+    if((adv.money ?? 3000) < 5000) return owSay(['The entry fee is ₽5000. Come back when you have it!'], ()=>after && after(false));
+    owYesNo('The entry fee is ₽5000. Would you like to go in?', yes=>{
+      if(!yes) return owSay(['Come back anytime!'], ()=>after && after(false));
+      adv.money -= 5000; adv.safariPass = true; saveAdv(); sfx('select');
+      owSay(['Thank you! Good luck out there!'], ()=>after && after(true));
+    });
+  });
+}
+// Legendary and mythical Pokémon (by National Dex number): the TRADER never sends one.
+const LEGEND_NUMS = new Set([144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,386,480,481,482,483,484,
+  485,486,487,488,489,490,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649,716,717,718,719,720,721,785,786,787,788,
+  789,790,791,792,800,801,802,807,808,809]);
+function isLegendary(name){ return LEGEND_NUMS.has(DEX_NUM[slug(name)]); }
+// One of yours for a random Pokémon of about the same level (two either way), holding the same item.
+function traderTalk(){
+  owSay(['TRADER: "I trade POKéMON with TRAINERS from all over. Give me one of yours, and I\'ll send you one of mine about as strong. Who knows what you\'ll get!"'], ()=>{
+    if(adv.nuzlocke) return owSay(['TRADER: "Hm? A NUZLOCKE challenger... Your rules say no trading. Good luck!"']);
+    const again = ()=>owYesNo('Trade a POKéMON?', yes=>{
+      if(!yes) return owSay(['TRADER: "Come back anytime!"']);
+      owBusy = true; owPrompt('Trade which POKéMON?');
+      uiMenu(document.getElementById('owView'), adv.party.map(m=>`${dname(m)} Lv${m.level}`).concat('CANCEL'), k=>{
+        owPromptClose();
+        const old = adv.party[k]; if(!old) return again();
+        if(alive(adv.party).length<=1 && !old.fainted) return owSay(["TRADER: \"That's your only POKéMON that can battle! Keep it.\""], again);
+        let d; do { d = DEX[Math.floor(Math.random()*DEX.length)]; } while(isLegendary(d.name));
+        const level = Math.max(1, Math.min(100, old.level - 2 + Math.floor(Math.random()*5)));
+        const got = makeMon(d, Date.now(), old.item, level);
+        if(typeof rollShiny==='function' && rollShiny()) got.shiny = true;
+        markOwned(got);
+        adv.party[k] = got; saveAdv();
+        sfx('obtain');
+        owSay([`${dname(old)} was sent to the TRADER.`, `In return, ${got.name.toUpperCase()} (Lv${got.level}${got.shiny ? ', SHINY!' : ''}) arrived!`,
+          'TRADER: "Take good care of it! Want to trade again?"'], again);
+      }, 'gm-br');
+    });
+    again();
+  });
+}
 function movePromptNext(done){
   const p = pendingMoves.shift();
   if(!p){ owBusy = false; return done(); }
@@ -4204,7 +4367,8 @@ const TIMES_OF_DAY = ['morning','day','evening','night'];
 // Game time runs on playtime: each time of day lasts 30 minutes, so a full day is 2 hours of play. A new game starts in the morning.
 function timeOfDay(){
   if(typeof window!=='undefined' && window.__todPeriod) return window.__todPeriod;   // test override
-  return TIMES_OF_DAY[Math.floor(((typeof adv!=='undefined' && adv && adv.playSec) || 0) / 1800) % 4];
+  // Each time of day lasts 7.5 minutes of play, so a full day is 30 minutes.
+  return TIMES_OF_DAY[Math.floor(((typeof adv!=='undefined' && adv && adv.playSec) || 0) / 450) % 4];
 }
 // Pick n species from the pool, weighted toward the types of this time of day (no repeats).
 function timePicks(pool, n){
@@ -4466,7 +4630,7 @@ function ballFx(fx){
   const k = scene.getBoundingClientRect().width/scene.offsetWidth || 1, s0 = scene.getBoundingClientRect(), t0 = spr.getBoundingClientRect(), b = document.createElement('div');
   const sr = {left:s0.left, top:s0.top, width:scene.offsetWidth, height:scene.offsetHeight}, tr = {left:s0.left+(t0.left-s0.left)/k, top:s0.top+(t0.top-s0.top)/k, width:t0.width/k, height:t0.height/k, bottom:s0.top+(t0.bottom-s0.top)/k};
   const size = Math.max(12, Math.round(sr.width/18)), tx = tr.left - sr.left + tr.width/2 - size/2, ty = tr.top - sr.top + tr.height*0.45 - size/2, ground = tr.bottom - sr.top - size*1.2;
-  b.className = 'bs-ball'; b.innerHTML = BALL_SVG; b.style.cssText = `width:${size}px; height:${size}px; left:${tx}px; top:${ty}px`;
+  b.className = 'bs-ball'; b.innerHTML = BALL_SVG; if(fx.kind) b.dataset.kind = fx.kind; b.style.cssText = `width:${size}px; height:${size}px; left:${tx}px; top:${ty}px`;
   scene.appendChild(b);
   msgBusy = true; sfx('throw');
   const sx = sr.width*0.12 - tx, sy = sr.height*0.9 - ty, peak = Math.min(sy, 0) - sr.height*0.25, wait = ms=>new Promise(r=>setTimeout(r, ms));
@@ -4984,7 +5148,7 @@ function renderCmd(focusIdx){
   } else if(cmd.view==='bag'){
     const wild = state.mode==='story' && !state.trainerLoc;
     left = `<div class="gba-box tlist" style="grid-template-columns:1fr">
-      ${wild ? `<button onclick="cmdBall()" ${balls?'':'disabled'}>Poké Ball<small>×${balls}</small></button>` : ''}
+      ${wild ? BALLS.filter(b=>b==='pokeball' || adv.items[b]>0).map(b=>`<button onclick="cmdBall('${b}')" ${adv.items[b]?'':'disabled'}>${ITEM_INFO[b].name}<small>×${adv.items[b]||0}</small></button>`).join('') : ''}
       ${state.mode==='story' ? Object.keys(ITEM_INFO).filter(id=>isMedicine(id) && adv.items[id]>0).map(id=>`<button onclick="cmdItem('${id}')">${ITEM_INFO[id].name}<small>×${adv.items[id]}</small></button>`).join('') : ''}
       <button onclick="cmdBack()">Cancel</button></div>`;
     right = `<div class="gba-box bdark">${wild ? (balls ? 'Weaken it first for a better catch rate!' : 'Out of Poké Balls! Restock at a Pokémon Center.') : "There's nothing in the Bag you can use here."}</div>`;
@@ -5315,7 +5479,7 @@ function submitTurn(){
     const m = state.sideA[ai];
     const target = state.sideB[ch.target];
     if(!m || m.fainted || m.caught || !target || target.fainted || target.caught) continue;
-    if(ch.move==='ball'){ actions.push({user:m, ball:true, target}); continue; }
+    if(ch.move==='ball'){ actions.push({user:m, ball:ch.ball || 'pokeball', target}); continue; }
     if(ch.move==='item'){ actions.push({user:m, item:ch.item, target:m}); continue; }
     actions.push({user:m, move:ch.move==='struggle' ? STRUGGLE : m.moves[ch.move], target});
   }
@@ -5342,14 +5506,16 @@ function submitTurn(){
     focusOn(act.user) || focusOn(act.target);
     if(act.item){ const said = useItem(act.item, act.user); addLog(said ? `${adv.playerName} used a ${ITEM_INFO[act.item].name}! ${said}` : `It won't have any effect.`); continue; }
     if(act.ball){
-      if(!adv.items.pokeball){ addLog(`No Poké Balls left!`); continue; }
-      adv.items.pokeball--;
+      const ball = act.ball, bname = ITEM_INFO[ball].name;
+      if(!adv.items[ball]){ addLog(`No ${bname}S left!`); continue; }
+      adv.items[ball]--;
       const hpFrac = act.target.hp/act.target.maxhp;
       const statusBonus = act.target.status ? 1.5 : 1;
-      const chance = Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus * (state.legendary ? 0.35 : 1);
-      let shakes = 0; while(shakes<3 && Math.random() < Math.pow(chance, 1/3)) shakes++;
-      addLog(`${adv.playerName} used POKé BALL!`);
-      addFx({ball:'B'+state.sideB.indexOf(act.target), shakes});
+      // GREAT BALL x1.5, ULTRA BALL x2; the MASTER BALL never fails.
+      const chance = Math.min(1, Math.max(0.1, Math.min(0.95, 0.95 - hpFrac*0.7)) * statusBonus * (state.legendary ? 0.35 : 1) * BALL_BONUS[ball]);
+      let shakes = 0; while(shakes<3 && (ball==='masterball' || Math.random() < Math.pow(chance, 1/3))) shakes++;
+      addLog(`${adv.playerName} used ${bname}!`);
+      addFx({ball:'B'+state.sideB.indexOf(act.target), shakes, kind:ball});
       if(shakes===3){
         act.target.caught = true;
         addLog(`Gotcha! ${dname(act.target)} was caught!`);
@@ -5476,3 +5642,39 @@ function mountScreens(){
 }
 // First launch: straight onto the handheld's title.
 if(typeof document!=='undefined' && document.getElementById('adv')){ mountScreens(); handheldTitle(); }
+
+// ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE (first built for the GBA) ----------
+// SPIRECREST TOWN, south of Duskmere Hollow, home of the CHALLENGE TOWER (ADVENTURE MODE); its road opens to
+// CHAMPIONS. Built like the League's town (a big building beside the POKéMON CENTER) that then becomes the
+// TOWER. TRADEWIND VILLAGE sits below WISPGATE CITY (open once ISKA is beaten): its TRADER swaps a Pokémon for
+// a random one of about the same level. The SAFARI ZONE, above PORTMERE HARBOUR, charges $5000 at its gate;
+// every species is as likely there as any other. They come after every older area (saves hold area
+// indices), are generated here, at the end of the script, once the map builder is all defined (the GBA export draws them
+// from these very maps) and have no trainers.
+const TOWER_TOWN = {type:'town', name:'Spirecrest Town', at:[0,1], tier:25, center:true, league:true, towerTown:true,
+  desc:"A quiet town in the shadow of the CHALLENGE TOWER. Only POKéMON LEAGUE CHAMPIONS may pass its gate."};
+LOCATIONS.push(TOWER_TOWN);
+LOCATIONS[0].links.push({dir:'down', to:LOCATIONS.length-1, gate:false});
+TOWER_TOWN.links = [{dir:'up', to:0, gate:false}];
+getMap(TOWER_TOWN);
+delete TOWER_TOWN.league;
+const TRADE_TOWN = {type:'town', name:'Tradewind Village', at:[3,3], tier:12, center:true, tradeTown:true,
+  desc:"A breezy market village where TRAINERS from all over come to swap POKéMON."};
+LOCATIONS.push(TRADE_TOWN);
+LOCATIONS[11].links.push({dir:'down', to:LOCATIONS.length-1, gate:true});
+TRADE_TOWN.links = [{dir:'up', to:11, gate:false}];
+getMap(TRADE_TOWN);
+const SAFARI = {type:'route', name:'Safari Zone', at:[5,1], tier:16, theme:'forest', safari:true,
+  desc:"A vast wild preserve. Any POKéMON at all might turn up in its grass. Entry: $5000."};
+LOCATIONS.push(SAFARI);
+LOCATIONS[13].links.push({dir:'up', to:LOCATIONS.length-1, gate:false});
+SAFARI.links = [{dir:'down', to:13, gate:false}];
+getMap(SAFARI);
+// (The web game's own touches, after generation: the tower's door, no trainers, the TRADER by the Center.)
+for(const b of getMap(TOWER_TOWN).buildings) if(b.kind==='league') b.kind = 'tower';
+for(const loc of [TRADE_TOWN, SAFARI]){ const m = getMap(loc); m.npcs = m.npcs.filter(n=>!n.trainer); }
+{
+  const m = getMap(TRADE_TOWN), c = m.buildings.find(b=>b.kind==='center');
+  if(c) m.npcs.push({kind:'gentleman', x:c.door.x+2, y:c.door.y+1, facing:'down', role:'trader', lines:['TRADER: "Any POKéMON for any POKéMON!"']});
+}
+
