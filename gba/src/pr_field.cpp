@@ -167,62 +167,62 @@ namespace
 }
 
 // ----- The hidden editor -----
-// Press A at the lone tree beside DUSKMERE HOLLOW's MART (5, 9), then stand under the lone tree up and to its
-// right (8, 7), facing it, and press A, B, A: the editor opens. Nobody wanders up there. Leaving DUSKMERE
-// HOLLOW (or going indoors) forgets the first tree.
+// In any POKéMON CENTER, stand in the bottom-left corner (1, 7), under the plant, and press LEFT, LEFT (at the
+// wall), then A, B, A facing it: the editor opens. Every CENTER shares the one layout, and that wall has nothing
+// to say, so nothing else answers those keys there.
 namespace
 {
-    bool egg_armed = false;
-    int egg_progress = 0;       // how much of A, B, A has been pressed at the second tree
+    int egg_progress = 0;       // how much of LEFT, LEFT, A, B, A has been pressed in the corner
 
-    constexpr int egg_tree_x = 5, egg_tree_y = 9;
-    constexpr int egg_spot_x = 8, egg_spot_y = 8;   // facing the tree at (8, 7)
+    constexpr int egg_spot_x = 1, egg_spot_y = 7;
 }
 
 bool overworld::egg_watch()
 {
     game_state& g = state();
-    if(_map_index != 0)
-    {
-        egg_armed = false;
-        egg_progress = 0;
-        return false;
-    }
-    if(! egg_armed)
-    {
-        return false;
-    }
-    bool at_window = g.x == egg_spot_x && g.y == egg_spot_y && g.facing == direction::UP;   // (the second tree)
-    bool a = bn::keypad::a_pressed(), b = bn::keypad::b_pressed();
-    if(! at_window)
+    bool in_center = _map->room && _map->room->kind == room_kind::CENTER;
+    if(! in_center || g.x != egg_spot_x || g.y != egg_spot_y)
     {
         egg_progress = 0;
         return false;
     }
-    if(bn::keypad::up_pressed() || bn::keypad::down_pressed() || bn::keypad::left_pressed() || bn::keypad::right_pressed() ||
-       bn::keypad::start_pressed() || bn::keypad::select_pressed())
+    enum key { NONE, LEFT, A, B, OTHER };
+    key k = NONE;
+    if(bn::keypad::left_pressed())
     {
-        egg_progress = 0;
+        k = LEFT;
+    }
+    else if(bn::keypad::a_pressed())
+    {
+        k = A;
+    }
+    else if(bn::keypad::b_pressed())
+    {
+        k = B;
+    }
+    else if(bn::keypad::up_pressed() || bn::keypad::down_pressed() || bn::keypad::right_pressed() ||
+            bn::keypad::start_pressed() || bn::keypad::select_pressed() || bn::keypad::l_pressed() ||
+            bn::keypad::r_pressed())
+    {
+        k = OTHER;
+    }
+    if(k == NONE)
+    {
         return false;
     }
-    if(! a && ! b)
-    {
-        return false;
-    }
-    constexpr bool want_a[] = { true, false, true };
-    if(a == want_a[egg_progress])
+    constexpr key want[] = { LEFT, LEFT, A, B, A };
+    if(k == want[egg_progress] && (k == LEFT || g.facing == direction::LEFT))
     {
         ++egg_progress;
     }
     else
     {
-        egg_progress = a ? 1 : 0;
+        egg_progress = k == LEFT ? 1 : 0;   // a LEFT always starts it over
     }
-    if(egg_progress < 3)
+    if(egg_progress < 5)
     {
         return false;
     }
-    egg_armed = false;
     egg_progress = 0;
     audio::play(audio::sfx::SPOT);
     suspend();
@@ -249,11 +249,6 @@ void overworld::interact()
     }
     int dx = dx_of(g.facing), dy = dy_of(g.facing);
     int fx = g.x + dx, fy = g.y + dy;
-    if(_map_index == 0 && fx == egg_tree_x && fy == egg_tree_y)
-    {
-        egg_armed = true;       // (no sign of it)
-        egg_progress = 0;
-    }
     // Talk across a counter.
     if(behaviour_at(fx, fy) == behaviour::COUNTER)
     {
