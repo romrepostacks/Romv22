@@ -5,10 +5,11 @@
     {
       "version": "GBA 1.4",
       "date": "2026-10-03",
-      "title": "Fast Travel",
+      "title": "Fast Travel and Faster Days",
       "changes": [
         "Open the POKéNAV map and pick any town or route you've been to, then press A to travel there",
-        "Towns drop you at the POKéMON CENTER door; routes put you on the path where you'd enter them"
+        "Towns drop you at the POKéMON CENTER door; routes put you on the path where you'd enter them",
+        "Days go by faster: morning, day, evening and night now last 7.5 minutes of play each, so a full day is 30 minutes"
       ]
     },
     {

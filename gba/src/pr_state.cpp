@@ -141,8 +141,8 @@ void set_game_active(bool on)
 
 time_of_day current_time_of_day()
 {
-    // Each time of day lasts 30 minutes of play (1800 s), so a full day is 2 hours.
-    return time_of_day((current.play_frames / 60 / 1800) % 4);
+    // Each time of day lasts 7.5 minutes of play (450 s), so a full day is 30 minutes.
+    return time_of_day((current.play_frames / 60 / 450) % 4);
 }
 
 const char* time_of_day_name(time_of_day t)
