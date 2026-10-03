@@ -1,7 +1,24 @@
 {
   "_howto": "Edit this file to change the title screen message (motd) or add a changelog entry. Newest entry first. Each entry: version, date (YYYY-MM-DD), title, changes (short bullet points, player-facing). The game fetches this file fresh on every launch.",
-  "motd": "Phase 5 is here: Victory Road, the Elite Four, Champion Wren, the credits, and a brand-new soundtrack!",
+  "motd": "Version 0.16: NUZLOCKE, ADVENTURE MODE and the CHALLENGE TOWER, shinies, PP and stat moves, new balls, the SAFARI ZONE and fast travel!",
   "changelog": [
+    {
+      "version": "0.16.0",
+      "date": "2026-10-03",
+      "title": "Nuzlocke, Adventure Mode and a Battle Overhaul",
+      "changes": [
+        "NEW GAME now asks NORMAL or NUZLOCKE: fainted Pokémon go to the PC's GRAVEYARD, one catch per area (dupes and shiny clauses), every catch is nicknamed, levels are capped at the next GYM LEADER, and losing your whole party ends the run",
+        "SKIP STORY TEXT at NEW GAME: scenes and calls complete themselves",
+        "After the credits, ADVENTURE MODE opens SPIRECREST TOWN and its CHALLENGE TOWER: five themed floors, then a SUMMONING STONE that calls a legendary POKéMON. Beating the game also adds NEW ADVENTURE MODE to the title: draft 6 at level 50 and start as CHAMPION",
+        "Shiny Pokémon: 1 in 4096, twice as often in ADVENTURE MODE and 1.25 times in a NUZLOCKE run. They sparkle when they appear",
+        "Every move has PP (a POKéMON CENTER refills it; with none left a Pokémon will Struggle). New stat, healing and weather moves; ABSORB and GIGA DRAIN heal, EARTHQUAKE hits every foe",
+        "FIGHT asks for a target first, and moves are coloured for it: red super effective, yellow a normal hit, grey no effect. B goes back to change the target",
+        "GREAT, ULTRA and MASTER BALLS, the RARE CANDY, and hidden items: look for a glint on the ground. WREN now gives you a MASTER BALL at the Sunken Shrine",
+        "TRADEWIND VILLAGE below WISPGATE CITY, whose TRADER swaps a Pokémon for a random one of about the same level, and the SAFARI ZONE north of PORTMERE HARBOUR ($5000; every species equally likely)",
+        "Fast travel: open the MAP and pick any town or route you've visited",
+        "Days go by faster: each time of day lasts 7.5 minutes of play, a full day 30 minutes"
+      ]
+    },
     {
       "version": "0.15.2",
       "date": "2026-09-30",
