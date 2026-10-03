@@ -26,10 +26,11 @@ MAX_TRAINERS = 256      # bits in game_state::beaten
 MAX_ITEM_BALLS = 256    # bits in game_state::picked
 ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal', 'hyperpotion',
             'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod',      # ITEM_INFO order
-            'greatball', 'ultraball', 'rarecandy']                    # GBA only (GBA_ITEMS)
+            'greatball', 'ultraball', 'rarecandy', 'masterball']      # GBA only (GBA_ITEMS)
 # GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
 GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
              'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
+             'masterball': {'name': 'MASTER BALL', 'pocket': 1, 'desc': 'The best ball there is. It catches any wild POKéMON without fail.', 'price': 0},
              'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800}}
 STATUS = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
           'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
@@ -981,7 +982,9 @@ def build_small_sprites(gfx):
     # Frame 0 the POKé BALL; 1 a GREAT BALL (blue top) and 2 an ULTRA BALL (dark top, yellow bands): the red
     # half recoloured.
     frames = [b]
-    for top, band in (((0x38, 0x78, 0xe0), (0xf0, 0x48, 0x48)), ((0x40, 0x40, 0x48), (0xf8, 0xd8, 0x30))):
+    # (3: a MASTER BALL, purple with pink bands.)
+    for top, band in (((0x38, 0x78, 0xe0), (0xf0, 0x48, 0x48)), ((0x40, 0x40, 0x48), (0xf8, 0xd8, 0x30)),
+                      ((0x80, 0x40, 0xb8), (0xf0, 0x80, 0xc0))):
         f = b.copy()
         fp = f.load()
         for y in range(16):

@@ -3,7 +3,7 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.5**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
+Version **1.6**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
 own data, plus the two story phases planned after it (STORY.md phases 6 and 7): NUZLOCKE mode and ADVENTURE
 MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves. The web game doesn't have these yet; the GBA builds them
 from the plan.
@@ -43,6 +43,7 @@ from the plan.
   ($5000 to enter), where every species, legendaries included, is equally likely; hidden items (a glint
   now and then; face the spot and press A) with RARE CANDIES, GREAT BALLS and ULTRA BALLS; GREAT BALLS
   (x1.5) and ULTRA BALLS (x2) in the POKé MART from the 2nd and 5th badges.
+  The MASTER BALL never fails; WREN gives you one at the Sunken Shrine, before the guardian.
 - **Catching as in Emerald:** each species' real catch rate with Gen 3's formula (the guardian uses the web
   game's odds). Then the POKéDEX registration page and the nickname prompt.
 - **Menus:** the POKéDEX (list, INFO, AREA, SIZE), the party screen (6 Pokémon, 10 from your fourth badge),
@@ -71,8 +72,8 @@ from the plan.
   DIVE and the other story rewards still come at the same points.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.4
-  saves load in 1.5; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.5
+  saves load in 1.6; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) is for the web app only: a GBA has one screen and one set of
 buttons.

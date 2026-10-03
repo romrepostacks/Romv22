@@ -38,6 +38,7 @@ namespace story
     constexpr uint32_t LEGEND_CAUGHT = 1u << 13;
     constexpr uint32_t CHAMPION = 1u << 14;       // saw the credits
     constexpr uint32_t OLD_ROD = 1u << 15;        // (unused: the rod is an item)
+    constexpr uint32_t MASTER_GIFT = 1u << 16;    // WREN's MASTER BALL at the Sunken Shrine (GBA only)
     // The cheat menu's switches.
     constexpr uint32_t CHEAT_NO_WILD = 1u << 30;     // no wild Pokémon in grass, caves or on the water
     constexpr uint32_t CHEAT_PERFECT_CATCH = 1u << 31;   // every POKé BALL catches

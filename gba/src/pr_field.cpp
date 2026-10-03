@@ -449,6 +449,13 @@ void overworld::legend_talk(int index)
         tower_legend_battle(legend, tower_level());
         return;
     }
+    if(! g.has(story::MASTER_GIFT) && ! g.has(story::LEGEND_CAUGHT))
+    {
+        // (A save from before 1.6, already past WREN at the door: the MASTER BALL waits at the guardian's feet.)
+        g.story |= story::MASTER_GIFT;
+        say("Something glints at the guardian's feet...");
+        obtain(item_id::MASTERBALL, 1);
+    }
     bn::string<64> text("The great ");
     text.append(game_data::species_list[int(legend)].name);
     text.append(" is stirring...");
@@ -1620,6 +1627,11 @@ bool overworld::play_scene()
         g.heal_party();
         audio::play(audio::sfx::HEAL);
         story_say("Your POKéMON were fully healed!");
+        // GBA only: WREN's MASTER BALL, for the guardian.
+        story_say("WREN: \"And take this. My mom gave it to me for something special... I think this is it.\"");
+        g.story |= story::MASTER_GIFT;
+        obtain(item_id::MASTERBALL, 1);
+        story_say("WREN: \"A MASTER BALL never misses. Save it for the guardian!\"");
         story_say("WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\"");
         return true;
     }
@@ -2594,8 +2606,9 @@ void overworld::cheat_menu()
         wild_label.append(wild ? "ON" : "OFF");
         bn::string<32> catch_label("PERFECT CAPTURE: ");
         catch_label.append(perfect ? "ON" : "OFF");
-        bn::string_view options[] = { wild_label, "HEAL PARTY POKéMON", "ADD 20 POKé BALLS", "ADD $1000", catch_label, "EXIT" };
-        constexpr int n = 6;
+        bn::string_view options[] = { wild_label, "HEAL PARTY POKéMON", "ADD 20 POKé BALLS", "ADD MASTER BALL", "ADD $1000",
+                                      catch_label, "EXIT" };
+        constexpr int n = 7;
         int widest = 0;
         for(const bn::string_view& o : options)
         {
@@ -2632,11 +2645,16 @@ void overworld::cheat_menu()
             say("20 POKé BALLS were put in the BAG.");
             break;
         case 3:
+            g.add_item(item_id::MASTERBALL, 1);
+            audio::play(audio::sfx::SELECT);
+            say("A MASTER BALL was put in the BAG.");
+            break;
+        case 4:
             g.money = bn::min(uint32_t(999999), uint32_t(g.money + 1000));
             audio::play(audio::sfx::SELECT);
             say("$1000 was added to your money.");
             break;
-        case 4:
+        case 5:
             g.story ^= story::CHEAT_PERFECT_CATCH;
             audio::play(audio::sfx::SELECT);
             break;

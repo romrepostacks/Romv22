@@ -703,7 +703,7 @@ namespace
         if(wild && ! nuz_block)
         {
             // The POKé BALL always (greyed when out); GREAT and ULTRA BALLS when you have some.
-            for(item_id ball : { item_id::POKEBALL, item_id::GREATBALL, item_id::ULTRABALL })
+            for(item_id ball : { item_id::POKEBALL, item_id::GREATBALL, item_id::ULTRABALL, item_id::MASTERBALL })
             {
                 if(ball != item_id::POKEBALL && ! g.item_count(ball))
                 {
@@ -1826,7 +1826,7 @@ namespace
         }
         // GREAT BALL x1.5, ULTRA BALL x2 (Emerald's ball bonus).
         int bonus_x10 = ball == item_id::ULTRABALL ? 20 : ball == item_id::GREATBALL ? 15 : 10;
-        int ball_frame = ball == item_id::ULTRABALL ? 2 : ball == item_id::GREATBALL ? 1 : 0;
+        int ball_frame = ball == item_id::MASTERBALL ? 3 : ball == item_id::ULTRABALL ? 2 : ball == item_id::GREATBALL ? 1 : 0;
         mon& m = *target.m;
         if(g.run.nuzlocke() && ! _s.legendary && ! m.shiny() &&
            (_nuz_caught || ! _s.nuzlocke_catch || g.owned.test(m.species_index)))
@@ -1902,9 +1902,9 @@ namespace
             caught = checks == 4;
             wobbles = bn::min(checks, 3);
         }
-        if(g.has(story::CHEAT_PERFECT_CATCH))
+        if(ball == item_id::MASTERBALL || g.has(story::CHEAT_PERFECT_CATCH))
         {
-            caught = true;      // the cheat menu's PERFECT CAPTURE
+            caught = true;      // the MASTER BALL never fails (nor the cheat menu's PERFECT CAPTURE)
             wobbles = 3;
         }
         // The throw plays while "used POKé BALL!" is up (ballFx).

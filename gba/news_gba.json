@@ -1,7 +1,16 @@
 {
   "_howto": "The GBA build's own WHAT'S NEW entries, shown before the web game's news.json changelog (newest first). Player-facing only.",
-  "motd": "Version 1.5: TRADEWIND VILLAGE's TRADER, the SAFARI ZONE, hidden items, GREAT and ULTRA BALLS!",
+  "motd": "Version 1.6: the MASTER BALL, and a gift from WREN at the Sunken Shrine!",
   "changelog": [
+    {
+      "version": "GBA 1.6",
+      "date": "2026-10-03",
+      "title": "The Master Ball",
+      "changes": [
+        "The MASTER BALL: the best ball there is. It catches any wild POKéMON without fail",
+        "At the Sunken Shrine, WREN now hands you a MASTER BALL before you face the guardian"
+      ]
+    },
     {
       "version": "GBA 1.5",
       "date": "2026-10-03",
