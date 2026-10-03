@@ -278,6 +278,10 @@ void overworld::interact()
     {
         return;
     }
+    if(find_hidden(tx, ty))
+    {
+        return;
+    }
     behaviour b = behaviour_at(tx, ty);
     if(b == behaviour::PC)
     {
@@ -402,6 +406,9 @@ void overworld::talk_to(int index)
         break;
     case person_role::TOWER:
         tower_guide();
+        break;
+    case person_role::TRADER:
+        trader();
         break;
     default:
         for(int i = 0; i < p.lines_count; ++i)
@@ -800,7 +807,7 @@ void overworld::mart()
     };
     show_money();
     int badges = g.badges();
-    item_id stock[10];
+    item_id stock[14];
     int stock_count = 0;
     for(item_id id : { item_id::POKEBALL, item_id::POTION, item_id::ANTIDOTE, item_id::PARLYZHEAL, item_id::AWAKENING })
     {
@@ -808,11 +815,13 @@ void overworld::mart()
     }
     if(badges >= 2)
     {
+        stock[stock_count++] = item_id::GREATBALL;
         stock[stock_count++] = item_id::SUPERPOTION;
         stock[stock_count++] = item_id::BURNHEAL;
     }
     if(badges >= 5)
     {
+        stock[stock_count++] = item_id::ULTRABALL;
         stock[stock_count++] = item_id::HYPERPOTION;
         stock[stock_count++] = item_id::REVIVE;
     }
@@ -828,8 +837,8 @@ void overworld::mart()
         u.clear_text();
         if(pick == 0)
         {
-            bn::string<32> labels[11];
-            bn::string_view views[11];
+            bn::string<32> labels[15];
+            bn::string_view views[15];
             for(int i = 0; i < stock_count; ++i)
             {
                 const item_info& it = game_data::items[int(stock[i])];
@@ -2336,6 +2345,7 @@ void overworld::start_menu()
             bag_screen(bag_mode::FIELD);
             save_game();
             resume();
+            move_prompts();     // a RARE CANDY's new moves
             break;
         case 3:
         {
@@ -2343,6 +2353,16 @@ void overworld::start_menu()
             bool travel = ! g.tower.active && ! (_map->room && _map->room->kind == room_kind::LEAGUE);
             suspend();
             int dest = region_map_screen(travel);
+            if(dest >= 0 && (wd::maps[dest].area->flags & area_flag::SAFARI) && ! (_map->area && (_map->area->flags & area_flag::SAFARI)))
+            {
+                // The SAFARI ZONE's fee, travelling in too.
+                resume();
+                if(! safari_gate())
+                {
+                    break;
+                }
+                suspend();
+            }
             if(dest >= 0)
             {
                 fast_travel(dest);
@@ -2435,6 +2455,130 @@ void overworld::fast_travel(int area)
     ui::fade_in(12);
     _fresh_press = true;
     save_game();
+}
+
+// ----- Hidden items, the TRADER and the SAFARI ZONE (GBA only) -----
+// A hidden item: facing its spot, A finds it.
+bool overworld::find_hidden(int tx, int ty)
+{
+    game_state& g = state();
+    if(_map->is_room())
+    {
+        return false;
+    }
+    for(int i = 0; i < wd::hidden_items_count; ++i)
+    {
+        const hidden_item& h = wd::hidden_items[i];
+        if(h.area == _map_index && h.x == tx && h.y == ty && ! g.picked.test(h.id))
+        {
+            g.picked.set(h.id);
+            update_glints();
+            say("There's something here!");
+            obtain(h.item, h.count);
+            save_game();
+            return true;
+        }
+    }
+    return false;
+}
+
+// The SAFARI ZONE's gate: $5000 to go in. Returns whether you paid.
+bool overworld::safari_gate()
+{
+    game_state& g = state();
+    ui& u = gui();
+    say("Welcome to the SAFARI ZONE! Any POKéMON at all could be waiting in its grass.");
+    if(g.money < 5000)
+    {
+        say("The entry fee is $5000. Come back when you have it!");
+        return false;
+    }
+    u.show_text("The entry fee is $5000. Would you like to go in?");
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        say("Come back anytime!");
+        return false;
+    }
+    g.money -= 5000;
+    audio::play(audio::sfx::SELECT);
+    say("Thank you! Good luck out there!");
+    return true;
+}
+
+// TRADEWIND VILLAGE's TRADER: one of yours for a random Pokémon of about the same level (not a legendary).
+void overworld::trader()
+{
+    game_state& g = state();
+    ui& u = gui();
+    say("TRADER: \"I trade POKéMON with TRAINERS from all over. Give me one of yours, and I'll send you one of mine "
+        "about as strong. Who knows what you'll get!\"");
+    if(g.run.nuzlocke())
+    {
+        say("TRADER: \"Hm? A NUZLOCKE challenger... Your rules say no trading. Good luck!\"");
+        return;
+    }
+    while(true)
+    {
+        u.show_text("Trade a POKéMON?");
+        bool yes = u.yes_no();
+        u.clear_text();
+        if(! yes)
+        {
+            say("TRADER: \"Come back anytime!\"");
+            return;
+        }
+        suspend();
+        int pick = party_screen(party_mode::CHOOSE, "Trade which POKéMON?");
+        resume();
+        if(pick < 0)
+        {
+            continue;
+        }
+        mon& old = g.party[pick];
+        if(g.able_count() <= 1 && ! old.fainted())
+        {
+            say("TRADER: \"That's your only POKéMON that can battle! Keep it.\"");
+            continue;
+        }
+        bn::random& r = rng();
+        int species = 0;
+        for(int tries = 0; tries < 50; ++tries)
+        {
+            species = r.get_int(species_count);
+            bool legend = false;
+            for(int k = 0; k < game_data::legendaries_count; ++k)
+            {
+                legend |= game_data::legendaries[k] == species;
+            }
+            if(! legend)
+            {
+                break;
+            }
+        }
+        int level = bn::clamp(old.level - 2 + r.get_int(5), 1, 100);
+        mon got = mon::make(species_id(species), level, old.item);
+        if(roll_shiny())
+        {
+            got.traits |= mon_trait::SHINY;
+        }
+        bn::string<96> text(old.name());
+        text.append(" was sent to the TRADER.");
+        say(text);
+        audio::play(audio::sfx::OBTAIN);
+        text = "In return, ";
+        text.append(got.name());
+        text.append(" (Lv");
+        text.append(bn::to_string<4>(got.level));
+        text.append(got.shiny() ? ", SHINY!) arrived!" : ") arrived!");
+        say(text);
+        g.mark_seen(species);
+        g.mark_owned(species);
+        old = got;
+        save_game();
+        say("TRADER: \"Take good care of it! Want to trade again?\"");
+    }
 }
 
 // The cheat menu (LEFT, RIGHT, LEFT, RIGHT, B, A, START on the field).

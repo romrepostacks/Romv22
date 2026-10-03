@@ -25,7 +25,12 @@ MAP_BANKS = 14          # BG palette banks a map tileset may use; the 15th is th
 MAX_TRAINERS = 256      # bits in game_state::beaten
 MAX_ITEM_BALLS = 256    # bits in game_state::picked
 ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal', 'hyperpotion',
-            'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod']      # ITEM_INFO order
+            'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod',      # ITEM_INFO order
+            'greatball', 'ultraball', 'rarecandy']                    # GBA only (GBA_ITEMS)
+# GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
+GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
+             'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
+             'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800}}
 STATUS = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
           'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
 
@@ -368,7 +373,7 @@ def build_world(exp, data, out_inc):
         rows = []
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
-            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER'}.get(n.get('role', ''), 'NONE')
+            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -464,6 +469,12 @@ def build_world(exp, data, out_inc):
             d = tower_door[0]
             people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'left', 'role': 'tower', 'wander': False,
                            'lines': ['The CHALLENGE TOWER opens to CHAMPIONS.']})
+        center_door = [d for d in a['doors'] if d['kind'] == 'center']
+        if a.get('trade_town') and center_door and not any(n.get('role') == 'trader' for n in people):
+            # GBA only: TRADEWIND VILLAGE's TRADER beside the POKéMON CENTER.
+            d = center_door[0]
+            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'down', 'role': 'trader', 'wander': False,
+                           'lines': ['TRADER: "Any POKéMON for any POKéMON!"']})
         people_rows(p, people)
         trainer_rows(p, a['trainers'], ('area', ai), ai)
         its = []
@@ -502,6 +513,8 @@ def build_world(exp, data, out_inc):
         if a['champion']: flags.append('area_flag::CHAMPION')
         if a['kind'] == 'boss': flags.append('area_flag::BOSS')
         if a.get('tower_town'): flags.append('area_flag::TOWER_TOWN')
+        if a.get('safari'): flags.append('area_flag::SAFARI')
+        if a.get('trade_town'): flags.append('area_flag::TRADE_TOWN')
         legend = a['legend']
         if a['own_pool']:
             flags.append('area_flag::OWN_POOL')
@@ -552,6 +565,11 @@ def build_world(exp, data, out_inc):
     L += room_maps
     L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows))
     L.append('constexpr int areas_count = %d;' % len(areas))
+    hidden = hidden_items(areas)
+    L.append('// GBA only: hidden items (press A facing the spot), by area.')
+    L.append('constexpr hidden_item hidden_items[] = {%s};' % ', '.join(
+        '{%d, %d, %d, item_id::%s, %d, %d}' % (h['area'], h['x'], h['y'], h['item'].upper(), h['count'], h['id']) for h in hidden))
+    L.append('constexpr int hidden_items_count = %d;' % len(hidden))
     L.append('constexpr int maps_count = %d;' % (len(areas) + len(rooms)))
     L.append('constexpr int trainers_count = %d;' % len(ids))
     L.append('constexpr int items_count = %d;\n' % item_count)
@@ -876,6 +894,58 @@ def build_ui_tiles(out_inc):
 BALL = []
 WRITTEN = set()      # graphics files this run produced
 
+HIDDEN_FIRST_ID = 128     # hidden items' bits in game_state::picked (item balls use the low ones)
+
+
+def hidden_items(areas):
+    """GBA only: hidden items along the way, a fixed few per area on reachable open ground (a nook or a dead end
+    when there is one), out of the way of doors, signs and people. Rare Candies and better balls."""
+    import random
+    out = []
+    for ai, a in enumerate(areas):
+        if a['at'][0] >= 100:
+            continue        # under the sea
+        beh = a['behaviour']
+        h, w = len(beh), len(beh[0])
+        sx, sy = a['spawn']['x'], a['spawn']['y']
+        open_ = lambda x, y: 0 <= x < w and 0 <= y < h and beh[y][x] in (0, 2)
+        if not open_(sx, sy):
+            continue
+        seen = {(sx, sy)}
+        todo = [(sx, sy)]
+        while todo:
+            x, y = todo.pop()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                q = (x + dx, y + dy)
+                if q not in seen and open_(*q):
+                    seen.add(q)
+                    todo.append(q)
+        busy = {(n['x'], n['y']) for n in a['people'] + a['trainers']} | {(d['x'], d['y'] + 1) for d in a['doors']} | \
+               {(sg['x'], sg['y'] + 1) for sg in a['signs']} | {(it['x'], it['y']) for it in a['items']} | {(sx, sy)}
+        def walls(x, y):
+            return sum(not open_(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+        cands = [(x, y) for (x, y) in seen if beh[y][x] == 0 and 3 <= x < w - 3 and 3 <= y < h - 3 and (x, y) not in busy]
+        if not cands:
+            continue
+        rnd = random.Random(1000 + ai)
+        nooks = sorted(c for c in cands if walls(*c) >= 2)
+        pool = nooks if len(nooks) >= 3 else sorted(cands)
+        n = 3 if a.get('safari') else 1 if a['type'] == 'town' else 2
+        picks = []
+        for _ in range(n):
+            free = [c for c in pool if all(abs(c[0] - p[0]) + abs(c[1] - p[1]) > 6 for p in picks)]
+            if not free:
+                break
+            picks.append(rnd.choice(free))
+        late = a['tier'] >= 12
+        for k, (x, y) in enumerate(picks):
+            item, count = ('rarecandy', 1) if (k + ai) % 2 == 0 else ('ultraball' if late else 'greatball', 3)
+            out.append({'area': ai, 'x': x, 'y': y, 'item': item, 'count': count, 'id': HIDDEN_FIRST_ID + len(out)})
+    if len(out) > MAX_ITEM_BALLS - HIDDEN_FIRST_ID:
+        raise SystemExit('%d hidden items (max %d)' % (len(out), MAX_ITEM_BALLS - HIDDEN_FIRST_ID))
+    return out
+
+
 def build_small_sprites(gfx):
     # Menu cursor: the web game's ▶ in ink (#383840) with its light shadow.
     cur = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
@@ -908,7 +978,30 @@ def build_small_sprites(gfx):
         for x, c in enumerate(row):
             if c:
                 px[x + 2, y + 2] = tuple(c) + (255,)
-    save_sprite(gfx, 'ball', [b], 16, 16)
+    # Frame 0 the POKé BALL; 1 a GREAT BALL (blue top) and 2 an ULTRA BALL (dark top, yellow bands): the red
+    # half recoloured.
+    frames = [b]
+    for top, band in (((0x38, 0x78, 0xe0), (0xf0, 0x48, 0x48)), ((0x40, 0x40, 0x48), (0xf8, 0xd8, 0x30))):
+        f = b.copy()
+        fp = f.load()
+        for y in range(16):
+            for x in range(16):
+                r, g, bl, al = fp[x, y]
+                if al and r > 150 and g < 120 and bl < 120:
+                    fp[x, y] = (band if y in (5, 6) and x in (4, 5, 10, 11) else top) + (255,)
+        frames.append(f)
+    save_sprite(gfx, 'ball', frames, 16, 16)
+    # A hidden item's glint: a small four-point star, two sizes.
+    frames = []
+    for big in (False, True):
+        f = Image.new('RGBA', (8, 8), (0, 0, 0, 0))
+        d = ImageDraw.Draw(f)
+        r = 3 if big else 2
+        d.line((4 - r, 4, 4 + r, 4), fill=(0xff, 0xff, 0xff, 255))
+        d.line((4, 4 - r, 4, 4 + r), fill=(0xff, 0xff, 0xff, 255))
+        d.point((4, 4), fill=(0xf8, 0xe8, 0x80, 255))
+        frames.append(f)
+    save_sprite(gfx, 'glint', frames, 8, 8)
     # HP bar segments: 8x8, fill 0-8 px, in green, yellow and red (27 frames), on the web game's trough.
     frames = []
     for col in ((88, 208, 128), (248, 216, 56), (240, 72, 56)):
@@ -1454,7 +1547,7 @@ def build_game_data(data, out_inc):
     # Items (ITEM_INFO): name, pocket, description, price, and what they do.
     its = []
     for i in ITEM_IDS:
-        it = data['items'][i]
+        it = data['items'][i] if i in data['items'] else GBA_ITEMS[i]
         its.append('{%s, %d, %s, %d, %d, %s, %s, %s}' % (
             c_text(it['name']), it['pocket'], c_text(it['desc']), it.get('price', 0), it.get('heal', 0),
             STATUS[it.get('cure')], 'true' if it.get('revive') else 'false', 'true' if it.get('full') else 'false'))

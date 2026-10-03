@@ -644,7 +644,7 @@ int bag_screen(bag_mode mode)
                 desc.clear();
                 bn::string_view text = said.empty() ? (index < count ? game_data::items[ids[index]].desc : "CLOSE BAG")
                                                     : bn::string_view(said);
-                if(said.empty() && mode == bag_mode::BATTLE && index < count && ids[index] == int(item_id::POKEBALL))
+                if(said.empty() && mode == bag_mode::BATTLE && index < count && game_data::items[ids[index]].pocket == 1)
                 {
                     text = "Weaken it first for a better catch rate!";
                 }
@@ -711,9 +711,10 @@ int bag_screen(bag_mode mode)
                     break;
                 }
                 bool medicine = it.heal || it.cure != status::NONE || it.revive || it.full;
-                if(! medicine)
+                bool candy = id == item_id::RARECANDY;
+                if(! medicine && ! candy)
                 {
-                    continue;   // only medicine works from the field
+                    continue;   // only medicine (and the RARE CANDY) works from the field
                 }
                 // Who on (bagOpen's list: "NAME hp/max", CANCEL).
                 bn::string<32> labels[max_party + 1];
@@ -729,7 +730,22 @@ int bag_screen(bag_mode mode)
                 }
                 views[g.party_count] = "CANCEL";
                 int who = u.list(views, g.party_count + 1);
-                if(who >= 0 && who < g.party_count)
+                if(who >= 0 && who < g.party_count && candy)
+                {
+                    // One level up (grantXp's level-up: new moves, evolution); not past the NUZLOCKE cap.
+                    mon& m = g.party[who];
+                    if(m.fainted() || m.level >= 100 || m.level >= level_cap_now())
+                    {
+                        said = "It won't have any effect.";
+                    }
+                    else
+                    {
+                        g.items[int(id)] = uint8_t(g.items[int(id)] - 1);
+                        m.grant_xp(bn::max(1, m.xp_next() - m.xp), u);
+                        u.clear_text();
+                    }
+                }
+                else if(who >= 0 && who < g.party_count)
                 {
                     bn::string<80> message;
                     if(! use_item(id, who, message))
@@ -2216,8 +2232,8 @@ int region_map_screen(bool travel)
     bn::vector<bn::sprite_ptr, 60> links;
     bn::vector<bn::sprite_ptr, 24> texts;
     bn::vector<bn::sprite_ptr, 24> used_marks;
-    // The grid: x 0..7, y -2..2.
-    constexpr int ox = 30, oy = 22, cw = 24, ch = 22;
+    // The grid: x 0..7, y -2..3.
+    constexpr int ox = 30, oy = 10, cw = 24, ch = 20;     // (rows -2 to 3: TRADEWIND VILLAGE is below WISPGATE)
     int here = g.map;
     if(world_data::maps[here].is_room())
     {

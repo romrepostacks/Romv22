@@ -1,7 +1,18 @@
 {
   "_howto": "The GBA build's own WHAT'S NEW entries, shown before the web game's news.json changelog (newest first). Player-facing only.",
-  "motd": "Version 1.4: fast travel from the POKéNAV map, and PP, stat moves and weather in battle!",
+  "motd": "Version 1.5: TRADEWIND VILLAGE's TRADER, the SAFARI ZONE, hidden items, GREAT and ULTRA BALLS!",
   "changelog": [
+    {
+      "version": "GBA 1.5",
+      "date": "2026-10-03",
+      "title": "Trades, the Safari Zone and Hidden Items",
+      "changes": [
+        "TRADEWIND VILLAGE: south of WISPGATE CITY, open once you beat its Gym Leader. Its TRADER swaps one of your POKéMON for a random one of about the same level",
+        "The SAFARI ZONE, north of PORTMERE HARBOUR: $5000 to enter, and every POKéMON, legendaries included, is as likely to appear as any other",
+        "Hidden items: watch for a glint on the ground, then face the spot and press A. RARE CANDIES and better POKé BALLS are waiting along the way",
+        "New items: GREAT BALL (1.5x catch rate) and ULTRA BALL (2x) in the POKé MART from your 2nd and 5th badges, and the RARE CANDY, which raises a POKéMON by one level"
+      ]
+    },
     {
       "version": "GBA 1.4",
       "date": "2026-10-03",

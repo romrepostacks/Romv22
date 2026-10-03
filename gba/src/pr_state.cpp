@@ -13,11 +13,19 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 6;
-    constexpr int v4_game_size = 20324;     // game_state up to `visited` (save version 4: GBA 1.0)
-    constexpr int v5_game_size = 21724;     // ...and `run` (save version 5: GBA 1.1)
-    static_assert(offsetof(game_state, run) == v4_game_size, "save version 4 must be game_state's prefix");
-    static_assert(offsetof(game_state, tower) == v5_game_size, "save version 5 must be game_state's prefix");
+    constexpr int save_version = 7;
+    // Older saves: game_state up to `visited` (save version 4: GBA 1.0), then `run` (5: GBA 1.1), then `tower` (6:
+    // GBA 1.2-1.4). Their bag had 13 kinds of items; version 7 (GBA 1.5) added three, which moved everything
+    // after the bag along.
+    constexpr int v4_game_size = 20324;
+    constexpr int v5_game_size = 21724;
+    constexpr int v6_game_size = 21728;
+    constexpr int old_items_count = 13;
+    constexpr int bag_growth = 2 * (items_count - old_items_count);     // items and pc_items
+    static_assert(offsetof(game_state, run) == v4_game_size + bag_growth, "save version 4 must be game_state's prefix");
+    static_assert(offsetof(game_state, tower) == v5_game_size + bag_growth, "save version 5 must be game_state's prefix");
+    static_assert(offsetof(game_state, pc_items) == offsetof(game_state, items) + items_count, "the bag's layout");
+    static_assert(offsetof(game_state, party) == offsetof(game_state, pc_items) + items_count, "the bag's layout");
 
     struct save_block
     {
@@ -56,9 +64,10 @@ namespace
                 return false;
             }
         }
-        if((block.version == 4 && block.size == v4_game_size) || (block.version == 5 && block.size == v5_game_size))
+        if((block.version == 4 && block.size == v4_game_size) || (block.version == 5 && block.size == v5_game_size) ||
+           (block.version == 6 && block.size == v6_game_size))
         {
-            // An older save: the same game_state without what came later, its checksum right after it.
+            // An older save: its checksum right after its game_state.
             int old_size = block.size;
             const auto* bytes = reinterpret_cast<const uint8_t*>(&block);
             int length = int(offsetof(save_block, game)) + old_size;
@@ -73,16 +82,49 @@ namespace
             {
                 return false;
             }
-            if(old_size < v5_game_size)
+            // The bag grew: move everything after it along, then the PC's items, and clear the new kinds.
+            auto* g = reinterpret_cast<uint8_t*>(&block.game);
+            int items_at = int(offsetof(game_state, items)), pc_at = int(offsetof(game_state, pc_items));
+            int party_at = int(offsetof(game_state, party));
+            int old_pc_at = items_at + old_items_count, old_party_at = old_pc_at + old_items_count;
+            int tail = old_size - old_party_at;
+            for(int i = tail - 1; i >= 0; --i)
+            {
+                g[party_at + i] = g[old_party_at + i];
+            }
+            for(int i = old_items_count - 1; i >= 0; --i)
+            {
+                g[pc_at + i] = g[old_pc_at + i];
+            }
+            for(int i = items_at + old_items_count; i < pc_at; ++i)
+            {
+                g[i] = 0;
+            }
+            for(int i = pc_at + old_items_count; i < party_at; ++i)
+            {
+                g[i] = 0;
+            }
+            for(int i = party_at + tail; i < int(sizeof(game_state)); ++i)
+            {
+                g[i] = 0;
+            }
+            if(block.version < 5)
             {
                 block.game.run = run_state();
             }
-            block.game.tower = tower_state();
-            // SPIRECREST TOWN came in as area 34, so every room moved up one.
-            constexpr int old_areas_count = 34;
-            if(block.game.map >= old_areas_count)
+            if(block.version < 6)
             {
-                block.game.map = int16_t(block.game.map + 1);
+                block.game.tower = tower_state();
+                // SPIRECREST TOWN came in as area 34, so every room moved up one.
+                if(block.game.map >= 34)
+                {
+                    block.game.map = int16_t(block.game.map + 1);
+                }
+            }
+            // TRADEWIND VILLAGE and the SAFARI ZONE came in as areas 35 and 36: the rooms moved up two more.
+            if(block.game.map >= 35)
+            {
+                block.game.map = int16_t(block.game.map + 2);
             }
             block.version = save_version;
             block.size = int(sizeof(game_state));

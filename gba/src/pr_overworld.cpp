@@ -18,6 +18,7 @@
 #include "bn_sprite_items_bang.h"
 #include "bn_sprite_items_dive.h"
 #include "bn_sprite_items_dust.h"
+#include "bn_sprite_items_glint.h"
 #include "bn_sprite_items_grass_front.h"
 #include "bn_sprite_items_surf.h"
 #include "bn_regular_bg_items_wx_ash_1.h"
@@ -430,6 +431,7 @@ void overworld::load_map(int index, bool keep_bg)
         build_bg();
     }
     load_actors();
+    update_glints();
     _grass_x = g.x;
     _grass_y = g.y;
     _from_x = _from_y = -1000;
@@ -736,6 +738,43 @@ void overworld::refresh(bool force)
     {
         _dust->set_position(sx(_dust_x * 16 - _cam_x + 8), sy(_dust_y * 16 - _cam_y + 9 + 4));
     }
+    // Hidden items glint for a moment every few seconds.
+    int t = _bob_timer % 200;
+    for(int i = 0; i < _glints.size(); ++i)
+    {
+        const hidden_item& h = wd::hidden_items[_glint_items[i]];
+        int x = h.x * 16 - _cam_x + 8, y = h.y * 16 - _cam_y + 6;
+        bool on = t < 24 && x > -8 && x < 248 && y > -8 && y < 168;
+        _glints[i].set_visible(on);
+        if(on)
+        {
+            _glints[i].set_position(sx(x + (i % 2 ? 3 : -2)), sy(y));
+            _glints[i].set_tiles(bn::sprite_items::glint.tiles_item(), (t / 6) % 2);
+        }
+    }
+}
+
+// The glints of this area's hidden items still to find.
+void overworld::update_glints()
+{
+    _glints.clear();
+    if(_suspended || _map->is_room())
+    {
+        return;
+    }
+    for(int i = 0; i < wd::hidden_items_count && ! _glints.full(); ++i)
+    {
+        const hidden_item& h = wd::hidden_items[i];
+        if(h.area == _map_index && ! state().picked.test(h.id))
+        {
+            bn::sprite_ptr s = bn::sprite_items::glint.create_sprite(0, 0);
+            s.set_bg_priority(1);
+            s.set_z_order(-40);
+            s.set_visible(false);
+            _glint_items[_glints.size()] = i;
+            _glints.push_back(s);
+        }
+    }
 }
 
 // ----- Weather and the time of day -----
@@ -932,6 +971,7 @@ void overworld::suspend()
     _grass_here.reset();
     _grass_from.reset();
     _dust.reset();
+    _glints.clear();
     for(actor& a : _actors)
     {
         a.sprite.reset();
@@ -946,6 +986,7 @@ void overworld::resume()
     {
         make_sprite(a);
     }
+    update_glints();
     refresh(true);
     update_weather();
     update_tint();
@@ -1191,6 +1232,17 @@ void overworld::step(direction want)
             say("A gate blocks the road. Its sign reads: \"SPIRECREST TOWN - CHALLENGE TOWER. CHAMPIONS ONLY.\"");
             hold_until_released();
             return;
+        }
+        // The SAFARI ZONE: $5000 at the gate, each time in.
+        if(target_place.map >= 0 && wd::maps[target_place.map].area && (wd::maps[target_place.map].area->flags & area_flag::SAFARI) &&
+           ! (_map->area && (_map->area->flags & area_flag::SAFARI)))
+        {
+            set_player_frame(0);
+            if(! safari_gate())
+            {
+                hold_until_released();
+                return;
+            }
         }
         // The way on is shut until this place's rival or Gym Leader is beaten (linkAreas gate).
         if(l.gate && _map->leader_id >= 0 && ! g.beaten.test(_map->leader_id))
@@ -1531,6 +1583,24 @@ void overworld::wild_battle(bool water)
         pool[pool_count++] = game_data::night_visitors[r.get_int(visitors)];
     }
     e.count = time_picks(pool, pool_count, e.species, n);
+    if(! water && _map->area && (_map->area->flags & area_flag::SAFARI))
+    {
+        // The SAFARI ZONE: every species as likely as any other, legendaries and all.
+        e.count = 0;
+        while(e.count < n)
+        {
+            auto s = species_id(r.get_int(species_count));
+            bool dupe = false;
+            for(int k = 0; k < e.count; ++k)
+            {
+                dupe |= e.species[k] == s;
+            }
+            if(! dupe)
+            {
+                e.species[e.count++] = s;
+            }
+        }
+    }
     e.level = bn::max(2, bn::min(int(_map->level_cap), g.average_level() - 2 + r.get_int(3)));
     _start_battle = true;
 }

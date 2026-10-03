@@ -274,19 +274,20 @@ namespace
         void used(const used_ctx& c);
         bool can_act(fighter& f);
         void apply_status(fighter& target, status s, int chance);
-        void throw_ball(fighter& target);
-        void ball_animation(fighter& target, int wobbles, bool caught);
+        void throw_ball(fighter& target, item_id ball);
+        void ball_animation(fighter& target, int wobbles, bool caught, int frame_index);
         struct ball_ctx
         {
             battle* self;
             fighter* target;
             int wobbles;
             bool caught;
+            int frame_index;
         };
         static void ball_hook(void* p)
         {
             auto* c = static_cast<ball_ctx*>(p);
-            c->self->ball_animation(*c->target, c->wobbles, c->caught);
+            c->self->ball_animation(*c->target, c->wobbles, c->caught, c->frame_index);
         }
         void set_hp(fighter& f, int hp);
         void faint(fighter& f);
@@ -701,11 +702,20 @@ namespace
         int n = 0;
         if(wild && ! nuz_block)
         {
-            ids[n] = int(item_id::POKEBALL);
-            labels[n] = "POKé BALL x";
-            labels[n].append(bn::to_string<4>(g.item_count(item_id::POKEBALL)));
-            views[n] = labels[n];
-            ++n;
+            // The POKé BALL always (greyed when out); GREAT and ULTRA BALLS when you have some.
+            for(item_id ball : { item_id::POKEBALL, item_id::GREATBALL, item_id::ULTRABALL })
+            {
+                if(ball != item_id::POKEBALL && ! g.item_count(ball))
+                {
+                    continue;
+                }
+                ids[n] = int(ball);
+                labels[n] = game_data::items[int(ball)].name;
+                labels[n].append(" x");
+                labels[n].append(bn::to_string<4>(g.item_count(ball)));
+                views[n] = labels[n];
+                ++n;
+            }
         }
         if(! _s.free)
         {
@@ -743,7 +753,7 @@ namespace
                 u.clear_text();
                 return -1;
             }
-            if(ids[k] == int(item_id::POKEBALL) && ! g.item_count(item_id::POKEBALL))
+            if(game_data::items[ids[k]].pocket == 1 && ! g.item_count(item_id(ids[k])))
             {
                 continue;       // greyed out
             }
@@ -859,9 +869,12 @@ namespace
                     continue;
                 }
                 item_id id = item_id(it);
-                if(id == item_id::POKEBALL)
+                if(game_data::items[int(id)].pocket == 1)
                 {
-                    int target = pick_target("Throw the POKé BALL at which one?");
+                    bn::string<48> ask("Throw the ");
+                    ask.append(game_data::items[int(id)].name);
+                    ask.append(" at which one?");
+                    int target = pick_target(ask.c_str());
                     _hint = -1;
                     if(target < 0)
                     {
@@ -1017,7 +1030,7 @@ namespace
             }
             if(act.c.kind == choice_kind::BALL)
             {
-                throw_ball(*act.target);
+                throw_ball(*act.target, act.c.item);
                 continue;
             }
             act.user->m->flags |= mon_flag::FOUGHT;
@@ -1798,15 +1811,22 @@ namespace
         faint(user);
     }
 
-    void battle::throw_ball(fighter& target)
+    void battle::throw_ball(fighter& target, item_id ball)
     {
         game_state& g = state();
         ui& u = gui();
-        if(! g.item_count(item_id::POKEBALL))
+        const char* ball_name = game_data::items[int(ball)].name;
+        if(! g.item_count(ball))
         {
-            u.say("No POKé BALLS left!");
+            bn::string<48> none("No ");
+            none.append(ball_name);
+            none.append("S left!");
+            u.say(none);
             return;
         }
+        // GREAT BALL x1.5, ULTRA BALL x2 (Emerald's ball bonus).
+        int bonus_x10 = ball == item_id::ULTRABALL ? 20 : ball == item_id::GREATBALL ? 15 : 10;
+        int ball_frame = ball == item_id::ULTRABALL ? 2 : ball == item_id::GREATBALL ? 1 : 0;
         mon& m = *target.m;
         if(g.run.nuzlocke() && ! _s.legendary && ! m.shiny() &&
            (_nuz_caught || ! _s.nuzlocke_catch || g.owned.test(m.species_index)))
@@ -1822,9 +1842,11 @@ namespace
             u.say(no);
             return;
         }
-        g.items[int(item_id::POKEBALL)] = uint8_t(g.items[int(item_id::POKEBALL)] - 1);
+        g.items[int(ball)] = uint8_t(g.items[int(ball)] - 1);
         bn::string<64> text(g.name);
-        text.append(" used POKé BALL!");
+        text.append(" used ");
+        text.append(ball_name);
+        text.append("!");
         int wobbles;
         bool caught;
         int max_hp = bn::max(1, int(m.max_hp));
@@ -1837,7 +1859,7 @@ namespace
             {
                 chance = chance * 15 / 10;
             }
-            chance = chance * 35 / 100;
+            chance = bn::min(1000, chance * 35 / 100 * bonus_x10 / 10);
             int per_shake = 0;
             while(per_shake < 1000 && (per_shake + 1) * (per_shake + 1) / 1000 * (per_shake + 1) / 1000 <= chance)
             {
@@ -1855,7 +1877,7 @@ namespace
             // Emerald's catch formula (pokeemerald CalcCatchOdds): the species' catch rate scaled by missing HP,
             // x2 asleep or frozen, x1.5 with another status; past 254 it's caught outright, otherwise four
             // checks against 1048560 / sqrt(sqrt(16711680 / odds)), and the ball wobbles once per check passed.
-            int odds = m.data().capture_rate * (3 * max_hp - 2 * m.hp) / (3 * max_hp);
+            int odds = m.data().capture_rate * bonus_x10 * (3 * max_hp - 2 * m.hp) / (30 * max_hp);
             if(m.st == status::SLEEP || m.st == status::FREEZE)
             {
                 odds *= 2;
@@ -1886,7 +1908,7 @@ namespace
             wobbles = 3;
         }
         // The throw plays while "used POKé BALL!" is up (ballFx).
-        ball_ctx bc{ this, &target, wobbles, caught };
+        ball_ctx bc{ this, &target, wobbles, caught, ball_frame };
         u.say(text, ball_hook, &bc);
         if(! caught)
         {
@@ -1949,10 +1971,10 @@ namespace
 
     // The throw (ballFx): the ball arcs over from your side, the Pokémon is drawn into it, the ball drops and
     // shakes once per check passed; caught, it clicks shut; not, it bursts open and the Pokémon is back.
-    void battle::ball_animation(fighter& target, int wobbles, bool caught)
+    void battle::ball_animation(fighter& target, int wobbles, bool caught, int frame_index)
     {
         audio::play(audio::sfx::THROW);
-        bn::sprite_ptr ball = bn::sprite_items::ball.create_sprite(sx(40), sy(90));
+        bn::sprite_ptr ball = bn::sprite_items::ball.create_sprite(sx(40), sy(90), frame_index);
         ball.set_bg_priority(1);
         int tx = target.base_x, ty = target.base_y + 4;
         constexpr int flight = 33;

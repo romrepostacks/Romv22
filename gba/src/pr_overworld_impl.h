@@ -193,6 +193,10 @@ public:
 
     void start_menu();
     void cheat_menu();
+    bool safari_gate();
+    void trader();
+    bool find_hidden(int tx, int ty);
+    void update_glints();
     void fast_travel(int area);
     void save_menu();
     void say(const bn::string_view& text);
@@ -228,6 +232,8 @@ public:
     bn::optional<bn::sprite_ptr> _grass_here;
     bn::optional<bn::sprite_ptr> _grass_from;
     bn::optional<bn::sprite_ptr> _dust;
+    bn::vector<bn::sprite_ptr, 3> _glints;      // hidden items' glints (update_glints)
+    int _glint_items[3] = {};
     int _dust_frames = 0, _dust_x = 0, _dust_y = 0;
     int _grass_x = 0, _grass_y = 0, _from_x = -1000, _from_y = -1000;
     bn::vector<actor, 24> _actors;

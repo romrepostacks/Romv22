@@ -43,6 +43,25 @@ TOWER_TOWN.links = [{dir:'up', to:0, gate:false}];
 G.getMap(TOWER_TOWN);
 delete TOWER_TOWN.league;
 for(const b of G.getMap(TOWER_TOWN).buildings) if(b.kind==='league') b.kind = 'tower';
+// ---------- GBA only: TRADEWIND VILLAGE and the SAFARI ZONE ----------
+// TRADEWIND VILLAGE sits below WISPGATE CITY (the 4th gym), its road open once ISKA is beaten; its TRADER swaps
+// a Pokémon for a random one of about the same level. The SAFARI ZONE, above PORTMERE HARBOUR, charges $5000 to
+// enter (the GBA asks), and every species is as likely there as any other. Neither has trainers (their ids
+// would shift every room's). They come after every older area, so the older areas keep their indices.
+const TRADE_TOWN = {type:'town', name:'Tradewind Village', at:[3,3], tier:12, center:true,
+  desc:"A breezy market village where TRAINERS from all over come to swap POKéMON."};
+const TRADE_INDEX = G.LOCATIONS.length;
+G.LOCATIONS.push(TRADE_TOWN);
+G.LOCATIONS[11].links.push({dir:'down', to:TRADE_INDEX, gate:true});
+TRADE_TOWN.links = [{dir:'up', to:11, gate:false}];
+G.getMap(TRADE_TOWN);
+const SAFARI = {type:'route', name:'Safari Zone', at:[5,1], tier:16, theme:'forest',
+  desc:"A vast wild preserve. Any POKéMON at all might turn up in its grass. Entry: $5000."};
+const SAFARI_INDEX = G.LOCATIONS.length;
+G.LOCATIONS.push(SAFARI);
+G.LOCATIONS[13].links.push({dir:'up', to:SAFARI_INDEX, gate:false});
+SAFARI.links = [{dir:'down', to:13, gate:false}];
+G.getMap(SAFARI);
 // The tower's rooms: five themed floors with one trainer each, the summit with the SUMMONING STONE, and a
 // chamber per theme where the summoned legendary waits (the GBA picks the chamber by its type).
 const TOWER_FLOORS = [
@@ -469,14 +488,14 @@ for(const li of AREAS){
     signs:map.signs.map(s=>({x:s.x, y:s.y, text:s.text || '', route:!!s.route, lines:s.lines || null})),
     doors, items,
     people:people.map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
-    trainers:trainers.map(n=>trainerOut(n, loc)).concat(loc.scene==='portmere' ? [{kind:'grunt', x:0, y:0, facing:'down', role:'route',
+    trainers:(loc===TRADE_TOWN || loc===SAFARI ? [] : trainers).map(n=>trainerOut(n, loc)).concat(loc.scene==='portmere' ? [{kind:'grunt', x:0, y:0, facing:'down', role:'route',
       title:'TEMPEST GRUNT', team:['Poochyena','Carvanha','Zubat'], scene:true, vanish:false,
       intro:['TEMPEST GRUNT: "The Admin said nobody gets past. That means you!"'],
       after:['TEMPEST GRUNT: "Go ahead, then. You\'ll never reach the shrine without a way to dive."']}] : []),
     spawn:map.spawn, pool:loc.pool || [], area_pool:G.areaPool(loc), water:G.waterPool(loc), fish:G.fishPool(loc), tier:loc.tier ?? li,
     theme:loc.theme || 'plain', weather:map.weather || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
-    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN,
+    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI,
     leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});
   if(legend) trainerSpecies.add(legend.legend);
 }

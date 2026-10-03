@@ -55,7 +55,8 @@ enum class person_role : uint8_t
     NURSE,
     CLERK,
     MOM,
-    TOWER           // the CHALLENGE TOWER's guide (ADVENTURE MODE only)
+    TOWER,          // the CHALLENGE TOWER's guide (ADVENTURE MODE only)
+    TRADER          // TRADEWIND VILLAGE's trader
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
@@ -156,6 +157,17 @@ struct item_ball
     uint16_t ground;                // metatile drawn once it's picked up
 };
 
+// A hidden item (GBA only): nothing shows but a glint now and then; A facing the spot finds it.
+struct hidden_item
+{
+    int8_t area;
+    int16_t x;
+    int16_t y;
+    item_id item;
+    uint8_t count;
+    uint8_t id;                     // bit in game_state::picked
+};
+
 // An item ball in a neighbour's strip: where it is (in the neighbour) and its picked-up metatile here.
 struct strip_item
 {
@@ -234,6 +246,8 @@ namespace area_flag
     constexpr uint8_t BOSS = 8;
     constexpr uint8_t OWN_POOL = 16;      // its own wild Pokémon (the POKéDEX's AREA), not a neighbour's
     constexpr uint8_t TOWER_TOWN = 32;    // SPIRECREST TOWN: shut until you're CHAMPION
+    constexpr uint8_t SAFARI = 64;        // the SAFARI ZONE: $5000 to enter, any species at all in the grass
+    constexpr uint8_t TRADE_TOWN = 128;   // TRADEWIND VILLAGE (the TRADER)
 }
 
 // What an area is (LOCATIONS): its kind, look and weather, where it sits on the region map, the layer
