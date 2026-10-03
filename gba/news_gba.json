@@ -1,0 +1,55 @@
+{
+  "_howto": "The GBA build's own WHAT'S NEW entries, shown before the web game's news.json changelog (newest first). Player-facing only.",
+  "motd": "Version 1.4: fast travel from the POKéNAV map, and PP, stat moves and weather in battle!",
+  "changelog": [
+    {
+      "version": "GBA 1.4",
+      "date": "2026-10-03",
+      "title": "Fast Travel",
+      "changes": [
+        "Open the POKéNAV map and pick any town or route you've been to, then press A to travel there",
+        "Towns drop you at the POKéMON CENTER door; routes put you on the path where you'd enter them"
+      ]
+    },
+    {
+      "version": "GBA 1.3",
+      "date": "2026-10-03",
+      "title": "PP, Stat Moves and Weather",
+      "changes": [
+        "Every move has PP. A POKéMON CENTER refills it; a Pokémon with no PP left will Struggle",
+        "New moves to learn: stat boosters like SWORDS DANCE and CALM MIND, stat drops like GROWL and LEER, healing like RECOVER, and SUNNY DAY, RAIN DANCE, SANDSTORM and HAIL",
+        "ABSORB and GIGA DRAIN heal the user, DOUBLE-EDGE has recoil, and EARTHQUAKE or ROCK SLIDE hit every foe",
+        "FIGHT now asks for a target first. Moves are coloured for it: red super effective, yellow a normal hit, grey no effect. B goes back to change the target"
+      ]
+    },
+    {
+      "version": "GBA 1.2",
+      "date": "2026-10-02",
+      "title": "Shiny Pokémon and Spirecrest Town",
+      "changes": [
+        "Shiny Pokémon: 1 in 4096, twice as often in ADVENTURE MODE and 1.25 times in a NUZLOCKE run. They sparkle when they appear",
+        "The CHALLENGE TOWER now stands in its own town, SPIRECREST, south of DUSKMERE HOLLOW. It opens once you're CHAMPION",
+        "Five themed floors, a SUMMONING STONE at the top, and a chamber themed for the legendary it calls"
+      ]
+    },
+    {
+      "version": "GBA 1.1",
+      "date": "2026-10-02",
+      "title": "Nuzlocke and Adventure Mode",
+      "changes": [
+        "NUZLOCKE mode at NEW GAME: fainted Pokémon are gone, one catch per area, level caps, and a GRAVEYARD in the PC",
+        "SKIP STORY TEXT for faster replays",
+        "After the credits, ADVENTURE MODE and the CHALLENGE TOWER, with legendaries to catch at the top"
+      ]
+    },
+    {
+      "version": "GBA 1.0",
+      "date": "2026-10-01",
+      "title": "Party Royale on the Game Boy Advance",
+      "changes": [
+        "The whole adventure, from the professor's welcome to the Hall of Fame",
+        "Every move animated in battle, and catching with each Pokémon's real catch rate"
+      ]
+    }
+  ]
+}

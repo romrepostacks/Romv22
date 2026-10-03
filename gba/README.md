@@ -38,9 +38,6 @@ from the plan.
 - **Fast travel (GBA only):** on the POKéNAV map (START > POKéNAV), move to any town or route you've
   been to and press A to travel there: to the door of its POKéMON CENTER, or onto the path where you'd
   enter a route. (Not from inside the CHALLENGE TOWER or the POKéMON LEAGUE.)
-- **Cheat menu (GBA only):** on the field, press LEFT, RIGHT, LEFT, RIGHT, B, A, START. It turns wild
-  encounters on or off (grass, caves and water; fishing still works), heals the party, adds 20 POKé BALLS
-  or $1000, and turns PERFECT CAPTURE on or off (every POKé BALL catches). The switches are saved.
 - **Catching as in Emerald:** each species' real catch rate with Gen 3's formula (the guardian uses the web
   game's odds). Then the POKéDEX registration page and the nickname prompt.
 - **Menus:** the POKéDEX (list, INFO, AREA, SIZE), the party screen (6 Pokémon, 10 from your fourth badge),
