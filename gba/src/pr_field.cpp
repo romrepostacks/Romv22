@@ -2338,10 +2338,19 @@ void overworld::start_menu()
             resume();
             break;
         case 3:
+        {
+            // Fast travel from the map, except from inside the CHALLENGE TOWER or the POKéMON LEAGUE.
+            bool travel = ! g.tower.active && ! (_map->room && _map->room->kind == room_kind::LEAGUE);
             suspend();
-            region_map_screen();
+            int dest = region_map_screen(travel);
+            if(dest >= 0)
+            {
+                fast_travel(dest);
+                return;
+            }
             resume();
             break;
+        }
         case 4:
             suspend();
             card_screen();
@@ -2360,6 +2369,139 @@ void overworld::start_menu()
             break;
         }
     }
+}
+
+// Fast travel (the POKéNAV map): to the door of the place's POKéMON CENTER, else where the place is entered
+// (its spawn), on the nearest open ground. Called while suspended.
+void overworld::fast_travel(int area)
+{
+    game_state& g = state();
+    const map_def& m = wd::maps[area];
+    int x = m.spawn_x, y = m.spawn_y;
+    for(int i = 0; i < m.doors_count; ++i)
+    {
+        if(m.doors[i].kind == door_kind::CENTER)
+        {
+            x = m.doors[i].x;
+            y = m.doors[i].y + 1;
+        }
+    }
+    auto open = [&](int tx, int ty)
+    {
+        if(tx < 0 || ty < 0 || tx >= m.w || ty >= m.h || behaviour(m.behaviours[ty * m.w + tx]) != behaviour::WALK)
+        {
+            return false;
+        }
+        for(int i = 0; i < m.people_count; ++i)
+        {
+            if(m.people[i].x == tx && m.people[i].y == ty)
+            {
+                return false;
+            }
+        }
+        for(int i = 0; i < m.trainers_count; ++i)
+        {
+            if(m.trainers[i].x == tx && m.trainers[i].y == ty)
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    // Rings out from there until there's a free path tile.
+    bool found = open(x, y);
+    for(int r = 1; r < 40 && ! found; ++r)
+    {
+        for(int dy = -r; dy <= r && ! found; ++dy)
+        {
+            for(int dx = -r; dx <= r && ! found; ++dx)
+            {
+                if((bn::abs(dx) == r || bn::abs(dy) == r) && open(x + dx, y + dy))
+                {
+                    x += dx;
+                    y += dy;
+                    found = true;
+                }
+            }
+        }
+    }
+    g.x = int16_t(x);
+    g.y = int16_t(y);
+    g.facing = direction::DOWN;
+    g.surfing = false;
+    _suspended = false;
+    _player.reset();
+    load_map(area);
+    ui::fade_in(12);
+    _fresh_press = true;
+    save_game();
+}
+
+// The cheat menu (LEFT, RIGHT, LEFT, RIGHT, B, A, START on the field).
+void overworld::cheat_menu()
+{
+    game_state& g = state();
+    ui& u = gui();
+    int last = 0;
+    while(! _quit)
+    {
+        bool wild = ! g.has(story::CHEAT_NO_WILD), perfect = g.has(story::CHEAT_PERFECT_CATCH);
+        bn::string<32> wild_label("WILD ENCOUNTERS: ");
+        wild_label.append(wild ? "ON" : "OFF");
+        bn::string<32> catch_label("PERFECT CAPTURE: ");
+        catch_label.append(perfect ? "ON" : "OFF");
+        bn::string_view options[] = { wild_label, "HEAL PARTY POKéMON", "ADD 20 POKé BALLS", "ADD $1000", catch_label, "EXIT" };
+        constexpr int n = 6;
+        int widest = 0;
+        for(const bn::string_view& o : options)
+        {
+            widest = bn::max(widest, u.width(o));
+        }
+        menu_spec s;
+        s.options = options;
+        s.count = n;
+        s.tw = bn::min(30, (widest + 16 + 12 + 7) / 8);
+        s.tx = 30 - s.tw;
+        s.ty = 0;
+        s.th = n * 2 + 2;
+        s.start = last;
+        int pick = u.menu(s);
+        if(pick < 0 || pick == n - 1)
+        {
+            break;
+        }
+        last = pick;
+        switch(pick)
+        {
+        case 0:
+            g.story ^= story::CHEAT_NO_WILD;
+            audio::play(audio::sfx::SELECT);
+            break;
+        case 1:
+            g.heal_party();
+            audio::play(audio::sfx::HEAL);
+            say("Your POKéMON were fully healed!");
+            break;
+        case 2:
+            g.add_item(item_id::POKEBALL, 20);
+            audio::play(audio::sfx::SELECT);
+            say("20 POKé BALLS were put in the BAG.");
+            break;
+        case 3:
+            g.money = bn::min(uint32_t(999999), uint32_t(g.money + 1000));
+            audio::play(audio::sfx::SELECT);
+            say("$1000 was added to your money.");
+            break;
+        case 4:
+            g.story ^= story::CHEAT_PERFECT_CATCH;
+            audio::play(audio::sfx::SELECT);
+            break;
+        default:
+            break;
+        }
+    }
+    save_game();
+    hold_until_released();
 }
 
 // Emerald's save: an info window top left (place, PLAYER, BADGES, POKéDEX), YES/NO, "SAVING...", then

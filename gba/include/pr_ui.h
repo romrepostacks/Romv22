@@ -22,6 +22,8 @@ using window_style = ui_data::style;
 
 // Runs one frame: commits window changes, animates the UI, waits for the next VBlank.
 void frame();
+// LEFT, RIGHT, LEFT, RIGHT, B, A were the last buttons pressed (START completes the cheat code). Forgets them.
+bool cheat_code_entered();
 void wait(int frames);
 
 enum class text_color

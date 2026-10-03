@@ -3,7 +3,7 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.3**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
+Version **1.4**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
 own data, plus the two story phases planned after it (STORY.md phases 6 and 7): NUZLOCKE mode and ADVENTURE
 MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves. The web game doesn't have these yet; the GBA builds them
 from the plan.
@@ -35,6 +35,12 @@ from the plan.
   moves coloured for it: red super effective, yellow a normal hit, dark not very effective, grey no effect
   (or it would fail, or no PP); B goes back to change the target. Data: `tools/build_moves.js` from
   PokeAPI's CSVs into `data/moves_extra.json`.
+- **Fast travel (GBA only):** on the POKéNAV map (START > POKéNAV), move to any town or route you've
+  been to and press A to travel there: to the door of its POKéMON CENTER, or onto the path where you'd
+  enter a route. (Not from inside the CHALLENGE TOWER or the POKéMON LEAGUE.)
+- **Cheat menu (GBA only):** on the field, press LEFT, RIGHT, LEFT, RIGHT, B, A, START. It turns wild
+  encounters on or off (grass, caves and water; fishing still works), heals the party, adds 20 POKé BALLS
+  or $1000, and turns PERFECT CAPTURE on or off (every POKé BALL catches). The switches are saved.
 - **Catching as in Emerald:** each species' real catch rate with Gen 3's formula (the guardian uses the web
   game's odds). Then the POKéDEX registration page and the nickname prompt.
 - **Menus:** the POKéDEX (list, INFO, AREA, SIZE), the party screen (6 Pokémon, 10 from your fourth badge),
@@ -63,8 +69,8 @@ from the plan.
   DIVE and the other story rewards still come at the same points.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.2
-  saves load in 1.3; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.3
+  saves load in 1.4; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) is for the web app only: a GBA has one screen and one set of
 buttons.

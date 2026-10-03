@@ -48,7 +48,8 @@ void pc_box_screen(pc_mode mode);
 void dex_screen(int register_species = -1);
 void option_screen();
 void card_screen();
-void region_map_screen();
+// The POKéNAV map. With travel, A on a place you've been to offers to travel there: returns that area, else -1.
+int region_map_screen(bool travel = false);
 // The Hall of Fame and the credits roll (playCredits).
 void credits_screen();
 

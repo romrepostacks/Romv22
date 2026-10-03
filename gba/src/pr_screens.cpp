@@ -2202,9 +2202,11 @@ void card_screen()
 
 // ---------------------------------------------------------------------------------------------------
 // The region map (renderMap, POKéNAV): every area on its grid cell with its connections; places you haven't
-// been to show as unseen; where you are blinks. Move over the cells to read their names.
-void region_map_screen()
+// been to show as unseen; where you are blinks. Move over the cells to read their names. With travel, A on
+// any town or route you've been to (but where you are) offers to go there.
+int region_map_screen(bool travel)
 {
+    int dest = -1;
     game_state& g = state();
     ui& u = gui();
     ui::fade_out(8);
@@ -2306,11 +2308,32 @@ void region_map_screen()
             {
                 name.append("  (encounter used)");
             }
-            u.print_fit(8, 140, name, 224, text_color::INK, texts);
+            bool can_go = travel && seen && cursor != here;
+            u.print_fit(8, 140, name, can_go ? 216 - u.width("A: TRAVEL", true) : 224, text_color::INK, texts);
+            if(can_go)
+            {
+                u.print(232 - u.width("A: TRAVEL", true), 142, "A: TRAVEL", text_color::BLUE, texts, true);
+            }
             redraw = false;
         }
         ++timer;
         frame();
+        if(bn::keypad::a_pressed() && travel && cursor != here && g.visited.test(cursor))
+        {
+            bn::string<80> ask("Travel to ");
+            ask.append(world_data::maps[cursor].name);
+            ask.append("?");
+            u.show_text(ask);
+            bool yes = u.yes_no();
+            u.clear_text();
+            if(yes)
+            {
+                dest = cursor;
+                break;
+            }
+            redraw = true;
+            continue;
+        }
         if(bn::keypad::b_pressed() || bn::keypad::start_pressed() || bn::keypad::select_pressed() || bn::keypad::a_pressed())
         {
             break;
@@ -2351,6 +2374,7 @@ void region_map_screen()
     ui::fade_out(8);
     texts.clear();
     u.win().clear_all();
+    return dest;
 }
 
 // ---------------------------------------------------------------------------------------------------

@@ -187,8 +187,47 @@ void windows::commit()
 }
 
 // ---------------------------------------------------------------------------------------------------
+namespace
+{
+    // The last buttons pressed (for the cheat code): L(eft), R(ight), B, A, or x for anything else.
+    char key_log[8] = {};
+
+    void log_keys()
+    {
+        char k = 0;
+        if(bn::keypad::left_pressed()) k = 'L';
+        else if(bn::keypad::right_pressed()) k = 'R';
+        else if(bn::keypad::b_pressed()) k = 'B';
+        else if(bn::keypad::a_pressed()) k = 'A';
+        else if(bn::keypad::up_pressed() || bn::keypad::down_pressed() || bn::keypad::start_pressed() ||
+                bn::keypad::select_pressed() || bn::keypad::l_pressed() || bn::keypad::r_pressed()) k = 'x';
+        if(k)
+        {
+            for(int i = 0; i < 7; ++i)
+            {
+                key_log[i] = key_log[i + 1];
+            }
+            key_log[7] = k;
+        }
+    }
+}
+
+bool cheat_code_entered()
+{
+    if(bn::string_view(key_log + 2, 6) != "LRLRBA")
+    {
+        return false;
+    }
+    for(char& k : key_log)
+    {
+        k = 0;
+    }
+    return true;
+}
+
 void frame()
 {
+    log_keys();
     if(instance)
     {
         instance->tick();

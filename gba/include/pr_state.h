@@ -38,6 +38,9 @@ namespace story
     constexpr uint32_t LEGEND_CAUGHT = 1u << 13;
     constexpr uint32_t CHAMPION = 1u << 14;       // saw the credits
     constexpr uint32_t OLD_ROD = 1u << 15;        // (unused: the rod is an item)
+    // The cheat menu's switches.
+    constexpr uint32_t CHEAT_NO_WILD = 1u << 30;     // no wild Pokémon in grass, caves or on the water
+    constexpr uint32_t CHEAT_PERFECT_CATCH = 1u << 31;   // every POKé BALL catches
 }
 
 enum class text_speed : uint8_t

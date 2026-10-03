@@ -1431,7 +1431,7 @@ void overworld::arrive()
         }
         return;
     }
-    bool can_fight = g.first_able() >= 0;
+    bool can_fight = g.first_able() >= 0 && ! g.has(story::CHEAT_NO_WILD);
     if(b == behaviour::TALL_GRASS && rng().get_int(100) < grass_percent && can_fight)
     {
         wild_battle(false);
@@ -1716,6 +1716,13 @@ bool overworld::run(encounter& battle, const battle_report* last)
 
         if(bn::keypad::start_pressed())
         {
+            if(cheat_code_entered())
+            {
+                audio::play(audio::sfx::SPOT);
+                cheat_menu();
+                tick();
+                continue;
+            }
             audio::play(audio::sfx::OPEN);
             start_menu();
             tick();

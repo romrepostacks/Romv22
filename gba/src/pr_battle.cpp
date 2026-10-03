@@ -1880,6 +1880,11 @@ namespace
             caught = checks == 4;
             wobbles = bn::min(checks, 3);
         }
+        if(g.has(story::CHEAT_PERFECT_CATCH))
+        {
+            caught = true;      // the cheat menu's PERFECT CAPTURE
+            wobbles = 3;
+        }
         // The throw plays while "used POKé BALL!" is up (ballFx).
         ball_ctx bc{ this, &target, wobbles, caught };
         u.say(text, ball_hook, &bc);

@@ -192,6 +192,8 @@ public:
     void credits();
 
     void start_menu();
+    void cheat_menu();
+    void fast_travel(int area);
     void save_menu();
     void say(const bn::string_view& text);
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.
