@@ -2467,7 +2467,7 @@ void credits_screen()
 }
 
 // ---------------------------------------------------------------------------------------------------
-// The hidden editor (the tree by DUSKMERE HOLLOW's MART, then A, B, A at the MART's window): a party
+// The hidden editor (the tree by DUSKMERE HOLLOW's MART, then A, B, A at the lone tree above it): a party
 // Pokémon's level, shininess, stats (each kept to Gen 3's range for its level: IV 0-31, EV 0-252, nature
 // x0.9-x1.1) and moves (from what its species can learn). DONE keeps the changes; B leaves them.
 namespace

@@ -167,33 +167,32 @@ namespace
 }
 
 // ----- The hidden editor -----
-// Press A at the lone tree beside DUSKMERE HOLLOW's MART (5, 9), go into the MART, stand under the right-hand
-// window (7, 2), facing it, and press A, B, A: the editor opens. Leaving DUSKMERE HOLLOW and its MART forgets
-// the tree.
+// Press A at the lone tree beside DUSKMERE HOLLOW's MART (5, 9), then stand under the lone tree up and to its
+// right (8, 7), facing it, and press A, B, A: the editor opens. Nobody wanders up there. Leaving DUSKMERE
+// HOLLOW (or going indoors) forgets the first tree.
 namespace
 {
     bool egg_armed = false;
-    int egg_progress = 0;       // how much of A, B, A has been pressed at the window
+    int egg_progress = 0;       // how much of A, B, A has been pressed at the second tree
 
     constexpr int egg_tree_x = 5, egg_tree_y = 9;
-    constexpr int egg_spot_x = 7, egg_spot_y = 2;
+    constexpr int egg_spot_x = 8, egg_spot_y = 8;   // facing the tree at (8, 7)
 }
 
 bool overworld::egg_watch()
 {
     game_state& g = state();
-    bool in_mart = _map->room && _map->room->kind == room_kind::MART && _map->exit_map == 0;
-    if(! in_mart && _map_index != 0)
+    if(_map_index != 0)
     {
         egg_armed = false;
         egg_progress = 0;
         return false;
     }
-    if(! egg_armed || ! in_mart)
+    if(! egg_armed)
     {
         return false;
     }
-    bool at_window = g.x == egg_spot_x && g.y == egg_spot_y && g.facing == direction::UP;
+    bool at_window = g.x == egg_spot_x && g.y == egg_spot_y && g.facing == direction::UP;   // (the second tree)
     bool a = bn::keypad::a_pressed(), b = bn::keypad::b_pressed();
     if(! at_window)
     {

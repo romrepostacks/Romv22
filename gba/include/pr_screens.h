@@ -32,7 +32,7 @@ enum class bag_mode
 };
 int bag_screen(bag_mode mode);
 
-// The hidden editor (see pr_field: the tree, then the MART's window): a party Pokémon's level, shininess,
+// The hidden editor (see pr_field: one tree, then A, B, A at another): a party Pokémon's level, shininess,
 // stats within their legal range, and moves.
 void secret_editor_screen();
 
