@@ -166,6 +166,72 @@ namespace
     }
 }
 
+// ----- The hidden editor -----
+// Press A at the lone tree beside DUSKMERE HOLLOW's MART (5, 9), go into the MART, stand under the right-hand
+// window (7, 2), facing it, and press A, B, A: the editor opens. Leaving DUSKMERE HOLLOW and its MART forgets
+// the tree.
+namespace
+{
+    bool egg_armed = false;
+    int egg_progress = 0;       // how much of A, B, A has been pressed at the window
+
+    constexpr int egg_tree_x = 5, egg_tree_y = 9;
+    constexpr int egg_spot_x = 7, egg_spot_y = 2;
+}
+
+bool overworld::egg_watch()
+{
+    game_state& g = state();
+    bool in_mart = _map->room && _map->room->kind == room_kind::MART && _map->exit_map == 0;
+    if(! in_mart && _map_index != 0)
+    {
+        egg_armed = false;
+        egg_progress = 0;
+        return false;
+    }
+    if(! egg_armed || ! in_mart)
+    {
+        return false;
+    }
+    bool at_window = g.x == egg_spot_x && g.y == egg_spot_y && g.facing == direction::UP;
+    bool a = bn::keypad::a_pressed(), b = bn::keypad::b_pressed();
+    if(! at_window)
+    {
+        egg_progress = 0;
+        return false;
+    }
+    if(bn::keypad::up_pressed() || bn::keypad::down_pressed() || bn::keypad::left_pressed() || bn::keypad::right_pressed() ||
+       bn::keypad::start_pressed() || bn::keypad::select_pressed())
+    {
+        egg_progress = 0;
+        return false;
+    }
+    if(! a && ! b)
+    {
+        return false;
+    }
+    constexpr bool want_a[] = { true, false, true };
+    if(a == want_a[egg_progress])
+    {
+        ++egg_progress;
+    }
+    else
+    {
+        egg_progress = a ? 1 : 0;
+    }
+    if(egg_progress < 3)
+    {
+        return false;
+    }
+    egg_armed = false;
+    egg_progress = 0;
+    audio::play(audio::sfx::SPOT);
+    suspend();
+    secret_editor_screen();
+    resume();
+    return true;
+}
+
 // ----- Talking, signs and things (owInteract) -----
 void overworld::interact()
 {
@@ -184,6 +250,11 @@ void overworld::interact()
     }
     int dx = dx_of(g.facing), dy = dy_of(g.facing);
     int fx = g.x + dx, fy = g.y + dy;
+    if(_map_index == 0 && fx == egg_tree_x && fy == egg_tree_y)
+    {
+        egg_armed = true;       // (no sign of it)
+        egg_progress = 0;
+    }
     // Talk across a counter.
     if(behaviour_at(fx, fy) == behaviour::COUNTER)
     {

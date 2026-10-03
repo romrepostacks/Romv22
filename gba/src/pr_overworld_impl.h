@@ -197,6 +197,8 @@ public:
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.
     void story_say(const bn::string_view& text);
     void tower_guide();
+    // The hidden editor's trigger: the tree beside DUSKMERE HOLLOW's MART, then A, B, A at the MART's window.
+    bool egg_watch();
     // The CHALLENGE TOWER (SPIRECREST TOWN): in at the door, up floor by floor, the SUMMONING STONE at the
     // summit, the legendary in its chamber, and out again.
     bool tower_door(const door& d);

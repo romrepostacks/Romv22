@@ -27,7 +27,13 @@ namespace mon_flag
 namespace mon_trait
 {
     constexpr uint8_t SHINY = 1;
+    constexpr uint8_t EDITED = 2;           // its stats were set by hand: they keep their place in the range
 }
+
+// Gen 3's range for a stat at a level: IV 0-31, EV 0-252 and a nature's x0.9-x1.1 (HP has no nature). This
+// game's own formula (IV 31, no EVs, a neutral nature) sits inside it.
+[[nodiscard]] int stat_min(int base, bool is_hp, int level);
+[[nodiscard]] int stat_max(int base, bool is_hp, int level);
 
 struct mon
 {
@@ -75,7 +81,9 @@ struct mon
     [[nodiscard]] bool has_type(int type) const;
     [[nodiscard]] const ability& abil() const;
 
-    void recalc_stats();
+    // The stats for its level (and species). A hand-edited one keeps each stat's place between the min and max
+    // it had (at old_level, with old_base) instead.
+    void recalc_stats(int old_level = 0, const base_stats* old_base = nullptr);
     void heal();
     // Adds XP (grantXp): level-ups, new moves and evolutions are reported through ui.say; moves it has no
     // room for wait in the pending list for after the battle (movePromptNext).

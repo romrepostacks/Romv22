@@ -1721,6 +1721,11 @@ bool overworld::run(encounter& battle, const battle_report* last)
             tick();
             continue;
         }
+        if(egg_watch())
+        {
+            tick();
+            continue;
+        }
         if(bn::keypad::a_pressed())
         {
             interact();

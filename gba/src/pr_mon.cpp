@@ -140,16 +140,57 @@ bool mon::has_type(int type) const
     return data().type1 == type || data().type2 == type;
 }
 
-void mon::recalc_stats()
+int stat_min(int base, bool is_hp, int level)
+{
+    if(is_hp)
+    {
+        return base == 1 ? 1 : (2 * base * level) / 100 + level + 10;
+    }
+    return ((2 * base * level) / 100 + 5) * 9 / 10;
+}
+
+int stat_max(int base, bool is_hp, int level)
+{
+    // IV 31 and 252 EVs add 31 + 63 to twice the base.
+    if(is_hp)
+    {
+        return base == 1 ? 1 : ((2 * base + 94) * level) / 100 + level + 10;
+    }
+    return (((2 * base + 94) * level) / 100 + 5) * 11 / 10;
+}
+
+void mon::recalc_stats(int old_level, const base_stats* old_base)
 {
     const base_stats& b = data().base;
     int old_max = max_hp;
-    max_hp = uint16_t(stat_calc(b.hp, true, level));
-    atk = uint16_t(stat_calc(b.atk, false, level));
-    def = uint16_t(stat_calc(b.def, false, level));
-    spa = uint16_t(stat_calc(b.spa, false, level));
-    spd = uint16_t(stat_calc(b.spd, false, level));
-    spe = uint16_t(stat_calc(b.spe, false, level));
+    if(traits & mon_trait::EDITED && old_max)
+    {
+        // Hand-set stats: the same place between this level's min and max as they had between the old ones.
+        int from = old_level ? old_level : level;
+        const base_stats& ob = old_base ? *old_base : b;
+        auto keep = [&](uint16_t& v, int old_b, int new_b, bool hp)
+        {
+            int lo = stat_min(old_b, hp, from), hi = stat_max(old_b, hp, from);
+            int pos = hi > lo ? bn::clamp((int(v) - lo) * 1024 / (hi - lo), 0, 1024) : 512;
+            int nlo = stat_min(new_b, hp, level), nhi = stat_max(new_b, hp, level);
+            v = uint16_t(nlo + (nhi - nlo) * pos / 1024);
+        };
+        keep(max_hp, ob.hp, b.hp, true);
+        keep(atk, ob.atk, b.atk, false);
+        keep(def, ob.def, b.def, false);
+        keep(spa, ob.spa, b.spa, false);
+        keep(spd, ob.spd, b.spd, false);
+        keep(spe, ob.spe, b.spe, false);
+    }
+    else
+    {
+        max_hp = uint16_t(stat_calc(b.hp, true, level));
+        atk = uint16_t(stat_calc(b.atk, false, level));
+        def = uint16_t(stat_calc(b.def, false, level));
+        spa = uint16_t(stat_calc(b.spa, false, level));
+        spd = uint16_t(stat_calc(b.spd, false, level));
+        spe = uint16_t(stat_calc(b.spe, false, level));
+    }
     // Keep the same fraction of HP (recalcStats: Math.round, at least 1 unless fainted).
     if(old_max)
     {
@@ -171,8 +212,9 @@ void mon::heal()
 
 void mon::set_species(int index)
 {
+    base_stats old = data().base;
     species_index = uint16_t(index);
-    recalc_stats();
+    recalc_stats(level, &old);
 }
 
 void mon::grant_xp(int amount, ui& ui)
@@ -193,7 +235,7 @@ void mon::grant_xp(int amount, ui& ui)
     {
         xp = uint16_t(xp - xp_next());
         ++level;
-        recalc_stats();
+        recalc_stats(level - 1);
         bn::string<64> text(name());
         text.append(" grew to level ");
         text.append(bn::to_string<4>(level));
@@ -268,8 +310,9 @@ void mon::_try_evolve(ui& ui)
         return;
     }
     bn::string<96> text(name());
+    base_stats old = s.base;
     species_index = uint16_t(s.evolves_to);
-    recalc_stats();
+    recalc_stats(level, &old);
     text.append(" evolved into ");
     text.append(data().name);
     text.append("!");

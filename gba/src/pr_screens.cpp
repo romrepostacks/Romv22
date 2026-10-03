@@ -2466,4 +2466,342 @@ void credits_screen()
     u.win().clear_all();
 }
 
+// ---------------------------------------------------------------------------------------------------
+// The hidden editor (the tree by DUSKMERE HOLLOW's MART, then A, B, A at the MART's window): a party
+// Pokémon's level, shininess, stats (each kept to Gen 3's range for its level: IV 0-31, EV 0-252, nature
+// x0.9-x1.1) and moves (from what its species can learn). DONE keeps the changes; B leaves them.
+namespace
+{
+    constexpr int editor_rows = 10;     // LEVEL, SHINY, six stats, MOVES, DONE
+
+    uint16_t& stat_ref(mon& m, int k)
+    {
+        switch(k)
+        {
+        case 0: return m.max_hp;
+        case 1: return m.atk;
+        case 2: return m.def;
+        case 3: return m.spa;
+        case 4: return m.spd;
+        default: return m.spe;
+        }
+    }
+
+    int base_of(const mon& m, int k)
+    {
+        const base_stats& b = m.data().base;
+        return k == 0 ? b.hp : k == 1 ? b.atk : k == 2 ? b.def : k == 3 ? b.spa : k == 4 ? b.spd : b.spe;
+    }
+
+    // The moves its species can know: its learnset at any level, and its hand-made moves.
+    int learnable_moves(const mon& m, uint16_t* out, int max)
+    {
+        const species& s = m.data();
+        int n = 0;
+        auto add = [&](uint16_t mv)
+        {
+            for(int i = 0; i < n; ++i)
+            {
+                if(out[i] == mv)
+                {
+                    return;
+                }
+            }
+            if(n < max)
+            {
+                out[n++] = mv;
+            }
+        };
+        for(int i = 0; i < s.learnset_count; ++i)
+        {
+            add(s.learnset[i].move);
+        }
+        for(int i = 0; i < s.fixed_count; ++i)
+        {
+            add(s.fixed_moves[i]);
+        }
+        for(int i = 0; i < m.move_count; ++i)
+        {
+            add(m.moves[i]);
+        }
+        return n;
+    }
+
+    // MOVES: four slots; A on one picks from what it can learn, or (none) to clear it (one always stays).
+    void edit_moves(mon& m)
+    {
+        ui& u = gui();
+        static uint16_t pool[256];
+        int pool_n = learnable_moves(m, pool, 256);
+        while(true)
+        {
+            bn::string<24> labels[5];
+            bn::string_view views[5];
+            for(int i = 0; i < 4; ++i)
+            {
+                labels[i] = i < m.move_count ? bn::string_view(move_data(m.moves[i]).name) : bn::string_view("-");
+                views[i] = labels[i];
+            }
+            views[4] = "DONE";
+            u.show_text("Which move slot?");
+            int slot = u.list(views, 5);
+            u.clear_text();
+            if(slot < 0 || slot == 4)
+            {
+                return;
+            }
+            static bn::string_view names[257];
+            names[0] = "(none)";
+            for(int i = 0; i < pool_n; ++i)
+            {
+                names[i + 1] = move_data(pool[i]).name;
+            }
+            u.show_text("Teach which move?");
+            menu_spec s;
+            s.options = names;
+            s.count = pool_n + 1;
+            s.rows = 6;
+            s.tx = 14; s.ty = 0; s.tw = 16; s.th = 14;
+            int k = u.menu(s);
+            u.clear_text();
+            u.win().clear(14, 0, 16, 14);
+            if(k < 0)
+            {
+                continue;
+            }
+            if(k == 0)
+            {
+                // Clear the slot (the others close up), but never the last move.
+                if(slot < m.move_count && m.move_count > 1)
+                {
+                    for(int i = slot; i < m.move_count - 1; ++i)
+                    {
+                        m.moves[i] = m.moves[i + 1];
+                    }
+                    --m.move_count;
+                }
+                continue;
+            }
+            uint16_t mv = pool[k - 1];
+            bool known = false;
+            for(int i = 0; i < m.move_count; ++i)
+            {
+                known |= m.moves[i] == mv && i != slot;
+            }
+            if(known)
+            {
+                continue;
+            }
+            if(slot < m.move_count)
+            {
+                m.moves[slot] = mv;
+            }
+            else
+            {
+                m.moves[m.move_count++] = mv;
+            }
+        }
+    }
+}
+
+void secret_editor_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    int index = party_screen(party_mode::CHOOSE, "Edit which POKéMON?");
+    if(index < 0 || index >= g.party_count)
+    {
+        return;
+    }
+    mon m = g.party[index];
+    for(int k = 0; k < 6; ++k)
+    {
+        uint16_t& v = stat_ref(m, k);
+        v = uint16_t(bn::clamp(int(v), stat_min(base_of(m, k), k == 0, m.level), stat_max(base_of(m, k), k == 0, m.level)));
+    }
+    m.hp = bn::min(m.hp, m.max_hp);
+    ui::fade_out(8);
+    u.win().clear_all();
+    bn::bg_palettes::set_transparent_color(bn::color(4, 6, 12));
+    bn::vector<bn::sprite_ptr, 96> texts;
+    bn::optional<bn::sprite_ptr> sprite;
+    bn::optional<bn::sprite_ptr> cursor;
+    int row = 0;
+    bool redraw = true;
+    bool faded = true;
+    bool keep = false;
+    constexpr const char* stat_names[] = { "HP", "ATTACK", "DEFENSE", "SP. ATK", "SP. DEF", "SPEED" };
+    while(true)
+    {
+        if(redraw)
+        {
+            texts.clear();
+            u.win().box(window_style::WINDOW, 0, 0, 30, 20);
+            bn::string<32> title;
+            upper(title, m.name());
+            u.print(8, 5, "EDITOR", text_color::RED, texts);
+            u.print_fit(8, 20, title, 84, text_color::INK, texts);
+            sprite = m.data().front.create_sprite(sx(48), sy(68));
+            apply_shiny(*sprite, m, mon_view::FRONT);
+            sprite->set_bg_priority(0);
+            // Its moves, in full, under it.
+            for(int i = 0; i < m.move_count; ++i)
+            {
+                u.print_fit(8, 104 + i * 9, move_data(m.moves[i]).name, 86, text_color::BLUE, texts, true);
+            }
+            u.print_fit(8, 146, "Left/Right: change   L/R: 10 at a time   A: open   B: leave", 224, text_color::INK, texts, true);
+            for(int r = 0; r < editor_rows; ++r)
+            {
+                int y = 5 + r * 14;
+                bn::string<32> value;
+                bn::string<24> range;
+                const char* label = "";
+                if(r == 0)
+                {
+                    label = "LEVEL";
+                    value = bn::to_string<4>(m.level);
+                    range = "1-100";
+                }
+                else if(r == 1)
+                {
+                    label = "SHINY";
+                    value = m.shiny() ? "YES" : "NO";
+                }
+                else if(r < 8)
+                {
+                    int k = r - 2;
+                    label = stat_names[k];
+                    value = bn::to_string<6>(stat_ref(m, k));
+                    range = bn::to_string<6>(stat_min(base_of(m, k), k == 0, m.level));
+                    range.append("-");
+                    range.append(bn::to_string<6>(stat_max(base_of(m, k), k == 0, m.level)));
+                }
+                else if(r == 8)
+                {
+                    label = "MOVES";
+                    value = "EDIT";
+                }
+                else
+                {
+                    label = "DONE";
+                }
+                u.print(103, y, label, row == r ? text_color::RED : text_color::INK, texts, true);
+                if(r < 8)
+                {
+                    bn::string<32> shown("<");
+                    shown.append(value);
+                    shown.append(">");
+                    u.print(154, y, shown, text_color::BLUE, texts, true);
+                    if(! range.empty())
+                    {
+                        u.print_fit(192, y, range, 40, text_color::INK, texts, true);
+                    }
+                }
+                else if(r == 8)
+                {
+                    u.print(156, y, value, text_color::BLUE, texts, true);
+                }
+            }
+            cursor = bn::sprite_items::cursor.create_sprite(sx(97), sy(5 + row * 14 + 4));
+            cursor->set_bg_priority(0);
+            redraw = false;
+            if(faded)
+            {
+                ui::fade_in(8);
+                faded = false;
+            }
+        }
+        frame();
+        if(bn::keypad::up_pressed() || bn::keypad::down_pressed())
+        {
+            row = (row + (bn::keypad::up_pressed() ? editor_rows - 1 : 1)) % editor_rows;
+            audio::play(audio::sfx::SELECT);
+            redraw = true;
+            continue;
+        }
+        int step = bn::keypad::left_pressed() ? -1 : bn::keypad::right_pressed() ? 1 : bn::keypad::l_pressed() ? -10 :
+                   bn::keypad::r_pressed() ? 10 : 0;
+        if(step && row < 8)
+        {
+            if(row == 0)
+            {
+                int old_level = m.level;
+                m.level = uint8_t(bn::clamp(int(m.level) + step, 1, 100));
+                if(m.level != old_level)
+                {
+                    m.xp = 0;
+                    m.recalc_stats(old_level);
+                }
+            }
+            else if(row == 1)
+            {
+                m.traits = uint8_t(m.traits ^ mon_trait::SHINY);
+            }
+            else
+            {
+                int k = row - 2;
+                int lo = stat_min(base_of(m, k), k == 0, m.level), hi = stat_max(base_of(m, k), k == 0, m.level);
+                uint16_t& v = stat_ref(m, k);
+                v = uint16_t(bn::clamp(int(v) + step, lo, hi));
+                m.traits = uint8_t(m.traits | mon_trait::EDITED);
+                if(k == 0)
+                {
+                    m.hp = bn::min(m.hp, m.max_hp);
+                }
+            }
+            audio::play(audio::sfx::SELECT);
+            redraw = true;
+            continue;
+        }
+        if(bn::keypad::a_pressed())
+        {
+            audio::play(audio::sfx::SELECT);
+            if(row == 8)
+            {
+                sprite.reset();
+                cursor.reset();
+                texts.clear();
+                edit_moves(m);
+                u.win().clear_all();
+                redraw = true;
+            }
+            else if(row == 9)
+            {
+                keep = true;
+                break;
+            }
+            continue;
+        }
+        if(bn::keypad::b_pressed())
+        {
+            u.show_text("Leave without saving the changes?");
+            bool yes = u.yes_no(false);
+            u.clear_text();
+            if(yes)
+            {
+                break;
+            }
+            redraw = true;
+        }
+    }
+    ui::fade_out(8);
+    texts.clear();
+    sprite.reset();
+    cursor.reset();
+    u.win().clear_all();
+    if(keep)
+    {
+        // Stats inside the range at its level; hit points no more than the max.
+        for(int k = 0; k < 6; ++k)
+        {
+            uint16_t& v = stat_ref(m, k);
+            v = uint16_t(bn::clamp(int(v), stat_min(base_of(m, k), k == 0, m.level), stat_max(base_of(m, k), k == 0, m.level)));
+        }
+        m.hp = bn::min(m.hp, m.max_hp);
+        g.party[index] = m;
+        g.mark_owned(m.species_index);
+        save_game();
+    }
+}
+
 }
