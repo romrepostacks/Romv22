@@ -1214,3 +1214,8 @@ body:has(#adv:not(.hidden)){background:#141418;}
 .ed-moves{position:absolute; left:10px; top:44px; width:134px; font-size:12px; line-height:1.6;}
 .ed-help{position:absolute; left:10px; right:10px; bottom:6px; font-size:12px; opacity:.85;}
 .gm-br.ed-list{max-height:70%; overflow-y:auto;}
+/* A shiny Pokémon's entrance: stars burst around it (twice); the SHINY mark on its summary. */
+.bmon.sparkling::after{content:'✦ ✧ ✦'; position:absolute; left:50%; top:30%; transform:translate(-50%,-50%); color:#fff; font-size:28px;
+  text-shadow:0 0 6px #f8e070, 0 0 2px #f8a000; letter-spacing:10px; pointer-events:none; animation:shinyburst .55s ease-out 2;}
+@keyframes shinyburst{0%{opacity:0; transform:translate(-50%,-50%) scale(.3);} 40%{opacity:1;} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.6);}}
+.sm-shiny{color:#e03830; font-size:.8em;}

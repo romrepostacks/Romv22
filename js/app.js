@@ -851,12 +851,16 @@ const DEX_NUM = {
  "celesteela":797,"kartana":798,"guzzlord":799,"necrozma":800,"magearna":801,"marshadow":802,"poipole":803,"naganadel":804,
  "stakataka":805,"blacephalon":806,"zeraora":807,"meltan":808,"melmetal":809,"ninetales-alola":10104
 };
-function spritePath(d, facing){
+function spritePath(d, facing, shiny){
   const num = DEX_NUM[slug(d.name)] || 0;
-  return `sprites/pokemon/${facing==='back'?'back/':''}${num}.png`;
+  return `sprites/pokemon/${facing==='back'?'back/':''}${shiny?'shiny/':''}${num}.png`;
 }
-function monSprite(d, facing){
-  const path = spritePath(d, facing);
+// A Pokémon's own sprite (its shiny colours if it's shiny).
+function monPath(m, facing){ return spritePath(m.dex, facing, m.shiny); }
+// Shiny odds (first built for the GBA): 1 in 4096, twice that in ADVENTURE MODE, 1.25 times in a NUZLOCKE run.
+function rollShiny(){ return Math.random()*16384 < (adv && adv.adventure ? 8 : adv && adv.nuzlocke ? 5 : 4); }
+function monSprite(d, facing, shiny){
+  const path = spritePath(d, facing, shiny);
   return `<div class="mon-sprite"><img src="${path}" alt="${d.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="ph">❔</span></div>`;
 }
 function showToast(msg){
@@ -2806,7 +2810,7 @@ function partyBox(m, k){
   // Icon frame time by HP (6/8/14/22 frames), doubled for the two-frame hop.
   const speed = {g: f>=1 ? 6 : 8, y:14, r:22}[cls];
   return `<div class="pb ${k?'pb-small':'pb-lead'} pb-${cls}${s.i===k?' on':''}${s.swap===k?' swapping':''}" data-k="${k}" style="${k ? slotPos(k) : ''}">
-    <img src="${spritePath(m.dex)}" alt="" style="${speed ? `animation-duration:${speed*2/60}s` : 'animation:none'}">
+    <img src="${monPath(m)}" alt="" style="${speed ? `animation-duration:${speed*2/60}s` : 'animation:none'}">
     <div class="pb-name">${dname(m)}</div><div class="pb-lv">Lv${m.level}</div>
     <div class="pb-hp"><span>HP</span><i><b class="hp-${cls}" style="width:${f*100}%"></b></i></div>
     <div class="pb-hpn">${Math.max(0,m.hp)}/${m.maxhp}</div></div>`;
@@ -2877,7 +2881,7 @@ function summaryDraw(dir){
     : `<div class="sm-rows">${m.moves.map(mv=>`<div><span class="tbadge" style="background:${TYPE_COLORS[mv.t]||'#888'}">${mv.t}</span> ${mv.n.toUpperCase()} <small>PP ${ppLeft(m, mv)}/${maxPP(mv)}</small> <b>${mv.p?'PWR '+mv.p:'—'}</b></div>`).join('')}</div>`;
   s.el.innerHTML = `<div class="sm">
     <div class="sm-head">${SUM_PAGES.map((t,k)=>`<span class="${k===p?'on':''}">${k===p?t:''}</span>`).join('')}<i>◀▶ PAGE</i></div>
-    <div class="sm-left"><img src="${spritePath(m.dex)}" alt=""><div>${dname(m)}</div><div>Lv${m.level}</div>
+    <div class="sm-left"><img src="${monPath(m)}" alt=""><div>${dname(m)}${m.shiny ? ' <b class="sm-shiny">★ SHINY</b>' : ''}</div><div>Lv${m.level}</div>
       <div class="pb-hp"><span>HP</span><i><b class="hp-${cls}" style="width:${Math.max(0,m.hp/m.maxhp)*100}%"></b></i></div></div>
     <div class="sm-page">${body}</div></div>`;
   if(dir) s.el.querySelector('.sm-page').animate([{transform:`translateX(${dir>0?256:-256}px)`},{transform:'none'}], {duration:8000/60, easing:'linear'});
@@ -3347,22 +3351,22 @@ function boxDraw(){
   const b = pcBox, wp = boxWall(b.box), m = boxMon() || b.held;
   const slots = [];
   for(let s=0;s<30;s++){ const mon = adv.box[b.box*30+s];
-    slots.push(`<div class="pb-slot" data-s="${s}">${mon ? `<img src="${spritePath(mon.dex)}" alt="">` : ''}</div>`); }
+    slots.push(`<div class="pb-slot" data-s="${s}">${mon ? `<img src="${monPath(mon)}" alt="">` : ''}</div>`); }
   const hand = b.mode==='deposit' ? `left:${b.p===MAX_PARTY ? 440 : 294+Math.floor(b.p/5)*143}px; top:${10+(b.p===MAX_PARTY ? 5 : b.p%5)*34}px` : b.c<0 ? `left:${34+(b.p%2)*78}px; top:${158+Math.floor(b.p/2)*31}px`
     : b.r<0 ? `left:310px; top:8px` : `left:${196+b.c*48}px; top:${46+b.r*44}px`;
   // MOVE mode shows the party as a 2×3 grid where the info panel usually is.
   const info = b.mode==='move'
-    ? `<div class="pb-pmini">${[...Array(MAX_PARTY).keys()].map(i=>`<div class="${b.c<0 && b.p===i ? 'on' : ''}" data-p="${i}">${adv.party[i] ? `<img src="${spritePath(adv.party[i].dex)}" alt="">` : ''}</div>`).join('')}</div>`
+    ? `<div class="pb-pmini">${[...Array(MAX_PARTY).keys()].map(i=>`<div class="${b.c<0 && b.p===i ? 'on' : ''}" data-p="${i}">${adv.party[i] ? `<img src="${monPath(adv.party[i])}" alt="">` : ''}</div>`).join('')}</div>`
     : `<div class="pb-info">${m ? `${dname(m)}<br><small>/${m.name.toUpperCase()}</small><br><small>Lv${m.level}</small>` : ''}</div>`;
   b.el.innerHTML = `
     <div class="pb-left"><div class="pb-label${m?' on':''}">POKéMON DATA</div>
-      <div class="pb-sprite">${m ? `<img src="${spritePath(m.dex)}" alt="">` : ''}</div>${info}</div>
+      <div class="pb-sprite">${m ? `<img src="${monPath(m)}" alt="">` : ''}</div>${info}</div>
     ${b.mode==='deposit'
-      ? `<div class="pb-party">${[...Array(MAX_PARTY).keys()].map(i=>`<div class="pb-prow${i===b.p?' on':''}" data-p="${i}">${adv.party[i] ? `<img src="${spritePath(adv.party[i].dex)}" alt="">${dname(adv.party[i])} <small>Lv${adv.party[i].level}</small>` : ''}</div>`).join('')}
+      ? `<div class="pb-party">${[...Array(MAX_PARTY).keys()].map(i=>`<div class="pb-prow${i===b.p?' on':''}" data-p="${i}">${adv.party[i] ? `<img src="${monPath(adv.party[i])}" alt="">${dname(adv.party[i])} <small>Lv${adv.party[i].level}</small>` : ''}</div>`).join('')}
          <div class="pb-prow pb-cancel${b.p===MAX_PARTY?' on':''}" data-p="${MAX_PARTY}">CANCEL</div></div>`
       : `<div class="pb-title" style="--wp:${wp[0]}"><span class="pb-arrow" data-a="-1">◀</span>${boxName(b.box)}<span class="pb-arrow" data-a="1">▶</span></div>
          <div class="pb-grid" style="background:repeating-linear-gradient(45deg,${wp[0]} 0 12px,${wp[1]} 12px 24px)">${slots.join('')}</div>`}
-    <div class="pb-hand${b.held ? ' fist' : ''}" style="${hand}">${b.held ? `<img src="${spritePath(b.held.dex)}" alt="">` : ''}</div>
+    <div class="pb-hand${b.held ? ' fist' : ''}" style="${hand}">${b.held ? `<img src="${monPath(b.held)}" alt="">` : ''}</div>
     <div class="pb-msg">${b.msg || (b.mode==='deposit' ? 'Which POKéMON will you deposit?'
       : b.held ? `Holding ${dname(b.held)}. Where to?`
       : `${adv.box.slice(b.box*30,b.box*30+30).filter(Boolean).length}/30  ◀▶ on the title to change BOX`)}</div>`;
@@ -3952,8 +3956,9 @@ function starterBag(){
       if(y!==0){ s.el.querySelector('.sb-show').innerHTML = ''; return; }
       s.el.remove(); uiScr = null;
       const mon = makeMon(d, 0, 'none', 5);
+      if(rollShiny()) mon.shiny = true;
       adv.party = [mon]; markOwned(mon); adv.starterPending = false; adv.starterThanks = true; saveAdv();
-      owSay([`${adv.playerName} chose ${d.name.toUpperCase()}!`], ()=>{ document.getElementById('evChaser')?.remove(); startWildBattle({names:['Zigzagoon'], level:2}); });
+      owSay([`${adv.playerName} chose ${d.name.toUpperCase()}!`], ()=>{ document.getElementById('evChaser')?.remove(); startWildBattle({names:['Zigzagoon'], level:2, scripted:true}); });
     }, 'gm-yesno');
   });
   const draw = ()=>{ s.el.innerHTML = `<div class="sb-bag"></div>${[0,1,2].map(k=>`<div class="sb-ball${k===i?' on':''}" style="left:${150+k*70}px"></div>`).join('')}
@@ -4090,7 +4095,7 @@ function renderAdventure(){
   document.getElementById('advParty').innerHTML = adv.party.map((m,mi)=>{
     const xpPct = Math.max(0,Math.min(100,Math.round(100*(m.xp||0)/(m.xpNext||1))));
     return `<div class="mon ${m.fainted?'fainted':''}"><div class="mon-row">
-      ${monSprite(m.dex)}
+      ${monSprite(m.dex, null, m.shiny)}
       <div class="mon-body">
         ${namePlate(m, ' HP', ` <button class="secondary" style="font-size:.6rem; padding:2px 5px; margin-left:4px" onclick="renamePartyMon(${mi})">✏️</button>`)}
         ${(m.nick||m.status) ? `<div class="mon-top" style="margin-top:-4px">${m.nick?`<span class="sub">(${m.name})</span> `:''}${statusTag(m)}</div>` : ''}
@@ -4129,6 +4134,8 @@ function startWildBattle(fixed, where){
   const picks = fixed ? fixed.names : loc.safari && where!=='water' ? safariPicks() : timePicks(pool, n);
   let id=9000;
   const wild = picks.map(n=>makeMon(dexByName(n), id++, 'none', fixed ? fixed.level : wildLevel()));
+  // Shiny odds (rollShiny); never the professor's ZIGZAGOON; the tower's legendary was rolled at the stone.
+  for(const m of wild) if(fixed && fixed.shiny!=null ? fixed.shiny : !(fixed && fixed.scripted) && rollShiny()) m.shiny = true;
   wild.forEach(markSeen);
   state = {sideA: adv.party, sideB: wild, log:[], mode:'story', legendary:!!(fixed && fixed.legendary)};
   if(state.legendary) for(const m of wild){ m.maxhp = Math.round(m.maxhp * Math.max(1, alive(adv.party).length/2)); m.hp = m.maxhp; }
@@ -4136,6 +4143,7 @@ function startWildBattle(fixed, where){
   showAdvScreens();
   document.getElementById('battle').classList.remove('hidden');
   addLog(`Wild ${wild.map(m=>`${m.name.toUpperCase()} (Lv${m.level})`).join(' and ')} appeared!`);
+  wild.forEach((m,i)=>{ if(m.shiny){ addLog(`${m.name.toUpperCase()} is SHINY!`); addFx({sparkle:'B'+i}); } });
   startBattleUI();
   });
 }
@@ -4393,7 +4401,7 @@ function playCredits(){
   try{ localStorage.setItem('partyroyale_cleared', '1'); }catch(e){}
   owBusy = true; held.length = 0;
   const view = document.getElementById('owView'), el = document.createElement('div');
-  const hof = adv.party.slice(0, 6).map(m=>`<div class="hof-mon"><img src="${spritePath(dexByName(m.name))}" alt=""><small>${dname(m).toUpperCase()}<br>Lv${m.level}</small></div>`).join('');
+  const hof = adv.party.slice(0, 6).map(m=>`<div class="hof-mon"><img src="${spritePath(dexByName(m.name), 'front', m.shiny)}" alt=""><small>${dname(m).toUpperCase()}<br>Lv${m.level}</small></div>`).join('');
   const roll = ['PARTY ROYALE', 'Vellorin Version', '', 'STARRING', `${adv.playerName.toUpperCase()}, the new CHAMPION`, 'WREN, rival and friend', PROF, '',
     'THE GYM LEADERS', 'RELL · SABLE · ORIN · ISKA', 'JUNO · BRYN · HALE · CORVIN', '', 'THE ELITE FOUR', 'MORROW · BRAKK · FERRIN · AURELLE', '',
     'ADMIN VESPER and TEAM TEMPEST', 'and LUGIA, guardian of the sea and sky', '', 'Made by the Party Royale team', '',
@@ -4756,6 +4764,12 @@ const BALL_SVG = (()=>{ const P = ['....KKKK....','..KKRRRRKK..','.KRRRRWWRRK.',
   let r = ''; P.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(C[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${C[ch]}"/>`; }));
   return `<svg viewBox="0 0 12 12" shape-rendering="crispEdges">${r}</svg>`; })();
 function ballFx(fx){
+  // A shiny one's entrance: stars burst around it, twice.
+  if(fx.sparkle){
+    const spr = document.getElementById('bs-'+fx.sparkle);
+    if(spr){ sfx('spot'); spr.classList.remove('sparkling'); void spr.offsetWidth; spr.classList.add('sparkling'); }
+    return;
+  }
   const scene = document.querySelector('#battle .battle-scene'), ball = scene && scene.querySelector('.bs-ball');
   if(fx.click){ if(ball){ sfx('caught'); ball.classList.add('shut'); } return; }
   if(fx.pop){ if(ball) ball.remove(); const spr = document.getElementById('bs-'+fx.pop); sfx('pop');
@@ -5133,7 +5147,7 @@ function renamePartyMon(i){
 function openBox(){
   document.getElementById('boxList').innerHTML = adv.box.map((m,i)=> !m ? '' :
     `<div class="mon"><div class="mon-row">
-       ${monSprite(m.dex)}
+       ${monSprite(m.dex, null, m.shiny)}
        <div class="mon-body">
          <div class="mon-top"><span>${dname(m)}<span class="lvbadge">Lv.${m.level}</span></span></div>
          <div class="types">${typeBadges(m.types)}</div>
@@ -5189,7 +5203,7 @@ function render(snap){
     const sz = spriteSize(player ? 1 : side.length, player);
     if(key==='A'){ const bl = document.querySelector('#battle .bs-ball'); if(bl) bl.remove(); }
     document.getElementById('field'+key).innerHTML = side.map((m,i)=>
-      `<div class="bmon" id="bs-${key}${i}" style="--sz:${sz}px"><img src="${spritePath(m.dex, player?'back':'front')}" alt="${dname(m)}" onerror="this.parentNode.classList.add('missing')"><span class="ph">❔</span></div>`).join('');
+      `<div class="bmon" id="bs-${key}${i}" style="--sz:${sz}px"><img src="${monPath(m, player?'back':'front')}" alt="${dname(m)}" onerror="this.parentNode.classList.add('missing')"><span class="ph">❔</span></div>`).join('');
     const hud = document.getElementById('hud'+key);
     hud.classList.toggle('compact', side.length>3);
     hud.classList.toggle('dense', side.length>5);   // big sides: two columns of small HP boxes
@@ -5245,7 +5259,7 @@ function startBattleUI(){
   state.lastMove = {};
   document.getElementById('battleCmd').innerHTML = '';
   render();
-  showMsgBox(state.log.slice(-1), beginCommand);
+  showMsgBox(state.log.slice(0), beginCommand, 0);
 }
 function beginCommand(){
   render();
