@@ -711,8 +711,11 @@ function learnMovesAt(mon, level){
 }
 function grantXp(mon, amount){
   if(mon.fainted) return;
+  // NUZLOCKE's level cap: no EXP past the next gym leader's level.
+  const cap = levelCapNow();
+  if(mon.level >= cap){ mon.xp = 0; return; }
   mon.xp = (mon.xp||0) + amount;
-  while(mon.level<100 && mon.xp >= mon.xpNext){
+  while(mon.level<cap && mon.xp >= mon.xpNext){
     mon.xp -= mon.xpNext;
     mon.level++;
     mon.xpNext = mon.level*8;
@@ -2965,7 +2968,7 @@ const CURED = {psn:'poisoning', par:'paralysis', slp:'sleep', brn:'its burn'};
 // Use a medicine on m. Returns the message, or null if it would do nothing (nothing is used up).
 function useItem(id, m){
   const it = ITEM_INFO[id];
-  if(it && it.revive && adv.items[id]){ if(!(m.fainted || m.hp<=0)) return null; adv.items[id]--; m.fainted = false; m.hp = Math.max(1, Math.floor(m.maxhp*it.revive)); return `${dname(m)} was revived!`; }
+  if(it && it.revive && adv.items[id]){ if(!(m.fainted || m.hp<=0) || adv.nuzlocke) return null; /* (NUZLOCKE: a fallen Pokémon stays fallen) */ adv.items[id]--; m.fainted = false; m.hp = Math.max(1, Math.floor(m.maxhp*it.revive)); return `${dname(m)} was revived!`; }
   if(it && it.full && adv.items[id] && !(m.fainted || m.hp<=0)){ if(m.hp>=m.maxhp && !m.status) return null; adv.items[id]--; m.hp = m.maxhp; m.status = null; m.sleepTurns = 0; return `${dname(m)} was fully restored!`; }
   if(!it || !adv.items[id] || m.fainted || m.hp<=0) return null;
   if(it.heal){
@@ -3010,7 +3013,7 @@ function bagOpen(){
 }
 // A RARE CANDY: one level (grantXp's level-up, with new moves and evolution); not past a NUZLOCKE cap.
 function rareCandy(m){
-  if(m.fainted || m.level>=100 || (typeof levelCapNow==='function' && m.level>=levelCapNow())) return null;
+  if(m.fainted || m.level>=100 || m.level>=levelCapNow()) return null;
   const was = state; state = {log:[], sideA:[], sideB:[]};
   adv.items.rarecandy--;
   grantXp(m, Math.max(1, m.xpNext - (m.xp||0)));
@@ -3286,7 +3289,9 @@ function usePC(){
 function pcTopMenu(){
   owBusy = true;
   owPrompt('Which PC should be accessed?');
-  uiMenu(document.getElementById('owView'), ["SOMEONE'S PC", `${adv.playerName.toUpperCase()}'s PC`, 'LOG OFF'], k=>{
+  const grave = adv.nuzlocke && adv.nuzlocke.deaths;   // NUZLOCKE: the graveyard, once someone has fallen
+  uiMenu(document.getElementById('owView'), ["SOMEONE'S PC", `${adv.playerName.toUpperCase()}'s PC`, ...(grave ? ['GRAVEYARD'] : []), 'LOG OFF'], k=>{
+    if(grave && k===2){ owPromptClose(); return graveyard(); }
     if(k===1){ sfx('pcLogin'); return owSay([`Accessed ${adv.playerName}'s PC.`], playerPC); }
     if(k!==0) return pcLogOff();
     sfx('pcLogin');
@@ -3747,6 +3752,7 @@ function loadSaveCode(){
 
 function startAdventure(){
   const saved = loadAdv();
+  if(saved && saved.nuzlocke && saved.nuzlocke.over) return nuzlockeSummary(saved);
   if(saved && saved.party && (saved.party.length || saved.starterPending)){
     adv = saved;
     showAdvScreens(); renderAdventure();
@@ -3768,7 +3774,18 @@ const INTRO_LINES = ["Hi there! Sorry to keep you waiting!", "Welcome to the wor
   "This world is home to creatures called POKéMON. People and POKéMON live side by side here in the VELLORIN region.",
   "Some play with them, some work with them, and some battle alongside them.", "Me? I study POKéMON for a living.",
   "But enough about me. Tell me about you. What's your name?"];
+// NEW GAME: the run's choices (NORMAL / NUZLOCKE, SKIP STORY TEXT), then the professor.
+let pendingRun = {nuzlocke:false, skip:false};
 function beginNewStory(){
+  ['titleScreen','setup','draft','battle','result','storyResult'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  leaveTitle();
+  document.getElementById('adv').classList.remove('hidden');
+  document.getElementById('owWorld').innerHTML = '';
+  const box = document.getElementById('adv'), view = document.getElementById('owView');
+  box.classList.add('on-title'); view.classList.add('run-pick');   // a plain screen, like the title's
+  chooseRun(run=>{ box.classList.remove('on-title'); view.classList.remove('run-pick'); pendingRun = run; beginIntro(); });
+}
+function beginIntro(){
   const trio = STARTER_TRIOS[Math.floor(Math.random()*STARTER_TRIOS.length)];
   starterOptions = trio.map(n=>DEX.find(d=>d.name===n)).filter(Boolean);
   ['titleScreen','setup','draft','battle','result','storyResult'].forEach(id=>document.getElementById(id).classList.add('hidden'));
@@ -3782,7 +3799,7 @@ function beginNewStory(){
     <img class="intro-mon" src="${spritePath(dexByName('Lotad'))}" alt="">
     <div class="intro-text" id="introText"></div>
     <div class="intro-name hidden" id="introName"><input id="apcNameInput" type="text" placeholder="Trainer" maxlength="12"><button id="introOk">OK</button></div></div>`;
-  let i = 0;
+  let i = pendingRun.skip ? INTRO_LINES.length-1 : 0;   // SKIP STORY TEXT: straight to your name
   const say = ()=>{ document.getElementById('introText').textContent = INTRO_LINES[i]; if(i===INTRO_LINES.length-1) askName(); };
   const next = ()=>{ if(i < INTRO_LINES.length-1){ i++; sfx('select'); say(); } };
   const askName = ()=>{
@@ -3792,6 +3809,7 @@ function beginNewStory(){
       const name = (input.value||'').trim().slice(0,12) || 'Trainer';
       document.removeEventListener('keydown', key);
       document.getElementById('introName').classList.add('hidden');
+      if(pendingRun.skip){ panel.onclick = null; return introFinish(name); }
       const outro = [`${name}! That's a fine name.`, `${name}, your very own POKéMON adventure is about to begin!`,
         "Dreams, friendships, rivals... they're all waiting out there. I'll see you soon!"];
       let k = 0;
@@ -3816,9 +3834,11 @@ function introFinish(name){
   document.getElementById('starterSelect').classList.add('hidden');
   adv = {playerName:name, party:[], loc:0, cleared:{}, visited:{}, items:{pokeball:10}, box:[], money:3000,
     starterPending:true, starterTrio:starterOptions.map(d=>d.name)};
+  if(pendingRun.nuzlocke) adv.nuzlocke = {deaths:0, catches:0, used:{}, grave:[]};
+  if(pendingRun.skip) adv.skipStory = true;
   saveAdv();
   renderAdventure();
-  owSay([`${PROF} went out toward ROUTE 1 to study wild POKéMON.`, `Maybe you should go and find him! ${routeOneWay()}`]);
+  storySay([`${PROF} went out toward ROUTE 1 to study wild POKéMON.`, `Maybe you should go and find him! ${routeOneWay()}`]);
 }
 
 // ---- Route 1: "H-help me!" ----
@@ -3862,7 +3882,13 @@ function storyEnter(){
   // A scene that can't be staged (no room) returns false and plays on a later visit instead.
   if(loc.scene && !adv.story[loc.scene] && SCENES[loc.scene] && SCENES[loc.scene]()!==false){ adv.story[loc.scene] = true; saveAdv(); return; }
   const call = PROF_CALLS.find(k=>badgeCount()>=k.badges && !adv.story[k.flag]);
-  if(call){ adv.story[call.flag] = true; saveAdv(); sfx('open'); owSay([`Beep beep beep! Incoming call from ${PROF}...`, ...call.lines.map(l=>`${PROF}: ${l}`)]); }
+  if(call){ adv.story[call.flag] = true; saveAdv(); sfx('open'); storySay([`Beep beep beep! Incoming call from ${PROF}...`, ...call.lines.map(l=>`${PROF}: ${l}`)]); }
+}
+// Story lines: skipped with SKIP STORY TEXT (NEW GAME), carrying straight on to what comes after.
+function storySay(lines, done){
+  if(!(adv && adv.skipStory)) return owSay(lines, done);
+  owBusy = false;
+  if(done) done(); else renderAdventure();
 }
 // A scene NPC placed n open tiles ahead of the player (null if there isn't room).
 function sceneNpc(npc, n, min=n){
@@ -3876,27 +3902,27 @@ function sceneNpc(npc, n, min=n){
 function sceneEnd(...npcs){ const map = curMap(); map.npcs = map.npcs.filter(n=>!npcs.includes(n)); owBusy = false; renderAdventure(); }
 const SCENES = {
   // The Sunken Shrine: Wren catches up, patches up your team and holds the way behind you.
-  shrine(){ owSay(["WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"", "WREN: \"Here, let me patch up your team first.\""], ()=>{
+  shrine(){ storySay(["WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"", "WREN: \"Here, let me patch up your team first.\""], ()=>{
       for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.ppUsed = {}; }
       saveAdv(); sfx('heal');
       // WREN's MASTER BALL, for the guardian.
-      owSay(['Your POKéMON were fully healed!', "WREN: \"And take this. My mom gave it to me for something special... I think this is it.\""], ()=>{
+      storySay(['Your POKéMON were fully healed!', "WREN: \"And take this. My mom gave it to me for something special... I think this is it.\""], ()=>{
         (adv.story ||= {}).masterGift = true;
         adv.items.masterball = (adv.items.masterball||0) + 1; saveAdv();
-        obtainItem('MASTER BALL', 1, 'POKé BALLS', ()=>owSay(["WREN: \"A MASTER BALL never misses. Save it for the guardian!\"", "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]));
+        obtainItem('MASTER BALL', 1, 'POKé BALLS', ()=>storySay(["WREN: \"A MASTER BALL never misses. Save it for the guardian!\"", "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]));
       });
     }); },
-  hideout(){ owSay(["Voices echo from deeper in the cave...", `${ADMIN}: "The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!"`,
+  hideout(){ storySay(["Voices echo from deeper in the cave...", `${ADMIN}: "The TIDEWARDEN songs are nearly decoded. Soon the guardian wakes, and the storms answer to TEAM TEMPEST!"`,
     `${ADMIN}: "WREN. Our little shadow has followed us here. Prove you're one of us."`]); },
   // Marrow Pass: a grunt barrels down the pass, warns you off and runs on.
   tempestRun(){
     held.length = 0;
     const g = sceneNpc({kind:'grunt'}, 5, 3);
-    if(!g) return owSay(["Somewhere up the pass, someone shouts: \"Move it! TEAM TEMPEST has business on the coast!\""]);
+    if(!g) return storySay(["Somewhere up the pass, someone shouts: \"Move it! TEAM TEMPEST has business on the coast!\""]);
     owBusy = true; renderAdventure(); owBusy = true;
     npcMove(g, g.facing, Math.abs(g.x-adv.pos.x)+Math.abs(g.y-adv.pos.y)-1, {run:true, fadeIn:true}, ()=>{
       owBusy = false;
-      owSay(["TEMPEST GRUNT: Hey! Outta the way, kid!", "TEMPEST GRUNT: TEAM TEMPEST has business on the coast. Don't you dare follow me!"], ()=>{
+      storySay(["TEMPEST GRUNT: Hey! Outta the way, kid!", "TEMPEST GRUNT: TEAM TEMPEST has business on the coast. Don't you dare follow me!"], ()=>{
         owBusy = true;
         const dir = OPPOSITE[g.facing];
         npcMove(g, dir, npcOpenRun(curMap(), g.x, g.y, dir, 6), {run:true, fadeOut:true}, ()=>sceneEnd(g));
@@ -3912,11 +3938,11 @@ const SCENES = {
       intro:"The Admin said nobody gets past. That means you!", after:"Go ahead, then. You'll never reach the shrine without a way to dive."}, Math.abs(a.x-adv.pos.x)+Math.abs(a.y-adv.pos.y)-2, 1);
     a.facing = OPPOSITE[a.facing];   // talking to the grunt, back to you
     owBusy = true; renderAdventure(); owBusy = false;
-    owSay([`${ADMIN}: The TIDEWARDENS' shrine lies somewhere beneath these very waves.`,
+    storySay([`${ADMIN}: The TIDEWARDENS' shrine lies somewhere beneath these very waves.`,
       `${ADMIN}: Once we can reach it, the guardian of the sea and sky will answer to TEAM TEMPEST!`,
       "TEMPEST GRUNT: Storms for the skies! Tempest rises!"], ()=>{
       faceNpcToPlayer(a);
-      owSay([`${ADMIN}: ...A child? You've been trailing my grunts since MARROW PASS, haven't you?`,
+      storySay([`${ADMIN}: ...A child? You've been trailing my grunts since MARROW PASS, haven't you?`,
         `${ADMIN}: How tiresome. Grunt, make sure this one stays on dry land.`], ()=>{
         owBusy = true;
         const dir = adv.facing;
@@ -3938,7 +3964,7 @@ function starterEvent(){
   const back = npcOpenRun(map, spot.x, spot.y, 'right', 8);
   const prof = {kind:'prof', x:spot.x+back, y:spot.y, facing:'left', event:true, lines:["Please! In my BAG!"], home:{...spot}};
   map.npcs.push(prof);
-  owSay(['H-help me!'], ()=>{
+  storySay(['H-help me!'], ()=>{
     owBusy = true;
     renderAdventure();
     const zig = dexByName('Zigzagoon'), zigAt = x=>`translate(${(x+1)*T}px,${spot.y*T-12}px)`;
@@ -3948,7 +3974,7 @@ function starterEvent(){
     if(back){ chaser.style.opacity = 0; void chaser.offsetWidth; chaser.style.opacity = 1; }
     npcMove(prof, 'left', back, {run:true, fadeIn:back>0, onStep:p=>{ chaser.style.transform = zigAt(p.x); }}, ()=>{
       owBusy = false;
-      owSay([`${PROF}: Hello! You over there! Please! Help me!`, "A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!"], starterBag);
+      storySay([`${PROF}: Hello! You over there! Please! Help me!`, "A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!"], starterBag);
     });
   });
 }
@@ -3981,7 +4007,7 @@ function starterThanks(){
   const map = getMap(LOCATIONS[1]), prof = map.npcs.find(n=>n.event);
   const gone = ()=>{ map.npcs = map.npcs.filter(n=>!n.event); owBusy = false; renderAdventure(); };
   saveAdv();
-  owSay([`${PROF}: Whew... I went into the tall grass to look at wild POKéMON, and it jumped me!`, "You saved me. Thanks a lot!",
+  storySay([`${PROF}: Whew... I went into the tall grass to look at wild POKéMON, and it jumped me!`, "You saved me. Thanks a lot!",
     `That ${adv.party[0].name.toUpperCase()} seems to like you. Please, keep it!`, "Travel with it and fill up your POKéDEX. I'll be watching your progress!"], ()=>{
     if(!prof || curMap()!==map) return gone();
     owBusy = true;
@@ -4060,6 +4086,8 @@ function closeMap(){
 function toggleMap(){ mapOpen ? closeMap() : openMap(false); }
 // Region map: areas on their grid cells, with a connector wherever two areas link. Places you
 // haven't been to yet show as "???".
+// NUZLOCKE: this area's encounter is spent.
+function nuzUsed(loc){ return !!(adv.nuzlocke && adv.nuzlocke.used && adv.nuzlocke.used[loc.name]); }
 function renderMap(){
   const el = document.getElementById('advMap');
   el.classList.toggle('hidden', !mapOpen);
@@ -4074,7 +4102,7 @@ function renderMap(){
     const icon = loc.type==='gym'?'🥊':loc.type==='trainer'?'🧑':loc.type==='route'?'🌿':'🏘️';
     const done = (loc.type==='gym'||loc.type==='trainer') && adv.cleared[loc.name];
     cells += `<div class="rm-cell ${i===adv.loc?'current':''} ${i===mapCursor?'cursor':''} ${seen?'':'unseen'} rm-${loc.type}" style="grid-column:${gx}; grid-row:${gy}" onclick="mapPick(${i})">
-      <span>${seen?icon:'❔'}</span><small>${seen ? loc.name.replace(/^Route (\d+):.*/, 'Route $1') : '???'}${done?' ✓':''}</small></div>`;
+      <span>${seen?icon:'❔'}</span><small>${seen ? loc.name.replace(/^Route (\d+):.*/, 'Route $1') : '???'}${done?' ✓':''}</small>${nuzUsed(loc) ? '<i class="rm-used">✕</i>' : ''}</div>`;
     for(const l of loc.links){
       if(l.dir!=='right' && l.dir!=='down') continue;   // draw each link once
       cells += `<div class="rm-link ${l.dir==='right'?'h':'v'} ${l.gate&&!adv.cleared[loc.name]?'locked':''}" style="grid-column:${gx+(l.dir==='right'?1:0)}; grid-row:${gy+(l.dir==='down'?1:0)}"></div>`;
@@ -4082,7 +4110,7 @@ function renderMap(){
   });
   const cur = LOCATIONS[mapCursor], go = mapCursor!==adv.loc && adv.visited[cur.name] && canTravel();
   el.innerHTML = `<div class="region-map" style="grid-template-columns:repeat(${cols}, minmax(0,1fr) 10px); grid-template-rows:repeat(${rows}, auto 10px)">${cells}</div>
-    <div class="rm-foot"><span>${adv.visited[cur.name] || mapCursor===adv.loc ? cur.name : '???'}</span>${go ? '<b>A: TRAVEL</b>' : ''}</div>`;
+    <div class="rm-foot"><span>${adv.visited[cur.name] || mapCursor===adv.loc ? cur.name : '???'}${nuzUsed(cur) ? ' <em>(encounter used)</em>' : ''}</span>${go ? '<b>A: TRAVEL</b>' : ''}</div>`;
 }
 
 function renderAdventure(){
@@ -4148,6 +4176,14 @@ function startWildBattle(fixed, where){
   for(const m of wild) if(fixed && fixed.shiny!=null ? fixed.shiny : !(fixed && fixed.scripted) && rollShiny()) m.shiny = true;
   wild.forEach(markSeen);
   state = {sideA: adv.party, sideB: wild, log:[], mode:'story', legendary:!!(fixed && fixed.legendary)};
+  // NUZLOCKE: the area's first wild encounter is its only chance to catch (the guardian and the professor's
+  // ZIGZAGOON aside); one that's all dupes doesn't count (dupes clause).
+  if(adv.nuzlocke){
+    const used = adv.nuzlocke.used ||= {}, area = LOCATIONS[adv.loc].name;
+    const counts = !state.legendary && !(fixed && fixed.scripted) && !used[area] && wild.some(m=>!(adv.owned && adv.owned[m.name]));
+    if(counts) used[area] = true;
+    state.nuzCatch = !(fixed && fixed.scripted) && (state.legendary || counts);
+  }
   if(state.legendary) for(const m of wild){ m.maxhp = Math.round(m.maxhp * Math.max(1, alive(adv.party).length/2)); m.hp = m.maxhp; }
   battleIntro(()=>{
   showAdvScreens();
@@ -4453,7 +4489,7 @@ function afterStory(){
   if(league && adv.cleared[league.name] && !(adv.story && adv.story.champion)) return playCredits();
   if(adv.story && adv.story.diveGift){
     delete adv.story.diveGift; adv.items.hm08 = 1; saveAdv();
-    return owSay(['HALE: "The ice keeps old secrets, and so does the sea. Take this."'], ()=>obtainItem('HM08 DIVE', 1, 'TMs & HMs', ()=>owSay([
+    return storySay(['HALE: "The ice keeps old secrets, and so does the sea. Take this."'], ()=>obtainItem('HM08 DIVE', 1, 'TMs & HMs', ()=>storySay([
       'HALE: "Look for dark, deep water while you SURF, and press A there to DIVE."', 'HALE: "They say the TIDEWARDENS\' shrine lies somewhere beneath the GLIMMER SEA."'], ()=>afterStory())));
   }
   if(adv.story && adv.story.legendFight){
@@ -4462,13 +4498,13 @@ function afterStory(){
     if(got) adv.story[name] = 'caught';
     adv.story.stormEnded = true; saveAdv();
     const lines = got ? [`${name.toUpperCase()}, guardian of the sea and sky, joined your team!`] : [`${name.toUpperCase()} sank back into the depths of the shrine...`, 'Maybe it will rise again if you return.'];
-    if(first) lines.push('Far above, the storm clouds over VELLORIN begin to break apart.', 'WREN: "You did it... The storms are clearing!"', 'WREN: "VESPER\'s gone, and TEAM TEMPEST with her. See you at the top!"');
+    if(first && !adv.skipStory) lines.push('Far above, the storm clouds over VELLORIN begin to break apart.', 'WREN: "You did it... The storms are clearing!"', 'WREN: "VESPER\'s gone, and TEAM TEMPEST with her. See you at the top!"');
     renderAdventure();
     return owSay(lines, ()=>afterStory());
   }
   if(adv.story && adv.story.surfGift){
     delete adv.story.surfGift; adv.items.hm03 = 1; saveAdv();
-    return owSay(['SABLE: "The sea chose well today. Take this as well."'], ()=>obtainItem('HM03 SURF', 1, 'TMs & HMs', ()=>owSay([
+    return storySay(['SABLE: "The sea chose well today. Take this as well."'], ()=>obtainItem('HM03 SURF', 1, 'TMs & HMs', ()=>storySay([
       'SABLE: "With SURF, a POKéMON can carry you across the water."', 'SABLE: "Face the water and press A. The sea is wider than you think!"'], ()=>afterStory())));
   }
   const rival = adv.walkOff && curMap().npcs.find(n=>n.vanish);
@@ -4481,7 +4517,7 @@ function afterStory(){
         adv.walkOff = null; owBusy = false; saveAdv(); renderAdventure(); dexRegisterNext();
       });
     };
-    return loc.rivalAfter ? owSay(loc.rivalAfter.map(l=>`${loc.leaderName.toUpperCase()}: ${l}`), leave) : leave();
+    return loc.rivalAfter ? storySay(loc.rivalAfter.map(l=>`${loc.leaderName.toUpperCase()}: ${l}`), leave) : leave();
   }
   adv.walkOff = null;
   if(adv.starterThanks) return starterThanks();
@@ -4493,15 +4529,17 @@ function nickNext(){
   const m = nickQueue.shift();
   if(!m) return;
   owBusy = true;
-  owPrompt(`Give a nickname to the caught ${m.name.toUpperCase()}?`);
-  uiMenu(document.getElementById('owView'), ['YES', 'NO'], k=>{
+  const ask = k=>{
     owPromptClose();
     if(k!==0) return nickNext();
     showConfirm(`${m.name.toUpperCase()}'s nickname?`, v=>{
       if(typeof v==='string' && v.trim()) m.nick = v.trim().slice(0,12);
       saveAdv(); renderAdventure(); nickNext();
     }, true, m.name);
-  }, 'gm-yesno');
+  };
+  if(adv.nuzlocke) return ask(0);   // NUZLOCKE: every catch gets a nickname
+  owPrompt(`Give a nickname to the caught ${m.name.toUpperCase()}?`);
+  uiMenu(document.getElementById('owView'), ['YES', 'NO'], ask, 'gm-yesno');
 }
 // After a first catch (Emerald): the new entry, headed "POKéDEX registration completed.", side bars
 // blinking; A or B closes it (then the next one, if you caught more).
@@ -5680,6 +5718,12 @@ function submitTurn(){
     if(act.ball){
       const ball = act.ball, bname = ITEM_INFO[ball].name;
       if(!adv.items[ball]){ addLog(`No ${bname}S left!`); continue; }
+      const t = act.target;
+      if(adv.nuzlocke && !state.legendary && !t.shiny && (state.nuzCaught || !state.nuzCatch || (adv.owned && adv.owned[t.name]))){
+        // Dupes clause: one you already have can't be caught (and the ball isn't used). (The shiny clause: a shiny always can.)
+        addLog(state.nuzCaught ? 'NUZLOCKE: one catch per encounter.' : !state.nuzCatch ? "NUZLOCKE: this area's encounter is used up." : `Dupes clause: you already have ${t.name.toUpperCase()}.`);
+        continue;
+      }
       adv.items[ball]--;
       const hpFrac = act.target.hp/act.target.maxhp;
       const statusBonus = act.target.status ? 1.5 : 1;
@@ -5690,6 +5734,8 @@ function submitTurn(){
       addFx({ball:'B'+state.sideB.indexOf(act.target), shakes, kind:ball});
       if(shakes===3){
         act.target.caught = true;
+        state.nuzCaught = true;
+        if(adv.nuzlocke) adv.nuzlocke.catches = (adv.nuzlocke.catches||0) + 1;
         addLog(`Gotcha! ${dname(act.target)} was caught!`);
         addFx({click:true});
         nickQueue.push(act.target);
@@ -5728,6 +5774,8 @@ function checkEnd(){
     clearCaught();
     document.getElementById('battle').classList.add('hidden');
     if(state.mode==='story'){
+      const fallen = buryFallen();
+      if(fallen && !adv.party.length) return nuzlockeOver(fallen), true;
       document.getElementById('storyResult').classList.remove('hidden');
       if(a>0){
         document.getElementById('storyResultText').textContent = '🏆 Victory!';
@@ -5747,7 +5795,7 @@ function checkEnd(){
           adv.money = (adv.money ?? 3000) + top*rate;
           grew.unshift(`${adv.playerName} got ₽${top*rate} for winning!`);
         }
-        document.getElementById('storyResultSub').innerHTML = [head, ...grew].join('<br>');
+        document.getElementById('storyResultSub').innerHTML = [head, ...(fallen||[]).map(n=>`${n} has fallen...`), ...grew].join('<br>');
       } else {
         document.getElementById('storyResultText').textContent = '💀 Your party was defeated...';
         document.getElementById('storyResultSub').textContent = `${adv.playerName} whited out!`;
@@ -6115,4 +6163,65 @@ function adventureModeDrafted(){
     showAdvScreens(); renderAdventure();
     owSay([`Welcome to SPIRECREST TOWN, ${name.toUpperCase()}!`, 'The CHALLENGE TOWER is right here in town. Talk to the guide by its door.']);
   }, true, 'Trainer');
+}
+
+// ---------- NUZLOCKE (NEW GAME; first built for the GBA) ----------
+// adv.nuzlocke = {deaths, catches, used:{area name:true}, grave:[the latest 30 fallen], over}.
+// NUZLOCKE's level cap: the first gym (in the region's order) whose leader you haven't beaten; after the eighth, the League.
+function levelCapNow(){
+  if(!adv || !adv.nuzlocke) return 100;
+  const cap = l=>Math.min(50, 8 + (l.tier ?? LOCATIONS.indexOf(l))*4);
+  const gym = LOCATIONS.find(l=>l.type==='gym' && !adv.cleared[l.name]);
+  if(gym) return cap(gym);
+  const champ = LOCATIONS.find(l=>l.champion && !adv.cleared[l.name]);
+  return champ ? cap(champ) : 100;
+}
+// The fallen leave the party for the graveyard. Returns their names (null outside a NUZLOCKE run).
+function buryFallen(){
+  if(!adv || !adv.nuzlocke) return null;
+  const n = adv.nuzlocke, fallen = adv.party.filter(m=>m.fainted || m.hp<=0);
+  if(!fallen.length) return null;
+  for(const m of fallen){ (n.grave ||= []).push({name:m.name, nick:m.nick, level:m.level, shiny:!!m.shiny}); n.deaths = (n.deaths||0) + 1; }
+  n.grave = n.grave.slice(-30);
+  adv.party = adv.party.filter(m=>!fallen.includes(m));
+  saveAdv();
+  return fallen.map(m=>dname(m).toUpperCase());
+}
+// Whiting out ends a NUZLOCKE run.
+function nuzlockeOver(fallen){
+  adv.nuzlocke.over = true; saveAdv();
+  cmd = null; state = null; clearCaught();
+  document.getElementById('battle').classList.add('hidden');
+  showAdvScreens(); renderAdventure();
+  owSay([...fallen.map(n=>`${n} has fallen...`), 'Your whole party has fallen.', 'The NUZLOCKE run is over.', `Badges: ${badgeCount()}`, `POKéMON lost: ${adv.nuzlocke.deaths}`], ()=>resetAll());
+}
+// The title's CONTINUE on a finished run: its summary, then back to the menu.
+function nuzlockeSummary(sv){
+  showConfirm(`${sv.playerName}'s NUZLOCKE run is over. Badges: ${LOCATIONS.filter(l=>l.type==='gym' && sv.cleared[l.name]).length}. POKéMON lost: ${sv.nuzlocke.deaths||0}. Catches: ${sv.nuzlocke.catches||0}.`, ()=>handheldTitle());
+}
+// The PC's GRAVEYARD: the fallen (the latest 30), three to a line.
+function graveyard(){
+  const g = adv.nuzlocke.grave || [], lines = [`POKéMON lost: ${adv.nuzlocke.deaths||0}`];
+  for(let i=0; i<g.length; i+=3) lines.push(g.slice(i, i+3).map(m=>`${(m.nick || m.name).toUpperCase()} Lv${m.level}`).join('  '));
+  owSay(lines, pcTopMenu);
+}
+// NEW GAME's choices: NORMAL or NUZLOCKE, then SKIP STORY TEXT.
+function chooseRun(cb){
+  const view = document.getElementById('owView');
+  owPrompt('Which kind of adventure would you like?');
+  uiMenu(view, ['NORMAL', 'NUZLOCKE'], k=>{
+    owPromptClose();
+    if(k!==0 && k!==1) return handheldTitle();
+    const run = {nuzlocke:k===1, skip:false};
+    const rules = run.nuzlocke ? ["NUZLOCKE: a POKéMON that faints is gone for good. It can't be used or revived.",
+      'Only the first wild POKéMON you meet in each area can be caught, and every catch gets a nickname.',
+      "Ones you already have don't count (dupes clause). Your POKéMON can't level past the next GYM LEADER.",
+      'If your whole party falls, the run is over. Good luck!'] : [];
+    const next = i=>{
+      if(i < rules.length){ owPrompt(rules[i]); return uiMenu(view, ['OK'], ()=>{ owPromptClose(); next(i+1); }, 'gm-yesno'); }
+      owPrompt('SKIP STORY TEXT? Scenes and calls complete themselves.');
+      uiMenu(view, ['YES', 'NO'], y=>{ owPromptClose(); run.skip = y===0; cb(run); }, 'gm-yesno');
+    };
+    next(0);
+  }, 'gm-br');
 }

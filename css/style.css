@@ -126,6 +126,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue); outline-o
 .rm-cell{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:58px; padding:4px 2px; text-align:center; border:2px solid #98a8b8; border-radius:8px; background:#fff; font-size:.72rem; line-height:1.1; text-shadow:none;}
 .rm-cell span{font-size:1.1rem;} .rm-cell.rm-route{background:#e4f4dc;} .rm-cell.rm-gym{background:#fff0d8;}
 .rm-cell.current{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); animation:blinkBorder 1s steps(2) infinite;}
+.rm-cell{position:relative;} .rm-used{position:absolute; top:1px; right:4px; color:#d03030; font-style:normal; font-weight:bold; font-size:.8rem;}
 @keyframes blinkBorder{50%{box-shadow:none}}
 .rm-cell.unseen{background:#e0e4e8; color:#8890a0;}
 .rm-link{background:#b8a068; align-self:center; justify-self:stretch;}
@@ -1219,3 +1220,4 @@ body:has(#adv:not(.hidden)){background:#141418;}
   text-shadow:0 0 6px #f8e070, 0 0 2px #f8a000; letter-spacing:10px; pointer-events:none; animation:shinyburst .55s ease-out 2;}
 @keyframes shinyburst{0%{opacity:0; transform:translate(-50%,-50%) scale(.3);} 40%{opacity:1;} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.6);}}
 .sm-shiny{color:#e03830; font-size:.8em;}
+.ow-view.run-pick{background:#183048;}
