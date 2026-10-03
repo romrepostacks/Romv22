@@ -2604,15 +2604,31 @@ namespace
     }
 }
 
+namespace
+{
+    void edit_one(int index);
+}
+
+// Pick a party Pokémon, edit it, and back to the party for the next, until CANCEL (or B).
 void secret_editor_screen()
+{
+    while(true)
+    {
+        int index = party_screen(party_mode::CHOOSE, "Edit which POKéMON?");
+        if(index < 0 || index >= state().party_count)
+        {
+            return;
+        }
+        edit_one(index);
+    }
+}
+
+namespace
+{
+void edit_one(int index)
 {
     game_state& g = state();
     ui& u = gui();
-    int index = party_screen(party_mode::CHOOSE, "Edit which POKéMON?");
-    if(index < 0 || index >= g.party_count)
-    {
-        return;
-    }
     mon m = g.party[index];
     for(int k = 0; k < 6; ++k)
     {
@@ -2802,6 +2818,7 @@ void secret_editor_screen()
         g.mark_owned(m.species_index);
         save_game();
     }
+}
 }
 
 }
