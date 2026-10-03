@@ -1635,7 +1635,7 @@ def inputs_hash():
     files = [os.path.join(ROOT, 'js', f) for f in ('app.js', 'dexdata.js', 'dexinfo.js', 'tileart.js', 'music.js')] + \
             [os.path.join(HERE, f) for f in ('export.js', 'build_assets.py', 'narrow_font.py')]
     files.append(os.path.join(ROOT, 'news.json'))
-    files.append(os.path.join(HERE, '..', 'data', 'moves_extra.json'))
+    files.append(os.path.join(ROOT, 'js', 'moveextra.js'))
     files.append(os.path.join(HERE, '..', 'news_gba.json'))
     for f in files:
         h.update(open(f, 'rb').read())

@@ -580,10 +580,22 @@ const LEVEL = 50;
 // hand-typed tables above: types, base stats, ability, level-up learnset and evolutions. The
 // curated entries keep their hand-tuned abilities, which already have battle effects.
 const STRUGGLE = {n:"Struggle", t:"Normal", p:50, c:"phys", a:100};
+// js/moveextra.js (MOVE_EXTRA, from PokeAPI): each move's PP, who it hits (one foe, every foe, the user, the
+// field), draining or recoil, healing, stat changes and weather; plus the status moves added after MOVEDATA
+// (GROWL, SWORDS DANCE, RECOVER, SANDSTORM...) and the learnset entries for them (d.learnAll).
+if(typeof MOVE_EXTRA!=='undefined'){
+  MOVEDATA.forEach((m,i)=>Object.assign(m, MOVE_EXTRA.existing[i]));
+  Object.assign(STRUGGLE, {pp:1, target:'one', drain:-25});
+}
+function moveByIndex(i){ return i < MOVEDATA.length ? MOVEDATA[i] : MOVE_EXTRA.added[i - MOVEDATA.length]; }
+const ALL_MOVES = typeof MOVE_EXTRA!=='undefined' ? MOVEDATA.concat(MOVE_EXTRA.added) : MOVEDATA;
+function moveByName(n){ return n==='Struggle' ? STRUGGLE : ALL_MOVES.find(m=>m.n===n); }
 if(typeof DEXDATA!=='undefined') for(const d of DEX){
   const r = DEXDATA[slug(d.name)];
   if(!r) continue;
   d.types = r.types; d.base = r.base; d.learn = r.learn; d.evo = r.evo;
+  const extra = typeof MOVE_EXTRA!=='undefined' && MOVE_EXTRA.learn[slug(d.name)];
+  d.learnAll = extra ? r.learn.concat(extra.filter(([lv])=>lv<=100)).sort((a,b)=>a[0]-b[0]) : r.learn;
   if(!CURATED_DEX.includes(d)) d.ability = r.ability;
   d.moves = movesAt(d, LEVEL);
 }
@@ -591,15 +603,21 @@ if(typeof DEXDATA!=='undefined') for(const d of DEX){
 function movesAt(d, level){
   if(!d.learn) return d.moves.slice();
   const known = [];
-  for(const [lv, mi] of d.learn){
+  for(const [lv, mi] of (d.learnAll || d.learn)){
     if(lv > level) break;
     const i = known.indexOf(mi); if(i>=0) known.splice(i,1);
     known.push(mi);
   }
   // Nothing usable yet (e.g. Magikarp only has Splash): take its first real attack, else Struggle.
   if(!known.length && d.learn.length) known.push(d.learn[0][1]);
-  return known.length ? known.slice(-4).map(i=>MOVEDATA[i]) : [STRUGGLE];
+  return known.length ? known.slice(-4).map(moveByIndex) : [STRUGGLE];
 }
+// PP (GBA 1.3): each move's real PP; ppUsed counts what's spent by move name; a POKéMON CENTER (or any full
+// heal) restores it. With nothing left anywhere, a Pokémon STRUGGLEs.
+function maxPP(mv){ return mv.pp || 10; }
+function ppLeft(m, mv){ return Math.max(0, maxPP(mv) - ((m.ppUsed || {})[mv.n] || 0)); }
+function usePP(m, mv){ if(mv!==STRUGGLE) (m.ppUsed ||= {})[mv.n] = ((m.ppUsed || {})[mv.n] || 0) + 1; }
+function outOfPP(m){ return m.moves.every(mv=>ppLeft(m, mv)===0); }
 function statCalc(base, isHp, level){
   level = level||LEVEL;
   if(isHp) return Math.floor(((2*base+31)*level)/100)+level+10;
@@ -672,9 +690,9 @@ function tryEvolve(mon){
 // pendingMoves and the player chooses after the battle (movePromptNext), as in the games.
 let pendingMoves = [];
 function learnMovesAt(mon, level){
-  for(const [lv, mi] of (mon.dex.learn||[])){
+  for(const [lv, mi] of (mon.dex.learnAll || mon.dex.learn || [])){
     if(lv!==level) continue;
-    const mv = MOVEDATA[mi];
+    const mv = moveByIndex(mi);
     mon.moves = mon.moves.filter(m=>m.n!=='Struggle');
     if(mon.moves.some(m=>m.n===mv.n)) continue;
     if(mon.moves.length>=4){ pendingMoves.push({mon, mv}); addLog(`${dname(mon)} wants to learn ${mv.n}!`); continue; }
@@ -2814,7 +2832,7 @@ function summaryDraw(dir){
         <div>EXP. POINTS <b>${m.xp||0}</b></div><div>NEXT LV. <b>${Math.max(0,(m.xpNext||0)-(m.xp||0))}</b></div></div>`
     : p===1 ? `<div class="sm-rows"><div>HP <b>${Math.max(0,m.hp)}/${m.maxhp}</b></div><div>ATTACK <b>${m.atk}</b></div><div>DEFENSE <b>${m.def}</b></div>
         <div>SP. ATK <b>${m.spa}</b></div><div>SP. DEF <b>${m.spd}</b></div><div>SPEED <b>${m.spe}</b></div></div>`
-    : `<div class="sm-rows">${m.moves.map(mv=>`<div><span class="tbadge" style="background:${TYPE_COLORS[mv.t]||'#888'}">${mv.t}</span> ${mv.n.toUpperCase()} <b>${mv.p?'PWR '+mv.p:'—'}</b></div>`).join('')}</div>`;
+    : `<div class="sm-rows">${m.moves.map(mv=>`<div><span class="tbadge" style="background:${TYPE_COLORS[mv.t]||'#888'}">${mv.t}</span> ${mv.n.toUpperCase()} <small>PP ${ppLeft(m, mv)}/${maxPP(mv)}</small> <b>${mv.p?'PWR '+mv.p:'—'}</b></div>`).join('')}</div>`;
   s.el.innerHTML = `<div class="sm">
     <div class="sm-head">${SUM_PAGES.map((t,k)=>`<span class="${k===p?'on':''}">${k===p?t:''}</span>`).join('')}<i>◀▶ PAGE</i></div>
     <div class="sm-left"><img src="${spritePath(m.dex)}" alt=""><div>${dname(m)}</div><div>Lv${m.level}</div>
@@ -3559,7 +3577,7 @@ function offWorldButton(k){
   return false;
 }
 function saveAdv(){
-  if(adv) for(const m of adv.box || []) if(m && !m.caught){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.sleepTurns = 0; }   // the Box heals (#27)
+  if(adv) for(const m of adv.box || []) if(m && !m.caught){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.sleepTurns = 0; m.ppUsed = {}; }   // the Box heals (#27)
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(adv)); }catch(e){}
 }
 // Phones close backgrounded apps without warning, so save the moment the game is hidden (the game
@@ -3585,6 +3603,9 @@ function patchAdv(a){
     if(m.nick===undefined) m.nick=null;
     // Saves from before the real-data update: real types/ability/stats, and the moves it would know.
     if(m.movesV!==2){ m.types = m.dex.types; m.ability = m.dex.ability; m.moves = movesAt(m.dex, m.level); recalcStats(m); m.movesV = 2; }
+    // Re-link its moves to the live move data (PP, targets and effects came later).
+    m.moves = m.moves.map(mv=>moveByName(mv.n) || mv);
+    if(!m.ppUsed) m.ppUsed = {};
   }
   return a;
 }
@@ -3759,7 +3780,7 @@ function sceneEnd(...npcs){ const map = curMap(); map.npcs = map.npcs.filter(n=>
 const SCENES = {
   // The Sunken Shrine: Wren catches up, patches up your team and holds the way behind you.
   shrine(){ owSay(["WREN: \"Wait up! I followed TEMPEST's divers all the way down here.\"", "WREN: \"Here, let me patch up your team first.\""], ()=>{
-      for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; }
+      for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.ppUsed = {}; }
       saveAdv(); sfx('heal');
       owSay(['Your POKéMON were fully healed!', "WREN: \"I'll hold off the grunts behind us. Go stop VESPER!\""]);
     }); },
@@ -3880,7 +3901,7 @@ function momTalk(){
   });
 }
 function healParty(){
-  for(const m of adv.party){ m.hp=m.maxhp; m.status=null; m.fainted=false; m.usedDisguise=false; m.sashUsed=false; m.sleepTurns=0; }
+  for(const m of adv.party){ m.hp=m.maxhp; m.status=null; m.fainted=false; m.usedDisguise=false; m.sashUsed=false; m.sleepTurns=0; m.ppUsed = {}; }
 }
 
 let mapOpen = false;
@@ -4088,7 +4109,7 @@ function playCredits(){
     ready = false; document.removeEventListener('keydown', key); el.remove(); window.creditsNext = null;
     const home = getMap(LOCATIONS[0]).buildings.find(b=>b.home);
     adv.loc = 0; adv.inside = null; adv.surfing = false; adv.pos = home ? {x:home.door.x, y:home.door.y+1} : {...getMap(LOCATIONS[0]).spawn}; adv.facing = 'down';
-    for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; }
+    for(const m of adv.party){ m.hp = m.maxhp; m.fainted = false; m.status = null; m.ppUsed = {}; }
     saveAdv(); owBusy = false; renderAdventure();
     owSay(['Back home in DUSKMERE HOLLOW...', `MOM: "${adv.playerName}! The CHAMPION! I'm so proud of you!"`,
       'Your adventure continues. ADVENTURE MODE is coming in a future update!']);
@@ -4917,6 +4938,9 @@ function applySnap(snap, instant){
 let cmd = null;
 function startBattleUI(){
   cmd = null;
+  // A new battle: no stat changes, no weather (GBA 1.3).
+  for(const m of state.sideA.concat(state.sideB)) m.stages = {atk:0, def:0, spa:0, spd:0, spe:0, acc:0, eva:0};
+  state.weather = null;
   if(adv) adv.party.forEach(m=>{ delete m.fought; });
   state.lastMove = {};
   document.getElementById('battleCmd').innerHTML = '';
@@ -4944,16 +4968,19 @@ function renderCmd(focusIdx){
   cmd.queue.forEach(q=>{ const hb = document.getElementById(`hb-A${q}`); if(hb) hb.classList.toggle('ordered', q in cmd.choices); });
   const balls = adv && adv.items ? (adv.items.pokeball||0) : 0;
   let left, right;
+  hintTarget(cmd.view==='fight' ? cmd.target : null);
   if(cmd.view==='fight'){
-    left = `<div class="gba-box movegrid">${m.moves.map((mv,i)=>`<button onclick="cmdMove(${i})" onfocus="moveInfo(${i})">${mv.n}</button>`).join('')}
+    // The moves, coloured for the chosen foe (moveRating).
+    const foe = state.sideB[cmd.target];
+    left = `<div class="gba-box movegrid">${m.moves.map((mv,i)=>`<button class="mv-${moveRating(m, mv, foe) || 'plain'}" onclick="cmdMove(${i})" onfocus="moveInfo(${i})">${mv.n}</button>`).join('')}
       <button onclick="cmdBack()">Cancel</button></div>`;
     right = `<div class="gba-box minfo" id="moveInfo"></div>`;
   } else if(cmd.view==='target'){
-    const what = cmd.pending.move==='ball' ? 'Throw the Poké Ball at' : `Use ${m.moves[cmd.pending.move].n} on`;
+    const what = cmd.pending.move==='ball' ? `Throw the ${ITEM_INFO[cmd.pending.ball || 'pokeball'].name} at which Pokémon?` : 'Attack which one?';
     left = `<div class="gba-box tlist">${enemyTargets().map(i=>{ const t = state.sideB[i];
-      return `<button onclick="cmdTarget(${i})">${dname(t)}<small>${Math.round(100*t.hp/t.maxhp)}%</small></button>`; }).join('')}
+      return `<button onclick="cmdTarget(${i})" onfocus="hintTarget(${i})">${dname(t)}<small>${Math.round(100*t.hp/t.maxhp)}%</small></button>`; }).join('')}
       <button onclick="cmdBack()">Cancel</button></div>`;
-    right = `<div class="gba-box bdark">${what} which Pokémon?</div>`;
+    right = `<div class="gba-box bdark">${what}</div>`;
   } else if(cmd.view==='bag'){
     const wild = state.mode==='story' && !state.trainerLoc;
     left = `<div class="gba-box tlist" style="grid-template-columns:1fr">
@@ -4978,28 +5005,49 @@ function renderCmd(focusIdx){
 }
 function moveInfo(i){
   const el = document.getElementById('moveInfo');
-  const mv = cmdMon().moves[i];
+  const m = cmdMon(), mv = m.moves[i];
   if(!el || !mv) return;
+  const pp = ppLeft(m, mv), noAim = mv.target==='self' || mv.target==='field';
   el.innerHTML = `<div class="row"><span>TYPE/</span>${typeBadge(mv.t)}</div>
+    <div class="row"><span>PP</span><span class="${pp?'':'pp-out'}">${pp}/${maxPP(mv)}</span></div>
     <div class="row"><span>POWER</span><span>${mv.p||'—'}</span></div>
-    <div class="row"><span>ACCURACY</span><span>${mv.a}</span></div>
-    <div class="row"><span>${mv.c==='phys'?'Physical':mv.c==='status'?'Status':'Special'}</span></div>`;
+    <div class="row"><span>ACCURACY</span><span>${noAim ? '—' : mv.a}</span></div>
+    <div class="row"><span>${mv.c==='phys'?'Physical':mv.c==='status'?'Status':'Special'}</span><span>${{foes:'All foes', self:'Self', field:'Field'}[mv.target] || ''}</span></div>`;
 }
-function cmdFight(){ cmd.view='fight'; renderCmd(state.lastMove[cmd.queue[cmd.pos]]||0); }
+// The foe being picked blinks.
+function hintTarget(i){
+  document.querySelectorAll('#battle .picking').forEach(e=>e.classList.remove('picking'));
+  const e = i==null ? null : document.getElementById(`bs-B${i}`);
+  if(e) e.classList.add('picking');
+}
+// FIGHT (GBA 1.3): the target first, then the moves coloured for it; B from the moves goes back to the target.
+function cmdFight(){
+  const t = enemyTargets();
+  if(t.length===1) return fightAt(t[0]);
+  cmd.pending = {move:'fight'}; cmd.view = 'target'; renderCmd(t.indexOf(cmd.target));
+}
+function fightAt(ti){
+  cmd.target = ti;
+  const m = cmdMon();
+  if(outOfPP(m)){ showMsgBox([`${dname(m)} has no moves left!`], ()=>cmdChoose({move:'struggle', target:ti})); return; }
+  cmd.view = 'fight'; renderCmd(state.lastMove[cmd.queue[cmd.pos]]||0);
+}
 function cmdBag(){ cmd.view='bag'; renderCmd(); }
 function cmdParty(){ cmd.view='party'; renderCmd(); }
 function cmdMove(i){
+  const m = cmdMon();
+  if(!ppLeft(m, m.moves[i])){ showMsgBox(["There's no PP left for this move!"], ()=>renderCmd(i)); return; }
   state.lastMove[cmd.queue[cmd.pos]] = i;
-  pickTarget({move:i});
+  cmdChoose({move:i, target:cmd.target});
 }
-function cmdBall(){ pickTarget({move:'ball'}); }
+function cmdBall(ball){ pickTarget({move:'ball', ball:ball || 'pokeball'}); }
 function cmdItem(id){ cmdChoose({move:'item', item:id, target:enemyTargets()[0]}); }
 function pickTarget(choice){
   const t = enemyTargets();
   if(t.length===1) return cmdChoose({...choice, target:t[0]});
   cmd.pending = choice; cmd.view = 'target'; renderCmd();
 }
-function cmdTarget(ti){ cmdChoose({...cmd.pending, target:ti}); }
+function cmdTarget(ti){ if(cmd.pending && cmd.pending.move==='fight') return fightAt(ti); cmdChoose({...cmd.pending, target:ti}); }
 function cmdChoose(choice){
   cmd.choices[cmd.queue[cmd.pos]] = choice;
   cmd.pos++; cmd.view = 'main'; cmd.pending = null;
@@ -5007,7 +5055,8 @@ function cmdChoose(choice){
   renderCmd();
 }
 function cmdBack(){
-  if(cmd.view==='target' && cmd.pending.move!=='ball'){ cmd.view='fight'; renderCmd(cmd.pending.move); return; }
+  if(cmd.view==='fight' && enemyTargets().length>1){ cmd.pending = {move:'fight'}; cmd.view = 'target'; renderCmd(enemyTargets().indexOf(cmd.target)); return; }
+  if(cmd.view==='target' && cmd.pending.move==='fight'){ cmd.view='main'; cmd.pending = null; renderCmd(0); return; }
   if(cmd.view==='target'){ cmd.view='bag'; renderCmd(); return; }
   if(cmd.view!=='main'){ const from = cmd.view; cmd.view='main'; renderCmd({fight:0,bag:1,party:2}[from]); return; }
   if(cmd.pos>0){ cmd.pos--; delete cmd.choices[cmd.queue[cmd.pos]]; renderCmd(); }
@@ -5052,14 +5101,25 @@ function applyStatus(target, status, chance){
   addLog(`${dname(target)} was afflicted with ${({par:'paralysis',brn:'a burn',psn:'poison',slp:'sleep',frz:'freeze'})[status]}!`);
 }
 
-function damage(user, move, target){
-  const atkStat = move.c==='phys' ? user.atk : user.spa;
-  let defStat = move.c==='phys' ? target.def : target.spd;
-  const stab = user.types.includes(move.t) ? 1.5 : 1;
+// The type multiplier with the target's ability (Levitate, Volt Absorb...) and the user's Corrosion.
+function moveEff(user, move, target){
   let e = eff(move.t, target.types);
   if(target.ability.type==='immune' && target.ability.immuneType===move.t) e = 0;
   if(user.ability.type==='corrosion' && move.t==='Poison' && e===0) e = eff(move.t, target.types.filter(t=>t!=='Steel'&&t!=='Poison')) || 1;
-  const rand = 0.85 + Math.random()*0.15;
+  return e;
+}
+function damage(user, move, target, spread){
+  const phys = move.c==='phys';
+  // Stat stages, the weather (rain: Water x1.5, Fire x0.5; sun the other way; a sandstorm raises Rock types'
+  // SP. DEF) and spread moves (x0.75) are GBA 1.3's.
+  const atkStat = (phys ? user.atk : user.spa) * stageMult(stg(user)[phys ? 'atk' : 'spa']);
+  let defStat = (phys ? target.def : target.spd) * stageMult(stg(target)[phys ? 'def' : 'spd']);
+  const w = state && state.weather;
+  if(w==='sand' && !phys && target.types.includes('Rock')) defStat *= 1.5;
+  const stab = user.types.includes(move.t) ? 1.5 : 1;
+  const e = moveEff(user, move, target);
+  const rand = (0.85 + Math.random()*0.15) * (w==='rain' ? (move.t==='Water' ? 1.5 : move.t==='Fire' ? 0.5 : 1) :
+    w==='sun' ? (move.t==='Fire' ? 1.5 : move.t==='Water' ? 0.5 : 1) : 1) * (spread ? 0.75 : 1);
   let power = move.p;
   if(user.ability.type==='boost' && user.ability.boostType===move.t && user.hp <= user.maxhp/3) power *= 1.5;
   if(user.ability.type==='punch' && move.punch) power *= 1.2;
@@ -5078,7 +5138,172 @@ function canAct(m){
   return true;
 }
 
-function effSpeed(m){ return m.status==='par' ? m.spe/2 : m.spe; }
+function effSpeed(m){ const s = m.spe * stageMult(stg(m).spe); return m.status==='par' ? s/2 : s; }
+
+// ---------- Moves (GBA 1.3): stat stages, accuracy, spread moves, draining, recoil, healing, weather ----------
+const STAGE_KEYS = ['atk','def','spa','spd','spe','acc','eva'];
+const STAGE_NAMES = ['ATTACK','DEFENSE','SP. ATK','SP. DEF','SPEED','accuracy','evasiveness'];
+function stageMult(s){ s = Math.max(-6, Math.min(6, s||0)); return s>=0 ? (2+s)/2 : 2/(2-s); }
+function accMult(s){ s = Math.max(-6, Math.min(6, s||0)); return s>=0 ? (3+s)/3 : 3/(3-s); }
+function stg(m){ return m.stages ||= {atk:0, def:0, spa:0, spd:0, spe:0, acc:0, eva:0}; }
+function hitChance(user, mv, target){ return mv.a * accMult(stg(user).acc - stg(target).eva); }
+// Whether a non-damaging move would do nothing: a status it can't take, stats already as far as they go, full
+// HP, the weather it would start already blowing.
+function wouldFail(user, mv, target){
+  if(mv.weather) return state.weather===mv.weather;
+  if(mv.heal && mv.target==='self') return user.hp >= user.maxhp;
+  if(mv.status){
+    const t = target.types;
+    if(target.status) return true;
+    if(mv.status==='brn' && t.includes('Fire')) return true;
+    if(mv.status==='psn' && (t.includes('Poison') || t.includes('Steel'))) return true;
+    if(mv.status==='par' && t.includes('Electric')) return true;
+    if(mv.status==='frz' && t.includes('Ice')) return true;
+    return mv.t==='Electric' && moveEff(user, mv, target)===0;   // Thunder Wave and Ground types
+  }
+  if(mv.stats){
+    const who = mv.stat_self ? user : target;
+    return mv.stats.every(([st, d])=>d>0 ? stg(who)[STAGE_KEYS[st]]>=6 : stg(who)[STAGE_KEYS[st]]<=-6);
+  }
+  return false;
+}
+// The move menu's colours for the chosen foe: red super effective, yellow a normal hit (or a status move
+// that will work), plain not very effective, grey no effect (or it would fail, or no PP).
+function moveRating(user, mv, target){
+  if(ppLeft(user, mv)===0) return 'gray';
+  if(mv.c==='status') return wouldFail(user, mv, target) ? 'gray' : 'yellow';
+  const e = moveEff(user, mv, target);
+  if(e===0) return 'gray';
+  if(target.ability.type==='disguise' && !target.usedDisguise) return 'yellow';
+  return e>1 ? 'red' : e<1 ? '' : 'yellow';
+}
+// A move's stat changes on whoever they're for. Says what happened; false if nothing changed.
+function changeStats(who, mv, sideEffect){
+  if(who.fainted || who.caught) return false;
+  let any = false;
+  for(const [st, d] of mv.stats || []){
+    const key = STAGE_KEYS[st], now = stg(who)[key], next = Math.max(-6, Math.min(6, now + d));
+    if(next===now){ if(!sideEffect) addLog(`${dname(who)}'s ${STAGE_NAMES[st]} won't go any ${d>0?'higher':'lower'}!`); continue; }
+    stg(who)[key] = next; any = true;
+    const k = next - now;
+    addLog(`${dname(who)}'s ${STAGE_NAMES[st]} ${k>=3?'rose drastically':k===2?'rose sharply':k===1?'rose':k===-1?'fell':k===-2?'harshly fell':'severely fell'}!`);
+  }
+  return any;
+}
+const WEATHER_START = {sun:'The sunlight turned harsh!', rain:'It started to rain!', sand:'A sandstorm kicked up!', hail:'It started to hail!'};
+const WEATHER_GOES = {sun:'The sunlight is strong.', rain:'Rain continues to fall.', sand:'The sandstorm rages.', hail:'Hail continues to fall.'};
+const WEATHER_ENDS = {sun:'The sunlight faded.', rain:'The rain stopped.', sand:'The sandstorm subsided.', hail:'The hail stopped.'};
+function startWeather(w){
+  if(state.weather===w) return false;
+  state.weather = w; state.weatherTurns = 5;
+  addLog(WEATHER_START[w]);
+  return true;
+}
+// End of turn: the weather goes on (a sandstorm or hail hurting all but the types it doesn't), or stops.
+function weatherTurn(focusOn){
+  const w = state.weather;
+  if(!w) return;
+  if(--state.weatherTurns<=0){ state.weather = null; addLog(WEATHER_ENDS[w]); return; }
+  addLog(WEATHER_GOES[w]);
+  if(w!=='sand' && w!=='hail') return;
+  for(const side of [state.sideA, state.sideB]) for(const m of alive(side)){
+    if(!alive(state.sideA).length || !alive(state.sideB).length) return;
+    const safe = w==='sand' ? m.types.some(t=>t==='Rock'||t==='Ground'||t==='Steel') : m.types.includes('Ice');
+    if(safe) continue;
+    focusOn(m);
+    const d = Math.max(1, Math.floor(m.maxhp/16));
+    m.hp = Math.max(0, m.hp - d);
+    addLog(`${dname(m)} is ${w==='sand' ? 'buffeted by the sandstorm' : 'pelted by hail'}! (-${d})`);
+    if(m.hp<=0){ m.fainted = true; addLog(`${dname(m)} fainted!`); }
+  }
+}
+// What a foe does: a move with PP left (Struggle without) and one of yours, favouring attacks and skipping
+// moves that would fail.
+function foeChoice(m){
+  const opts = alive(state.sideA);
+  const target = opts[Math.floor(Math.random()*opts.length)];
+  if(outOfPP(m)) return {move:STRUGGLE, target};
+  let weights = m.moves.map(mv=>!ppLeft(m, mv) ? 0 : mv.c!=='status' ? 3 : wouldFail(m, mv, target) ? 0 : 1);
+  if(!weights.some(Boolean)) weights = m.moves.map(mv=>ppLeft(m, mv) ? 1 : 0);
+  let roll = Math.random()*weights.reduce((a,b)=>a+b, 0);
+  let k = 0; while(k < m.moves.length-1 && roll >= weights[k]){ roll -= weights[k]; k++; }
+  return {move:m.moves[k], target};
+}
+// A move: PP, then whoever it's for: the user (Swords Dance, Recover), the field (weather), the chosen foe, or
+// every foe still standing (Earthquake, Growl).
+function useMove(act){
+  const user = act.user, mv = act.move;
+  usePP(user, mv);
+  const userSide = state.sideA.includes(user) ? state.sideA : state.sideB;
+  const foes = userSide===state.sideA ? state.sideB : state.sideA;
+  if(mv.target==='self' || mv.target==='field'){
+    addLog(`${dname(user)} used ${mv.n}!`);
+    addFx({atk:mv.t, mv:mv.n, from:sideKey(user), to:sideKey(user)});
+    let worked = false;
+    if(mv.weather) worked = startWeather(mv.weather) || worked;
+    if(mv.heal){
+      if(user.hp >= user.maxhp){ addLog(`${dname(user)}'s HP is full!`); return; }
+      const h = Math.max(1, Math.floor(user.maxhp*mv.heal/100));
+      user.hp = Math.min(user.maxhp, user.hp + h);
+      addLog(`${dname(user)} regained health! (+${h})`);
+      worked = true;
+    }
+    if(mv.stats){ changeStats(user, mv, false); return; }
+    if(!worked) addLog('But it failed!');
+    return;
+  }
+  const aimed = mv.target==='foes' ? alive(foes) : [act.target];
+  const spread = aimed.length > 1;
+  const hit = aimed.filter(t=>Math.random()*100 < hitChance(user, mv, t));
+  if(!hit.length){ addLog(`${dname(user)} used ${mv.n} — missed!`); return; }
+  if(mv.c==='status'){
+    addLog(`${dname(user)} used ${mv.n}!`);
+    addFx({atk:mv.t, mv:mv.n, from:sideKey(user), to:sideKey(hit[0])});
+    for(const t of aimed){
+      if(!hit.includes(t)){ addLog(`${dname(t)} avoided the attack!`); continue; }
+      if(!mv.stats && wouldFail(user, mv, t)){ addLog(spread ? `It didn't affect ${dname(t)}...` : 'But it failed!'); continue; }
+      if(mv.status) applyStatus(t, mv.status, 100);
+      if(mv.stats) changeStats(t, mv, false);
+    }
+    return;
+  }
+  let dealt = 0, first = true;
+  for(const t of aimed){
+    if(!hit.includes(t)){ addLog(`${dname(t)} avoided the attack!`); continue; }
+    if(t.ability.type==='disguise' && !t.usedDisguise){
+      t.usedDisguise = true;
+      if(first){ addLog(`${dname(user)} used ${mv.n}!`); addFx({atk:mv.t, mv:mv.n, from:sideKey(user), to:sideKey(t)}); first = false; }
+      addLog(`${dname(t)}'s Disguise absorbed the hit — no damage!`);
+      continue;
+    }
+    const r = damage(user, mv, t, spread);
+    let dmg = Math.min(r.dmg, t.hp), sash = false;
+    if(t.item==='sash' && !t.sashUsed && t.hp===t.maxhp && r.dmg>=t.hp){ dmg = t.hp - 1; t.sashUsed = true; sash = true; }
+    t.hp = Math.max(0, t.hp - dmg);
+    dealt += dmg;
+    const tag = r.eff===0?' (no effect)':r.eff>1?' (super effective!)':r.eff<1?' (not very effective)':'';
+    addLog(first || !spread ? `${dname(user)} used ${mv.n} on ${dname(t)} for ${dmg}${tag}` : `It hit ${dname(t)} for ${dmg}${tag}`);
+    if(first) addFx({atk:mv.t, mv:mv.n, from:sideKey(user), to:sideKey(t)});
+    first = false;
+    if(sash) addLog(`${dname(t)} hung on using its Focus Sash!`);
+    if(r.eff===0) continue;
+    if(mv.sec) applyStatus(t, mv.sec.status, mv.sec.chance);
+    if(mv.stats && !mv.stat_self && Math.random()*100 < (mv.stat_chance || 100)) changeStats(t, mv, true);
+  }
+  if(mv.stats && mv.stat_self && dealt>0 && Math.random()*100 < (mv.stat_chance || 100)) changeStats(user, mv, true);
+  if(mv.drain>0 && dealt>0 && !user.fainted && user.hp < user.maxhp){
+    const h = Math.max(1, Math.floor(dealt*mv.drain/100));
+    user.hp = Math.min(user.maxhp, user.hp + h);
+    addLog(`${dname(hit[0])} had its energy drained! (+${h})`);
+  }
+  const recoil = mv===STRUGGLE ? Math.max(1, Math.floor(user.maxhp/4)) : mv.drain<0 && dealt>0 ? Math.max(1, Math.floor(dealt*-mv.drain/100)) : 0;
+  if(recoil && !user.fainted){
+    user.hp = Math.max(0, user.hp - recoil);
+    addLog(`${dname(user)} is damaged by recoil! (-${recoil})`);
+  }
+  for(const t of hit) if(t.hp<=0 && !t.fainted){ t.fainted = true; addLog(`${dname(t)} fainted!`); }
+  if(user.hp<=0 && !user.fainted){ user.fainted = true; addLog(`${dname(user)} fainted!`); }
+}
 
 function submitTurn(){
   const actorsA = alive(state.sideA);
@@ -5092,17 +5317,15 @@ function submitTurn(){
     if(!m || m.fainted || m.caught || !target || target.fainted || target.caught) continue;
     if(ch.move==='ball'){ actions.push({user:m, ball:true, target}); continue; }
     if(ch.move==='item'){ actions.push({user:m, item:ch.item, target:m}); continue; }
-    actions.push({user:m, move:m.moves[ch.move], target});
+    actions.push({user:m, move:ch.move==='struggle' ? STRUGGLE : m.moves[ch.move], target});
   }
   cmd = null;
+  hintTarget(null);
   document.getElementById('battle').classList.remove('choosing');
   document.querySelectorAll('#battle .active, #battle .ordered').forEach(e=>e.classList.remove('active', 'ordered'));
   for(const m of alive(state.sideB)){
-    const opts = alive(state.sideA);
-    if(opts.length===0) continue;
-    const move = m.moves[Math.floor(Math.random()*m.moves.length)];
-    const target = opts[Math.floor(Math.random()*opts.length)];
-    actions.push({user:m, move, target});
+    if(alive(state.sideA).length===0) continue;
+    actions.push({user:m, ...foeChoice(m)});
   }
   actions.sort((a,b)=>(b.item?1:0) - (a.item?1:0) || effSpeed(b.user) - effSpeed(a.user));   // items go first
 
@@ -5144,37 +5367,10 @@ function submitTurn(){
     }
     if(!canAct(act.user)) continue;
     act.user.fought = true;   // took part (for EXP SHARE OFF)
-    if(Math.random()*100 > act.move.a){ addLog(`${dname(act.user)} used ${act.move.n} — missed!`); continue; }
-
-    if(act.move.c==='status'){
-      addLog(`${dname(act.user)} used ${act.move.n}!`);
-      addFx({atk:act.move.t, mv:act.move.n, from:sideKey(act.user), to:sideKey(act.target)});
-      const had = act.target.status;
-      applyStatus(act.target, act.move.status, 100);
-      if(act.target.status===had) addLog('But it failed!');
-      continue;
-    }
-
-    if(act.target.ability.type==='disguise' && !act.target.usedDisguise){
-      act.target.usedDisguise = true;
-      addLog(`${dname(act.target)}'s Disguise absorbed the hit — no damage!`);
-      continue;
-    }
-
-    const r = damage(act.user, act.move, act.target);
-    let dmg = r.dmg;
-    if(act.target.item==='sash' && !act.target.sashUsed && act.target.hp===act.target.maxhp && dmg>=act.target.hp){
-      dmg = act.target.hp - 1; act.target.sashUsed = true;
-      addLog(`${dname(act.target)} hung on using its Focus Sash!`);
-    }
-    act.target.hp = Math.max(0, act.target.hp - dmg);
-    let tag = r.eff===0?' (no effect)':r.eff>1?' (super effective!)':r.eff<1?' (not very effective)':'';
-    addLog(`${dname(act.user)} used ${act.move.n} on ${dname(act.target)} for ${dmg}${tag}`);
-    addFx({atk:act.move.t, mv:act.move.n, from:sideKey(act.user), to:sideKey(act.target)});
-    if(act.move.sec) applyStatus(act.target, act.move.sec.status, act.move.sec.chance);
-    if(act.target.hp<=0 && !act.target.fainted){ act.target.fainted=true; addLog(`${dname(act.target)} fainted!`); }
+    useMove(act);
   }
 
+  weatherTurn(focusOn);
   for(const side of [state.sideA, state.sideB]){
     for(const m of alive(side)){
       focusOn(m);

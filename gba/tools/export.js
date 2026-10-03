@@ -22,13 +22,13 @@ const ctx = {console, Math, JSON, Date, document:stub(), window:stub(), navigato
   performance:{now:()=>0}, Image:function(){}, Audio:function(){}, addEventListener(){}};
 ctx.adv = null;
 vm.createContext(ctx);
-const src = ['js/dexdata.js', 'js/dexinfo.js', 'js/tileart.js', 'js/app.js', 'js/music.js'].map(f=>fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n;\n');
+const src = ['js/dexdata.js', 'js/moveextra.js', 'js/dexinfo.js', 'js/tileart.js', 'js/app.js', 'js/music.js'].map(f=>fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n;\n');
 vm.runInContext(src + `
 ;this.G = {LOCATIONS, getMap, getInterior, neighbours, TILE_ART, TILE_CLS, WALKABLE, LEDGE_DIR, EDGE_GROUPS, edgeOverlay, ROOF_SWAP,
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- GBA only: SPIRECREST TOWN and the CHALLENGE TOWER ----------
 // A town south of Duskmere Hollow, home of the CHALLENGE TOWER (ADVENTURE MODE). The way in stays shut until
@@ -561,7 +561,7 @@ for(const n of trainerSpecies) if(!usedSpecies.has(n)) throw new Error('no speci
 
 // The GBA's extra move data (tools/build_moves.js: PP, targets, draining, healing, stat changes, weather) and
 // the status moves it adds, which join the learnsets after every existing move has its index (saves hold them).
-const EXTRA = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'moves_extra.json'), 'utf8'));
+const EXTRA = G.MOVE_EXTRA;
 G.MOVEDATA.forEach((m, i)=>Object.assign(m, EXTRA.existing[i]));
 Object.assign(G.STRUGGLE, {pp:1, target:'one', drain:-25});
 for(const sp of species){

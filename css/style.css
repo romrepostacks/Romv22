@@ -1183,3 +1183,10 @@ body:has(#adv:not(.hidden)){background:#141418;}
 /* The forest past the map edges: a backdrop in the world, sized to the tile window (#25/#26). */
 .ow-backdrop{position:absolute; background:var(--art-forest_fill) 0 0/32px 32px; image-rendering:pixelated; z-index:0;}
 .indoors .ow-backdrop{background:#000;}
+/* GBA 1.3's FIGHT menu: the moves coloured for the chosen foe; the foe being picked blinks. */
+.movegrid button.mv-red{color:#e03830;}
+.movegrid button.mv-yellow{color:#c89000;}
+.movegrid button.mv-gray{color:#a0a0a8;}
+.minfo .pp-out{color:#e03830;}
+.bmon.picking{animation:pickblink .6s steps(2,start) infinite;}
+@keyframes pickblink{50%{opacity:.25;}}
