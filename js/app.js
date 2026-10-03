@@ -1517,6 +1517,7 @@ function leagueReset(){
 const GYM_STYLE = {Rell:{kind:'leaderFire', type:'Fire'}, Sable:{kind:'leaderWater', type:'Water'}, Orin:{kind:'leaderGround', type:'Ground and Poison'}, Iska:{kind:'leaderGhost', type:'Ghost and Psychic'},
   Juno:{kind:'leaderElectric', type:'Electric'}, Bryn:{kind:'leaderGrass', type:'Grass'}, Hale:{kind:'leaderIce', type:'Ice'}, Corvin:{kind:'leaderDragon', type:'Dragon and Flying'}};
 function getInterior(loc, bi){
+  if(getMap(loc).buildings[bi].kind==='tower') return towerInterior(loc, bi);
   loc.__rooms ||= {};
   if(loc.__rooms[bi]) return loc.__rooms[bi];
   const b = getMap(loc).buildings[bi];
@@ -1851,7 +1852,7 @@ function tileHtml(map, ch, x, y, wx=x, wy=y){
   return `<div class="t t-${cls}${extra}" data-x="${wx}" data-y="${wy}" style="left:${wx*T}px;top:${wy*T}px;${style}"></div>`;
 }
 function npcHtml(n, i){
-  if(n.legend) return `<div class="ow-actor npc ow-legend" id="npc-${i}" style="transform:translate(${n.x*T+4}px,${n.y*T-6}px); z-index:${20+2*n.y}"><img src="${spritePath(dexByName(n.legend))}" alt=""></div>`;
+  if(n.legend) return `<div class="ow-actor npc ow-legend" id="npc-${i}" style="transform:translate(${n.x*T+4}px,${n.y*T-6}px); z-index:${20+2*n.y}"><img src="${spritePath(dexByName(n.legend), 'front', n.shiny)}" alt=""></div>`;
   return `<div class="ow-actor npc" id="npc-${i}" style="transform:translate(${n.x*T+4}px,${n.y*T-6}px); z-index:${20+2*n.y}">${charSvg(n.kind, n.facing, 0)}<div class="ow-bang hidden">!</div></div>`;
 }
 // Overworld weather, Emerald-style: volcanic ash near Cindergate (like Route 113), fog around
@@ -2228,7 +2229,7 @@ function owArrive(ch, endedAt){
   const keepWalking = held.length > 0;
   if(!keepWalking || ch!==':' && ch!=='.' && ch!=='_') saveAdv();
   if(ch==='D'){ const bi = map.buildings.findIndex(b=>b.door.x===adv.pos.x && b.door.y===adv.pos.y); if(bi>=0) return enterBuilding(bi); }
-  if(ch==='M') return leaveBuilding();
+  if(ch==='M') return towerInside() ? towerLeaveAsk() : leaveBuilding();
   const wildOn = !adv.cheatNoWild;
   if(ch==='"' && wildOn){
     if(Math.random()<0.08){ held.length = 0; owRun = false; saveAdv(); startWildBattle(); return; }
@@ -2363,6 +2364,7 @@ function owInteract(){
   const npc = npcAt(tx, ty);
   if(npc) return talkTo(npc);
   const sign = map.signs.find(s=>s.x===tx && s.y===ty);
+  if(sign && sign.stone) return towerStone();
   if(sign) return owSay(sign.lines || (sign.route ? [sign.text] : [sign.text, loc.desc.replace(/\s*"[^"]*"\s*/g,' ').trim()]));
   const hidden = !map.interior && hiddenHere().find(h=>h.x===tx && h.y===ty);
   if(hidden){
@@ -2483,6 +2485,7 @@ function goFish(){
 }
 function talkTo(n){
   const loc = LOCATIONS[adv.loc];
+  if(n.towerLegend) return towerLegendTalk(n);
   if(n.legend) return legendTalk(n);
   faceNpcToPlayer(n);
   if(n.kind==='fisher' && !n.trainer && !adv.items.oldrod){
@@ -2491,11 +2494,12 @@ function talkTo(n){
       ()=>obtainItem('OLD ROD', 1, 'KEY ITEMS', ()=>owSay(['Face any water and press A to cast your line. Good luck!'], ()=>renderAdventure())));
   }
   if(activeTrainer(n)) return triggerTrainer(n);
-  if(n.id) return owSay([`${n.title}: "${n.after}"`]);
+  if(n.id) return owSay([`${n.title}: "${n.after}"`], n.towerFloor!=null ? ()=>towerOfferUp(n.towerFloor) : undefined);
   if(n.gymLeader) return owSay([`${loc.leaderName}: "You've already beaten me. The road ahead is waiting for you!"`]);
   if(n.role==='nurse') return nurseTalk(n);
   if(n.role==='mom') return momTalk();
   if(n.role==='trader') return traderTalk();
+  if(n.role==='tower') return towerGuide();
   if(n.role==='clerk'){
     if(adv.restockedLoc !== adv.loc){
       adv.restockedLoc = adv.loc; adv.items.pokeball = (adv.items.pokeball||0) + 5; saveAdv();
@@ -3223,7 +3227,13 @@ function cardOpen(){
       ? `<div class="tc tc-back"><div class="tc-head">${adv.playerName}</div>
           <div class="tc-row">AREAS VISITED<b>${Object.keys(adv.visited||{}).length}</b></div>
           <div class="tc-row">RIVAL BATTLES WON<b>${LOCATIONS.filter(l=>l.type==='trainer' && adv.cleared[l.name]).length}</b></div>
-          <div class="tc-row">POKéMON IN BOXES<b>${adv.box.filter(Boolean).length}</b></div></div>`
+          <div class="tc-row">POKéMON IN BOXES<b>${adv.box.filter(Boolean).length}</b></div>
+          ${adv.nuzlocke ? `<div class="tc-row">NUZLOCKE DEATHS<b>${(adv.nuzlocke.deaths||0)}</b></div>
+          <div class="tc-row">CATCHES<b>${(adv.nuzlocke.catches||0)}</b></div>
+          <div class="tc-row">ENCOUNTERS USED<b>${Object.keys(adv.nuzlocke.used||{}).length}</b></div>`
+          : adv.adventure ? `<div class="tc-row">TOWER RANK<b>${towerRun().clears+1}</b></div>
+          <div class="tc-row">BEST STREAK<b>${towerRun().best}</b></div>
+          <div class="tc-row">LEGENDARIES LEFT<b>${towerLegendsLeft().length}</b></div>` : ''}</div>`
       : `<div class="tc"><div class="tc-head">TRAINER CARD<span>IDNo.${adv.tid}</span></div>
           <div class="tc-row">NAME<b>${adv.playerName}</b></div>
           <div class="tc-row">MONEY<b>₽${adv.money ?? 3000}</b></div>
@@ -4004,7 +4014,7 @@ function openMap(fromStart){ mapFromStart = !!fromStart; mapOpen = true; owBusy 
 // to and press A to go: to the door of its POKéMON CENTER, else where the place is entered, on open ground. Not
 // from inside the CHALLENGE TOWER or the POKéMON LEAGUE; the SAFARI ZONE takes its fee.
 let mapCursor = 0;
-function canTravel(){ const loc = LOCATIONS[adv.loc]; return !adv.tower && !(adv.inside!=null && getMap(loc).buildings[adv.inside] && getMap(loc).buildings[adv.inside].kind==='league'); }
+function canTravel(){ const loc = LOCATIONS[adv.loc]; return !(adv.tower && adv.tower.active) && !(adv.inside!=null && getMap(loc).buildings[adv.inside] && getMap(loc).buildings[adv.inside].kind==='league'); }
 function mapMove(dir){
   const [dx, dy] = DIRS[dir], c = LOCATIONS[mapCursor].at;
   let best = -1, bestD = Infinity;
@@ -4153,6 +4163,7 @@ function startWildBattle(fixed, where){
 function startTrainerBattle(npc){
   const loc = LOCATIONS[adv.loc], rt = npc && npc.id;
   if(alive(adv.party).length===0){ showToast('Your whole party has fainted! Rest at the Pokémon Center.'); return; }
+  if(npc && npc.towerFloor!=null) return towerBattle(npc);
   let id=9000;
   const junior = rt && /#gym\d/.test(npc.id);
   const lv = junior ? Math.max(3, Math.min(advLevel(), Math.round(partyAvgLevel()) - 2))
@@ -4397,7 +4408,9 @@ function trainerWalkBack(done){
 // Hall of Fame, then the credits roll (A continues at THE END), then home. The first clear unlocks
 // Adventure Mode for this device (Phase 7).
 function playCredits(){
-  (adv.story ||= {}).champion = true; saveAdv();
+  (adv.story ||= {}).champion = true;
+  if(!adv.nuzlocke) adv.adventure = true;   // ADVENTURE MODE: the CHALLENGE TOWER opens
+  saveAdv();
   try{ localStorage.setItem('partyroyale_cleared', '1'); }catch(e){}
   owBusy = true; held.length = 0;
   const view = document.getElementById('owView'), el = document.createElement('div');
@@ -4434,6 +4447,7 @@ function playCredits(){
 }
 function afterStory(){
   if(walkBackNpc && !activeTrainer(walkBackNpc)) return trainerWalkBack(afterStory);
+  if(towerAfterBattle()) return;
   if(curMap().interior==='league'){ leagueGates(curMap(), LOCATIONS[adv.loc]); renderTiles(adv.pos.x, adv.pos.y); }
   const league = LOCATIONS.find(l=>l.league);
   if(league && adv.cleared[league.name] && !(adv.story && adv.story.champion)) return playCredits();
@@ -4592,7 +4606,9 @@ function titleKey(k){
   if(uiMenus.length || !['a','start'].includes(k)) return;
   sfx('select');
   const sv = loadAdv(), has = !!(sv && sv.party && (sv.party.length || sv.starterPending));   // same test as startAdventure
-  const items = (has ? ['CONTINUE'] : []).concat(['NEW GAME', 'FREE BATTLE', newsUnread() ? "WHAT'S NEW ★" : "WHAT'S NEW", 'IMPORT SAVE']);
+  let cleared = false; try{ cleared = !!localStorage.getItem('partyroyale_cleared'); }catch(e){}
+  cleared ||= !!(sv && sv.story && sv.story.champion);
+  const items = (has ? ['CONTINUE'] : []).concat(['NEW GAME'], cleared ? ['NEW ADVENTURE MODE'] : [], ['FREE BATTLE', newsUnread() ? "WHAT'S NEW ★" : "WHAT'S NEW", 'IMPORT SAVE']);
   document.getElementById('owTitle').classList.add('menu');   // Emerald: the menu replaces the title art
   uiMenu(document.getElementById('owView'), items, i=>{
     document.getElementById('owTitle')?.classList.remove('menu');
@@ -4603,6 +4619,7 @@ function titleKey(k){
     leaveTitle();
     if(pick==='CONTINUE') return startAdventure();
     if(pick==='NEW GAME') return has ? newAdventurePrompt() : startAdventure();
+    if(pick==='NEW ADVENTURE MODE') return has ? showConfirm('Start a new adventure? This will overwrite your current saved game.', ok=>ok ? adventureModeStart() : handheldTitle()) : adventureModeStart();
     showSetup();
   }, 'gm-title');
 }
@@ -4646,8 +4663,9 @@ function newAdventure(){
 
 function goToDraft(mode){
   draftMode = mode;
-  needA = +document.getElementById('sizeA').value;
-  needB = +document.getElementById('sizeB').value;
+  needA = mode==='adventure' ? 6 : +document.getElementById('sizeA').value;
+  needB = mode==='adventure' ? 0 : +document.getElementById('sizeB').value;
+  document.getElementById('confirmDraftBtn').textContent = mode==='adventure' ? 'Confirm Team' : 'Confirm & Start Battle';
   draftPool = shuffle(DEX);
   draftPicked = []; draftItems = {};
   document.getElementById('setup').classList.add('hidden');
@@ -4699,6 +4717,7 @@ function toggleDraft(i){
 }
 
 function confirmDraft(){
+  if(draftMode==='adventure') return adventureModeDrafted();
   let id=0;
   const sideA = draftPicked.map(i=>makeMon(draftPool[i], id++, draftItems[i]||'none'));
   const remaining = draftPool.map((d,i)=>i).filter(i=>!draftPicked.includes(i));
@@ -5379,9 +5398,11 @@ function cmdRun(){
   if(state.mode==='free'){ showConfirm('Forfeit this battle?', ok=>{ if(ok){ cmd=null; resetAll(); } }); return; }
   if(state.trainerLoc){ showMsgBox(["No! There's no running from a Trainer battle!"], ()=>renderCmd(3)); return; }
   showMsgBox(['Got away safely!'], ()=>{
+    const tower = state.towerLegend;
     cmd = null; state = null; clearCaught();
     document.getElementById('battle').classList.add('hidden');
     saveAdv(); renderAdventure();
+    if(tower) afterStory();
   });
 }
 // Arrow keys / WASD move the ▶ cursor, Z or Enter confirms, X / Esc backs out.
@@ -5534,6 +5555,7 @@ function weatherTurn(focusOn){
 // What a foe does: a move with PP left (Struggle without) and one of yours, favouring attacks and skipping
 // moves that would fail.
 function foeChoice(m){
+  if(state.smart && !outOfPP(m)) return smartChoice(m);
   const opts = alive(state.sideA);
   const target = opts[Math.floor(Math.random()*opts.length)];
   if(outOfPP(m)) return {move:STRUGGLE, target};
@@ -5715,6 +5737,7 @@ function checkEnd(){
         for(const m of earners) grantXp(m, xpAmount);
         const grew = state.log.slice(growStart);   // level-ups, new moves, evolutions
         const head = state.trainerLoc ? `You defeated ${state.trainerLoc.type==='gym'?'Gym Leader ':''}${state.trainerLoc.leaderName}! (+${xpAmount} XP)` : `The wild Pokémon retreated. (+${xpAmount} XP)`;
+        if(state.towerFloor!=null && adv.tower) adv.tower.beat = state.towerFloor;
         if(state.trainerLoc){
           adv.cleared[state.trainerLoc.name] = true;
           if(state.trainerLoc.name==='Tidalkeep City' && !adv.items.hm03) (adv.story ||= {}).surfGift = true;
@@ -5728,6 +5751,7 @@ function checkEnd(){
       } else {
         document.getElementById('storyResultText').textContent = '💀 Your party was defeated...';
         document.getElementById('storyResultSub').textContent = `${adv.playerName} whited out!`;
+        if(adv.tower && adv.tower.active){ towerEnd(false); delete adv.tower.legendBattle; }   // out of the CHALLENGE TOWER, the streak with it
         healParty();
         sendToCenter();
       }
@@ -5828,3 +5852,267 @@ for(const loc of [TRADE_TOWN, SAFARI]){ const m = getMap(loc); m.npcs = m.npcs.f
   if(c) m.npcs.push({kind:'gentleman', x:c.door.x+2, y:c.door.y+1, facing:'down', role:'trader', lines:['TRADER: "Any POKéMON for any POKéMON!"']});
 }
 
+
+{
+  const m = getMap(TOWER_TOWN), t = m.buildings.find(b=>b.kind==='tower');
+  if(t) m.npcs.push({kind:'gentleman', x:t.door.x+2, y:t.door.y+1, facing:'left', role:'tower', lines:['The CHALLENGE TOWER opens to CHAMPIONS.']});
+}
+
+// ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------
+// Five themed floors with one trainer each, the summit with the SUMMONING STONE, and a chamber per theme where
+// the summoned legendary waits. adv.tower: the challenge under way ({active, room, legend, legendShiny});
+// adv.towerRun: {clears, streak, best} (your RANK is clears + 1).
+const TOWER_FLOORS = [
+  {theme:'fire', kind:'boy', title:'KINDLER BLAZE', team:['Arcanine'], type:'Fire'},
+  {theme:'water', kind:'lass', title:'SWIMMER MARINA', team:['Gyarados'], type:'Water'},
+  {theme:'electric', kind:'girl', title:'GUITARIST VOLTA', team:['Raichu'], type:'Electric'},
+  {theme:'ghost', kind:'oldwoman', title:'HEX MANIAC WISP', team:['Gengar'], type:'Ghost'},
+  {theme:'dragon', kind:'gentleman', title:'TOWER MASTER DRACO', team:['Dragonite'], type:'Dragon'}];
+const TOWER_INTROS = ["Welcome to the CHALLENGE TOWER! Let's see what you've got!", "The water up here runs deep. Can you keep afloat?",
+  "Feel the current! This floor is charged!", "Few climb this high... fewer climb higher.", "I am the master of this tower. Come, show me a CHAMPION's strength!"];
+const CHAMBER_THEMES = ['fire', 'water', 'ground', 'ghost', 'electric', 'grass', 'ice', 'dragon', 'league'];
+const TOWER_ROOMS = {
+  floor:['###############','###############','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#',
+         '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____ooo_____#','#######M#######'],
+  summit:['###############','###############','#u___________u#','#_____________#','#_____________#','#______^______#','#_____________#',
+          '#u___________u#','#_____________#','#_____________#','#_____________#','#_____________#','#######M#######'],
+  chamber:['###############','###############','#u___________u#','#_____________#','#u___________u#','#_____ooo_____#','#u____ooo____u#',
+           '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____________#','#######M#######']};
+function towerRun(){ return adv.towerRun ||= {clears:0, streak:0, best:0}; }
+function towerInside(){ const loc = LOCATIONS[adv.loc]; return adv.inside!=null && getMap(loc).buildings[adv.inside].kind==='tower' && !!(adv.tower && adv.tower.active); }
+// The room you're in (by adv.tower.room: floor0..floor4, summit, chamber_<theme>).
+function towerInterior(loc, bi){
+  const key = (adv && adv.tower && adv.tower.room) || 'floor0', b = getMap(loc).buildings[bi];
+  loc.__rooms ||= {};
+  const id = `${bi}/${key}`;
+  let room = loc.__rooms[id];
+  if(!room){
+    const kind = key.startsWith('floor') ? 'floor' : key==='summit' ? 'summit' : 'chamber';
+    const theme = kind==='floor' ? TOWER_FLOORS[+key.slice(5)].theme : kind==='chamber' ? key.slice(8) : 'league';
+    const tiles = TOWER_ROOMS[kind].map(r=>r.split('')), h = tiles.length, w = tiles[0].length, matX = tiles[h-1].indexOf('M');
+    const npcs = [], signs = [];
+    if(kind==='floor'){
+      const k = +key.slice(5), f = TOWER_FLOORS[k];
+      npcs.push({kind:f.kind, x:7, y:2, facing:'down', trainer:true, id:`${loc.name}#tower${k}`, towerFloor:k, title:f.title, team:f.team, intro:TOWER_INTROS[k],
+        after:k===4 ? "The summit is yours. Go, and see what answers the stone." : "Up you go. The next floor won't be so kind."});
+    }
+    if(kind==='summit') signs.push({x:7, y:5, lines:['A SUMMONING STONE. It hums faintly.'], stone:true});
+    for(const n of npcs) n.home = {x:n.x, y:n.y};
+    room = loc.__rooms[id] = {w, h, tiles, buildings:[], npcs, exits:[], signs, interior:theme==='league' ? 'league' : 'gym', theme:theme==='league' ? null : theme,
+      spawn:{x:matX, y:h-2}, mat:{x:matX, y:h-1}, tower:kind};
+  }
+  if(room.tower==='chamber'){
+    const t = adv.tower || {};
+    room.npcs = t.legend && !t.legendBattle ? [{x:7, y:5, facing:'down', legend:t.legend, towerLegend:true, shiny:!!t.legendShiny, home:{x:7, y:5}}] : [];
+  }
+  return room;
+}
+function towerRoomName(){
+  const key = adv.tower.room;
+  return key.startsWith('floor') ? `CHALLENGE TOWER - FLOOR ${+key.slice(5)+1}` : key==='summit' ? 'TOWER SUMMIT' : 'SUMMONING CHAMBER';
+}
+function towerWarp(key, then){
+  sfx('door');
+  owFade(()=>{
+    adv.tower.room = key;
+    const room = curMap();
+    adv.pos = {...room.spawn}; adv.facing = 'up';
+  });
+  setTimeout(()=>{ showToast(towerRoomName()); then && then(); }, 400);
+}
+// Every floor's trainer stands ready again.
+function towerResetTrainers(){ for(const k of Object.keys(adv.cleared)) if(/#tower\d$/.test(k)) delete adv.cleared[k]; }
+// The challenge ends (left early, or done): the floors reset, and one left early ends the streak.
+function towerEnd(keepStreak){
+  adv.tower = {active:false};
+  towerResetTrainers();
+  if(!keepStreak) towerRun().streak = 0;
+  saveAdv();
+}
+// The tower's door: in ADVENTURE MODE, healed, for a fresh challenge.
+function towerDoor(bi){
+  if(adv.nuzlocke || !adv.adventure) return owSay([adv.nuzlocke ? "The CHALLENGE TOWER's doors stay shut to NUZLOCKE challengers." : "The CHALLENGE TOWER's doors are shut."]);
+  if(!alive(adv.party).length) return owSay(["Your POKéMON can't battle! Rest them at the POKéMON CENTER first."]);
+  owYesNo('Enter the CHALLENGE TOWER? Your POKéMON will be healed.', yes=>{
+    owBusy = false;
+    if(!yes) return renderAdventure();
+    healParty(); sfx('heal');
+    towerResetTrainers();
+    adv.tower = {active:true, room:'floor0'};
+    saveAdv();
+    owFade(()=>{
+      adv.inside = bi;
+      const room = curMap();
+      adv.pos = {...room.spawn}; adv.facing = 'up';
+    });
+    setTimeout(()=>showToast(towerRoomName()), 400);
+  });
+}
+// The mat: leaving mid-challenge ends it.
+function towerLeaveAsk(){
+  owYesNo('Leave the CHALLENGE TOWER? Your challenge will end.', yes=>{
+    owBusy = false;
+    if(yes){ towerEnd(false); return leaveBuilding(); }
+    adv.pos.y -= 1; adv.facing = 'up'; saveAdv(); renderAdventure();
+  });
+}
+// "Up you go": the next floor, or the summit after the TOWER MASTER.
+function towerOfferUp(floor){
+  if(!adv.tower || !adv.tower.active) return;
+  const summit = floor >= 4;
+  owYesNo(summit ? 'Climb to the SUMMIT?' : `Go up to FLOOR ${floor+2}?`, yes=>{
+    owBusy = false;
+    if(!yes) return renderAdventure();
+    towerWarp(summit ? 'summit' : `floor${floor+1}`);
+  });
+}
+function towerLevel(){
+  const clears = Math.max(0, towerRun().clears - 1);
+  return Math.min(100, Math.max(50 + 3*clears, Math.round(partyAvgLevel()) + clears) + 5);
+}
+// A floor's trainer: a team of the floor's type, fully evolved and not legendary, bigger and stronger with each
+// rank, held items from rank 2 (half of them; all from rank 4), smarter from rank 3; the TOWER MASTER brings six.
+function towerBattle(npc){
+  const floor = npc.towerFloor, clears = towerRun().clears, master = floor===4;
+  const base = Math.min(100, Math.max(50 + 3*clears, Math.round(partyAvgLevel()) + clears));
+  const size = master ? 6 : Math.min(6, 3 + Math.floor((floor+1)/2) + Math.floor(clears/2));
+  const level = Math.min(100, base + floor + (master ? 2 : 0));
+  const final = d=>!d.evo && !EVOLUTIONS[d.name] && !isLegendary(d.name);
+  let pool = DEX.filter(d=>final(d) && d.types.includes(TOWER_FLOORS[floor].type));
+  if(pool.length < size) pool = DEX.filter(final);
+  pool = shuffle(pool);
+  const held = Object.keys(ITEMS).filter(k=>k!=='none');
+  let id = 9000;
+  const team = pool.slice(0, size).map(d=>makeMon(d, id++, clears>=3 || (clears>=1 && Math.random()<0.5) ? held[Math.floor(Math.random()*held.length)] : 'none', level));
+  team.forEach(markSeen);
+  state = {sideA:adv.party, sideB:team, log:[], mode:'story', trainerLoc:{type:'route', name:npc.id, leaderName:npc.title}, towerFloor:floor, smart:master || clears>=2};
+  battleIntro(()=>{
+    showAdvScreens();
+    document.getElementById('battle').classList.remove('hidden');
+    addLog(`${npc.title} would like to battle!`);
+    startBattleUI();
+  });
+}
+// After a battle in the tower: a floor cleared (the TOWER MASTER's raises your rank), or the legendary met.
+function towerAfterBattle(){
+  const t = adv.tower;
+  if(!t || !t.active) return false;
+  if(t.beat!=null){
+    const floor = t.beat, lines = [];
+    delete t.beat;
+    if(floor >= 4){
+      const r = towerRun();
+      r.clears++; r.streak++; r.best = Math.max(r.best, r.streak);
+      sfx('heal');
+      lines.push("You've conquered the CHALLENGE TOWER!", `RANK ${r.clears+1} reached. The SUMMIT awaits.`);
+    } else lines.push(`FLOOR ${floor+1} cleared!`);
+    saveAdv();
+    owSay(lines, ()=>towerOfferUp(floor));
+    return true;
+  }
+  if(t.legendBattle){
+    const name = t.legend, got = [...adv.party, ...adv.box].filter(m=>m && m.name===name).length > t.legendBattle.had;
+    delete t.legendBattle;
+    saveAdv(); renderAdventure();
+    owSay([got ? `${name.toUpperCase()} is yours! It leaves the stone for good.` : `${name.toUpperCase()} faded back into the SUMMONING STONE...`,
+      'The challenge is complete. Well done!'], ()=>{ towerEnd(true); leaveBuilding(); });
+    return true;
+  }
+  return false;
+}
+// The legendaries still in the stone: every one you haven't caught.
+function towerLegendsLeft(){ return DEX.filter(d=>isLegendary(d.name) && !(adv.owned && adv.owned[d.name])).map(d=>d.name); }
+// Where a legendary waits: the chamber themed for its first type.
+function chamberTheme(name){
+  const t = dexByName(name).types[0];
+  return {Fire:'fire', Water:'water', Electric:'electric', Grass:'grass', Bug:'grass', Ice:'ice', Ghost:'ghost', Psychic:'ghost', Dark:'ghost',
+    Poison:'ghost', Fairy:'ghost', Dragon:'dragon', Flying:'dragon', Ground:'ground', Rock:'ground', Steel:'ground', Fighting:'ground'}[t] || 'league';
+}
+// The SUMMONING STONE: a legendary still in the stone answers, and waits in the chamber of its type.
+function towerStone(){
+  const t = adv.tower;
+  if(!t || !t.active) return owSay(["A SUMMONING STONE. It's cold and silent."]);
+  if(!t.legend){
+    const left = towerLegendsLeft();
+    if(!left.length) return owSay(['The SUMMONING STONE is silent. Every legendary POKéMON has already been caught!'], ()=>{ towerEnd(true); leaveBuilding(); });
+    t.legend = left[Math.floor(Math.random()*left.length)];
+    t.legendShiny = rollShiny();
+    saveAdv();
+  }
+  owSay(['You place your hand on the SUMMONING STONE...', `It blazes with light! ${t.legend.toUpperCase()} answers the call!`],
+    ()=>towerWarp(`chamber_${chamberTheme(t.legend)}`));
+}
+function towerLegendTalk(n){
+  const t = adv.tower;
+  owSay([`${n.legend.toUpperCase()} looks down at you, waiting...`], ()=>{
+    t.legendBattle = {had:[...adv.party, ...adv.box].filter(m=>m && m.name===n.legend).length};
+    saveAdv();
+    startWildBattle({names:[n.legend], level:towerLevel(), legendary:true, shiny:!!t.legendShiny});
+    state.towerLegend = true;
+  });
+}
+// The guide by the door: what the tower is, your rank, best streak and the legendaries still in the stone.
+function towerGuide(){
+  const r = towerRun();
+  owSay(['Welcome to SPIRECREST TOWN, CHAMPION. Behind me stands the CHALLENGE TOWER.',
+    'Five floors, five themes, one trainer on each. No healing inside but what you carry.',
+    'Reach the summit and touch the SUMMONING STONE. A legendary POKéMON will answer!',
+    `RANK ${r.clears+1}   BEST STREAK ${r.best}   LEGENDARIES LEFT ${towerLegendsLeft().length}`,
+    ...(adv.nuzlocke ? ["...But the tower doesn't take NUZLOCKE challengers, I'm afraid."] : [])]);
+}
+// The CHALLENGE TOWER's smarter foes: the move and target that hit hardest (power x type x same-type bonus,
+// weighted to finish the weakest); a status move only when it helps.
+function smartChoice(m){
+  let best = -1, pick = null;
+  for(const mv of m.moves){
+    if(!ppLeft(m, mv)) continue;
+    for(const t of alive(state.sideA)){
+      let score;
+      if(mv.c==='status'){
+        const st = stg(m), ts = stg(t);
+        score = wouldFail(m, mv, t) ? 0 : mv.status ? 120 : mv.heal ? (m.maxhp - m.hp)*160/Math.max(1, m.maxhp)
+          : mv.weather ? 40 : mv.stats && mv.stat_self ? 90 - 30*st[STAGE_KEYS[mv.stats[0][0]]] : mv.stats ? 50 + 10*ts[STAGE_KEYS[mv.stats[0][0]]] : 0;
+      } else {
+        score = mv.p * moveEff(m, mv, t) * (m.types.includes(mv.t) ? 1.5 : 1) * (mv.a||100)/100 + (t.maxhp - t.hp)*40/Math.max(1, t.maxhp);
+      }
+      score += Math.random()*20;
+      if(score > best){ best = score; pick = {move:mv, target:t}; }
+    }
+  }
+  return pick || {move:STRUGGLE, target:alive(state.sideA)[0]};
+}
+
+// ---------- NEW ADVENTURE MODE (title, once the game's been beaten on this device) ----------
+// No story: a draft of 6 at level 50, your name, and the post-game: every gym, rival and the League beaten,
+// SURF, DIVE and the OLD ROD in the bag, starting in SPIRECREST TOWN by the CHALLENGE TOWER.
+function adventureModeStart(){
+  leaveTitle(); showOnHandheld();
+  owSayPlain(['NEW ADVENTURE MODE: skip the story and start as a CHAMPION, with the CHALLENGE TOWER open.',
+    'Draft a team of 6 POKéMON at level 50.'], ()=>goToDraft('adventure'));
+}
+// Two lines on the handheld before the draft (no world loaded yet).
+function owSayPlain(lines, done){
+  showConfirm(lines.join(' '), ok=>ok ? done() : resetAll());
+}
+function adventureModeDrafted(){
+  const picks = draftPicked.map(i=>({d:draftPool[i], item:draftItems[i] || 'none'}));
+  showConfirm('YOUR NAME?', input=>{
+    const name = (String(input||'').trim().slice(0, 12)) || 'Trainer';
+    document.getElementById('draft').classList.add('hidden');
+    const li = LOCATIONS.indexOf(TOWER_TOWN), league = LOCATIONS.find(l=>l.league || l.champion), cleared = {};
+    for(const l of LOCATIONS) if(l.leaderName) cleared[l.name] = true;
+    if(league) for(let k=0; k<4; k++) cleared[`${league.name}#elite${k}`] = true;
+    const story = {champion:true, stormEnded:true, starter:true};
+    for(const l of LOCATIONS) if(l.scene) story[l.scene] = true;
+    for(const c of PROF_CALLS) story[c.flag] = true;
+    let id = 0;
+    const party = picks.map(p=>makeMon(p.d, id++, p.item, 50));
+    adv = {playerName:name, party, loc:li, cleared, visited:{[TOWER_TOWN.name]:true}, box:[], money:10000, story, adventure:true, lastHeal:li,
+      items:{pokeball:20, superpotion:10, revive:3, hm03:1, hm08:1, oldrod:1}};
+    party.forEach(markOwned);
+    spawnPlayer();
+    saveAdv();
+    showAdvScreens(); renderAdventure();
+    owSay([`Welcome to SPIRECREST TOWN, ${name.toUpperCase()}!`, 'The CHALLENGE TOWER is right here in town. Talk to the guide by its door.']);
+  }, true, 'Trainer');
+}

@@ -28,7 +28,7 @@ vm.runInContext(src + `
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
 // The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
@@ -37,24 +37,9 @@ const G = ctx.G;
 const TOWER_TOWN = G.LOCATIONS.find(l=>l.name==='Spirecrest Town');
 const TRADE_TOWN = G.LOCATIONS.find(l=>l.name==='Tradewind Village');
 const SAFARI = G.LOCATIONS.find(l=>l.name==='Safari Zone');
-// The tower's rooms: five themed floors with one trainer each, the summit with the SUMMONING STONE, and a
-// chamber per theme where the summoned legendary waits (the GBA picks the chamber by its type).
-const TOWER_FLOORS = [
-  {theme:'fire', kind:'boy', title:'KINDLER BLAZE', team:['Arcanine']},
-  {theme:'water', kind:'lass', title:'SWIMMER MARINA', team:['Gyarados']},
-  {theme:'electric', kind:'girl', title:'GUITARIST VOLTA', team:['Raichu']},
-  {theme:'ghost', kind:'oldwoman', title:'HEX MANIAC WISP', team:['Gengar']},
-  {theme:'dragon', kind:'gentleman', title:'TOWER MASTER DRACO', team:['Dragonite']}];
-const TOWER_INTROS = ["Welcome to the CHALLENGE TOWER! Let's see what you've got!", "The water up here runs deep. Can you keep afloat?",
-  "Feel the current! This floor is charged!", "Few climb this high... fewer climb higher.", "I am the master of this tower. Come, show me a CHAMPION's strength!"];
-const CHAMBER_THEMES = ['fire', 'water', 'ground', 'ghost', 'electric', 'grass', 'ice', 'dragon', 'league'];
-const TOWER_ROOMS = {
-  floor:['###############','###############','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#u____ooo____u#',
-         '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____ooo_____#','#######M#######'],
-  summit:['###############','###############','#u___________u#','#_____________#','#_____________#','#______^______#','#_____________#',
-          '#u___________u#','#_____________#','#_____________#','#_____________#','#_____________#','#######M#######'],
-  chamber:['###############','###############','#u___________u#','#_____________#','#u___________u#','#_____ooo_____#','#u____ooo____u#',
-           '#_____ooo_____#','#u____ooo____u#','#_____ooo_____#','#_____ooo_____#','#_____________#','#######M#######']};
+// The tower's rooms (js/app.js): five themed floors with one trainer each, the summit with the SUMMONING STONE,
+// and a chamber per theme where the summoned legendary waits (the GBA picks the chamber by its type).
+const {TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS} = G;
 const AREAS = AREAS_ARG.length ? AREAS_ARG : G.LOCATIONS.map((l,i)=>i);
 
 // ---------- Pixels ----------
@@ -462,7 +447,7 @@ for(const li of AREAS){
     gate_kind:loc.type==='gym' ? 'gym' : loc.type==='trainer' ? 'rival' : '', leader_name:loc.leaderName || '',
     signs:map.signs.map(s=>({x:s.x, y:s.y, text:s.text || '', route:!!s.route, lines:s.lines || null})),
     doors, items,
-    people:people.filter(n=>n.role!=='trader').map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
+    people:people.filter(n=>n.role!=='trader' && n.role!=='tower').map(n=>({kind:n.kind, x:n.x, y:n.y, facing:n.facing, wander:!!n.wander, lines:lines(n)})),
     trainers:(loc===TRADE_TOWN || loc===SAFARI ? [] : trainers).map(n=>trainerOut(n, loc)).concat(loc.scene==='portmere' ? [{kind:'grunt', x:0, y:0, facing:'down', role:'route',
       title:'TEMPEST GRUNT', team:['Poochyena','Carvanha','Zubat'], scene:true, vanish:false,
       intro:['TEMPEST GRUNT: "The Admin said nobody gets past. That means you!"'],
