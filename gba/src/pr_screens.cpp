@@ -504,7 +504,7 @@ void summary_screen(const mon* mons, int count, int index)
                 {
                     for(int i = 0; i < m.move_count; ++i)
                     {
-                        const move& mv = move_data(m.moves[i]);
+                        const move& mv = move_data(m.move(i));
                         u.print_fit(98, 28 + i * 30, mv.name, 136, text_color::INK, texts);
                         u.print(100, 43 + i * 30, type_name(mv.type), text_color::BLUE, texts, true);
                         if(mv.power)
@@ -517,6 +517,11 @@ void summary_screen(const mon* mons, int count, int index)
                             row = "-";
                         }
                         u.print(232 - u.width(row, true), 43 + i * 30, row, text_color::INK, texts, true);
+                        bn::string<16> pp("PP ");
+                        pp.append(bn::to_string<4>(m.pp(i)));
+                        pp.append("/");
+                        pp.append(bn::to_string<4>(m.max_pp(i)));
+                        u.print(150, 43 + i * 30, pp, m.pp(i) ? text_color::INK : text_color::RED, texts, true);
                     }
                 }
                 redraw = false;
@@ -2522,7 +2527,7 @@ namespace
         }
         for(int i = 0; i < m.move_count; ++i)
         {
-            add(m.moves[i]);
+            add(m.move(i));
         }
         return n;
     }
@@ -2539,7 +2544,7 @@ namespace
             bn::string_view views[5];
             for(int i = 0; i < 4; ++i)
             {
-                labels[i] = i < m.move_count ? bn::string_view(move_data(m.moves[i]).name) : bn::string_view("-");
+                labels[i] = i < m.move_count ? bn::string_view(move_data(m.move(i)).name) : bn::string_view("-");
                 views[i] = labels[i];
             }
             views[4] = "DONE";
@@ -2576,7 +2581,7 @@ namespace
                 {
                     for(int i = slot; i < m.move_count - 1; ++i)
                     {
-                        m.moves[i] = m.moves[i + 1];
+                        m.slots[i] = m.slots[i + 1];
                     }
                     --m.move_count;
                 }
@@ -2586,7 +2591,7 @@ namespace
             bool known = false;
             for(int i = 0; i < m.move_count; ++i)
             {
-                known |= m.moves[i] == mv && i != slot;
+                known |= m.move(i) == mv && i != slot;
             }
             if(known)
             {
@@ -2594,11 +2599,11 @@ namespace
             }
             if(slot < m.move_count)
             {
-                m.moves[slot] = mv;
+                m.set_move(slot, mv);
             }
             else
             {
-                m.moves[m.move_count++] = mv;
+                m.set_move(m.move_count++, mv);
             }
         }
     }
@@ -2663,7 +2668,7 @@ void edit_one(int index)
             // Its moves, in full, under it.
             for(int i = 0; i < m.move_count; ++i)
             {
-                u.print_fit(8, 104 + i * 9, move_data(m.moves[i]).name, 86, text_color::BLUE, texts, true);
+                u.print_fit(8, 104 + i * 9, move_data(m.move(i)).name, 86, text_color::BLUE, texts, true);
             }
             u.print_fit(8, 146, "Left/Right: change   L/R: 10 at a time   A: open   B: leave", 224, text_color::INK, texts, true);
             for(int r = 0; r < editor_rows; ++r)

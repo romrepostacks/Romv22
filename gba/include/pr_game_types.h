@@ -26,6 +26,36 @@ enum class status : uint8_t
     FREEZE
 };
 
+// Who a move hits: the chosen foe, every foe (Earthquake, Growl), the user (Swords Dance) or no one (weather).
+enum class move_target : uint8_t
+{
+    ONE,
+    FOES,
+    SELF,
+    FIELD
+};
+
+enum class battle_weather : uint8_t
+{
+    NONE,
+    SUN,
+    RAIN,
+    SAND,
+    HAIL
+};
+
+// The battle stats a move can raise or lower.
+namespace battle_stat
+{
+    enum : int8_t { ATK, DEF, SPA, SPD, SPE, ACC, EVA, COUNT };
+}
+
+struct stat_change
+{
+    int8_t stat;
+    int8_t delta;
+};
+
 struct move
 {
     const char* name;
@@ -37,6 +67,15 @@ struct move
     status secondary;         // damaging moves' side effect
     uint8_t secondary_chance;
     bool punch;               // Iron Fist boosts it
+    uint8_t pp;
+    move_target target;
+    int8_t drain;             // % of the damage dealt: + heals the user, - is recoil
+    uint8_t heal;             // % of the user's max HP it restores
+    stat_change stats[3];     // stage changes (to the target, or the user if stat_self)
+    uint8_t stat_count;
+    uint8_t stat_chance;      // % (damaging moves' side effect; status moves always)
+    bool stat_self;
+    battle_weather weather;
 };
 
 struct learn_entry

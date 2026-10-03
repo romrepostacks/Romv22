@@ -52,6 +52,7 @@ namespace
         bn::vector<bn::sprite_ptr, 8> bar;
         int hud_tx = 0, hud_ty = 0, hud_tw = 0, hud_th = 0;
         bool hud_big = false;
+        int8_t stages[battle_stat::COUNT] = {};     // ATTACK .. evasiveness, -6 to 6
 
         [[nodiscard]] bool out() const
         {
@@ -69,7 +70,7 @@ namespace
     struct choice
     {
         choice_kind kind = choice_kind::MOVE;
-        int move = 0;          // index into the user's moves
+        int move = 0;          // index into the user's moves; -1: Struggle (no PP left)
         int target = 0;        // foe index (MOVE / BALL)
         item_id item = item_id::POTION;
     };
@@ -204,6 +205,10 @@ namespace
         int _own_sprite_index = -1;
         bool _animating = false;    // a move animation is moving the sprites (no bobbing)
         bool _nuz_caught = false;   // NUZLOCKE: this battle's one catch is made
+        battle_weather _weather = battle_weather::NONE;
+        int _weather_turns = 0;
+        int _hint = -1;             // the foe being picked (it blinks)
+        int _blinking = -1;
 
         [[nodiscard]] bn::string<32> label(const fighter& f) const
         {
@@ -234,21 +239,32 @@ namespace
 
         bool command(choice* choices, bool& ran);
         int pick_target(const char* what);
-        int pick_move(int own_index);
+        int pick_move(int own_index, int target);
+        void foe_choice(fighter& f, choice& c, int& target);
+        [[nodiscard]] bool would_fail(const fighter& user, const move& mv, const fighter& target) const;
+        [[nodiscard]] text_color rating(const fighter& user, int slot, const fighter& target) const;
+        [[nodiscard]] damage_mods mods_for(const fighter& user, const move& mv, const fighter& target, bool spread) const;
+        [[nodiscard]] int hit_chance(const fighter& user, const move& mv, const fighter& target) const;
+        bool change_stats(fighter& who, const move& mv, bool side_effect);
+        bool start_weather(battle_weather w);
+        void weather_turn();
+        void heal_by(fighter& f, int amount);
         int pick_bag_item();
         void party_view();
         void turn(choice* choices);
-        void use_move(fighter& user, int move_index, fighter& target);
+        void use_move(fighter& user, int slot, fighter& target);
         [[nodiscard]] fx_body body_of(fighter& f);
 
         // What plays once "X used MOVE!" is out (the web's atkFx, then the hit and the HP bar).
+        static constexpr int max_targets = max_own > max_foes ? max_own : max_foes;
         struct used_ctx
         {
             battle* self;
             fighter* user;
-            fighter* target;
+            fighter* targets[max_targets];
+            int damages[max_targets];   // -1: a status move
+            int count;
             int move_index;
-            int damage;         // -1: a status move
         };
         static void used_hook(void* p)
         {
@@ -273,7 +289,6 @@ namespace
             c->self->ball_animation(*c->target, c->wobbles, c->caught);
         }
         void set_hp(fighter& f, int hp);
-        void flash(fighter& f);
         void faint(fighter& f);
         void end_of_turn();
         void win();
@@ -445,6 +460,19 @@ namespace
     void battle::bob()
     {
         ++_bob;
+        // The foe being picked blinks (and shows again once it isn't).
+        if(_blinking != _hint)
+        {
+            if(_blinking >= 0 && _foes[_blinking].sprite)
+            {
+                _foes[_blinking].sprite->set_visible(! _foes[_blinking].out());
+            }
+            _blinking = _hint;
+        }
+        if(_hint >= 0 && _foes[_hint].sprite && ! _foes[_hint].out())
+        {
+            _foes[_hint].sprite->set_visible((_bob / 10) % 3 != 0);
+        }
         if(_own_sprite && ! _animating)
         {
             int dy = _active >= 0 && _active == _focus ? ((_bob / 15) % 2) : 0;
@@ -500,7 +528,7 @@ namespace
         bn::vector<bn::sprite_ptr, 16>* sprites;
     };
 
-    // moveInfo(): TYPE, POWER, ACCURACY and the category.
+    // moveInfo(): TYPE, PP, POWER, ACCURACY and the category.
     void show_move_info(void* p, int index)
     {
         auto* c = static_cast<move_info_ctx*>(p);
@@ -510,52 +538,80 @@ namespace
         {
             return;
         }
-        const move& mv = move_data(c->m->moves[index]);
-        // Each row: the label on the left, its value on the right (the web's .row spans).
-        // Label on the left, value on the right; a pair too wide for the box drops to the condensed font.
-        auto row = [&](int y, const bn::string_view& label, const bn::string_view& value)
+        const move& mv = move_data(c->m->move(index));
+        // Each row: the label on the left, its value on the right (the web's .row spans); a pair too wide for
+        // the box drops to the condensed font.
+        auto row = [&](int y, const bn::string_view& label, const bn::string_view& value, text_color color = text_color::INK)
         {
             constexpr int left = 166, right = 234;
             int vw = value.empty() ? 0 : u.fit_width(value, (right - left) / 2, true);
-            int lw = u.print_fit(left, y, label, right - left - vw - 3, text_color::INK, *c->sprites, true);
-            (void) lw;
+            u.print_fit(left, y, label, right - left - vw - 3, text_color::INK, *c->sprites, true);
             if(! value.empty())
             {
-                u.print_fit(right - vw, y, value, vw, text_color::INK, *c->sprites, true);
+                u.print_fit(right - vw, y, value, vw, color, *c->sprites, true);
             }
         };
         bn::string<24> type("TYPE/");
         type.append(type_name(mv.type));
-        row(116, type, "");
-        row(126, "POWER", mv.power ? bn::string_view(bn::to_string<4>(mv.power)) : bn::string_view("-"));
-        row(136, "ACCURACY", bn::to_string<4>(mv.accuracy));
-        row(146, mv.category == move_category::PHYSICAL ? "Physical" : mv.category == move_category::STATUS ? "Status" : "Special", "");
+        row(114, type, "");
+        bn::string<12> pp(bn::to_string<4>(c->m->pp(index)));
+        pp.append("/");
+        pp.append(bn::to_string<4>(c->m->max_pp(index)));
+        row(122, "PP", pp, c->m->pp(index) ? text_color::INK : text_color::RED);
+        row(130, "POWER", mv.power ? bn::string_view(bn::to_string<4>(mv.power)) : bn::string_view("-"));
+        row(138, "ACCURACY", mv.target == move_target::SELF || mv.target == move_target::FIELD ? bn::string_view("-") :
+                             bn::string_view(bn::to_string<4>(mv.accuracy)));
+        const char* hits = mv.target == move_target::FOES ? "All foes" : mv.target == move_target::SELF ? "Self" :
+                           mv.target == move_target::FIELD ? "Field" : "";
+        row(146, mv.category == move_category::PHYSICAL ? "Physical" : mv.category == move_category::STATUS ? "Status" : "Special", hits);
     }
 
-    int battle::pick_move(int own_index)
+    // The move menu, coloured for the chosen foe: red super effective, yellow a normal hit (or a status move
+    // that will work), the usual ink not very effective, grey no effect (or out of PP).
+    int battle::pick_move(int own_index, int target)
     {
         ui& u = gui();
-        const mon& m = *_own[own_index].m;
+        const fighter& user = _own[own_index];
+        const mon& m = *user.m;
         // Two to a row like Emerald; a long name drops to a smaller font (the menu's fit_columns).
         bn::string_view names[4];
+        text_color colors[4];
         for(int i = 0; i < m.move_count; ++i)
         {
-            names[i] = move_data(m.moves[i]).name;
+            names[i] = move_data(m.move(i)).name;
+            colors[i] = rating(user, i, _foes[target]);
         }
         // Emerald: the moves in a 2x2 grid on the left, the move's details on the right.
         bn::vector<bn::sprite_ptr, 16> info;
         u.win().box(window_style::WINDOW, 20, 14, 10, 6);
         move_info_ctx ctx{ &m, &info };
-        menu_spec s;
-        s.options = names;
-        s.count = m.move_count;
-        s.tx = 0; s.ty = 14; s.tw = 20; s.th = 6;
-        s.columns = 2;
-        s.column_width = 72;
-        s.start = bn::min(_last_move[own_index], m.move_count - 1);
-        s.on_move = show_move_info;
-        s.ctx = &ctx;
-        int pick = u.menu(s);
+        int start = bn::min(_last_move[own_index], m.move_count - 1);
+        int pick;
+        while(true)
+        {
+            menu_spec s;
+            s.options = names;
+            s.colors = colors;
+            s.count = m.move_count;
+            s.tx = 0; s.ty = 14; s.tw = 20; s.th = 6;
+            s.columns = 2;
+            s.column_width = 72;
+            s.start = start;
+            s.on_move = show_move_info;
+            s.ctx = &ctx;
+            pick = u.menu(s);
+            if(pick >= 0 && ! m.pp(pick))
+            {
+                // Gen 3: "There's no PP left for this move!"
+                info.clear();
+                u.win().clear(20, 14, 10, 6);
+                u.say("There's no PP left for this move!");
+                u.win().box(window_style::WINDOW, 20, 14, 10, 6);
+                start = pick;
+                continue;
+            }
+            break;
+        }
         info.clear();
         u.win().clear(20, 14, 10, 6);
         u.set_battle_style(true);
@@ -566,6 +622,12 @@ namespace
         return pick;
     }
 
+    struct target_ctx
+    {
+        int* hint;
+        const int* idx;
+    };
+
     int battle::pick_target(const char* what)
     {
         ui& u = gui();
@@ -573,10 +635,15 @@ namespace
         bn::string<32> names[max_foes];
         bn::string_view views[max_foes];
         int n = 0;
+        int start = 0;
         for(int i = 0; i < _foe_count; ++i)
         {
             if(! _foes[i].out())
             {
+                if(i == _hint)
+                {
+                    start = n;
+                }
                 idx[n] = i;
                 names[n] = _foes[i].m->name();
                 views[n] = names[n];
@@ -585,18 +652,33 @@ namespace
         }
         if(n == 1)
         {
+            _hint = idx[0];
             return idx[0];
         }
         u.show_text(what, 80);
+        target_ctx ctx{ &_hint, idx };
+        _hint = idx[start];
         menu_spec s;
         s.options = views;
         s.count = n;
+        s.start = start;
         s.tx = 12; s.ty = 14; s.tw = 18; s.th = 6;
         s.columns = 2;
         s.column_width = 66;
+        s.on_move = [](void* p, int index)
+        {
+            auto* c = static_cast<target_ctx*>(p);
+            *c->hint = c->idx[index];
+        };
+        s.ctx = &ctx;
         int pick = u.menu(s);
         u.clear_text();
-        return pick < 0 ? -1 : idx[pick];
+        if(pick < 0)
+        {
+            return -1;
+        }
+        _hint = idx[pick];
+        return idx[pick];
     }
 
     // The battle's BAG (renderCmd 'bag'): POKé BALLS against wild Pokémon, and your medicine. Returns an item
@@ -733,21 +815,41 @@ namespace
             _last_command = c;
             if(c == 0)
             {
-                int mv = pick_move(who);
-                if(mv < 0)
+                // The target first, then the move (coloured for it); B from the moves goes back to the target.
+                bool chosen = false;
+                while(true)
                 {
-                    continue;
+                    int target = pick_target("Attack which one?");
+                    if(target < 0)
+                    {
+                        break;
+                    }
+                    if(m.out_of_pp())
+                    {
+                        bn::string<64> none(m.name());
+                        none.append(" has no moves left!");
+                        u.say(none);
+                        choices[who] = { choice_kind::MOVE, -1, target, item_id::POTION };
+                        chosen = true;
+                        break;
+                    }
+                    int mv = pick_move(who, target);
+                    if(mv >= 0)
+                    {
+                        choices[who] = { choice_kind::MOVE, mv, target, item_id::POTION };
+                        chosen = true;
+                        break;
+                    }
+                    if(alive(false) == 1)
+                    {
+                        break;      // only one foe: back to FIGHT / BAG
+                    }
                 }
-                bn::string<48> what("Use ");
-                what.append(move_data(m.moves[mv]).name);
-                what.append(" on which one?");
-                int target = pick_target(what.c_str());
-                if(target < 0)
+                _hint = -1;
+                if(chosen)
                 {
-                    continue;
+                    ++pos;
                 }
-                choices[who] = { choice_kind::MOVE, mv, target, item_id::POTION };
-                ++pos;
             }
             else if(c == 1)
             {
@@ -760,6 +862,7 @@ namespace
                 if(id == item_id::POKEBALL)
                 {
                     int target = pick_target("Throw the POKé BALL at which one?");
+                    _hint = -1;
                     if(target < 0)
                     {
                         continue;
@@ -810,7 +913,6 @@ namespace
     // ----- The turn (submitTurn) -----
     void battle::turn(choice* choices)
     {
-        bn::random& r = rng();
         bn::vector<action, max_own + max_foes> actions;
         for(int i = 0; i < _own_count; ++i)
         {
@@ -819,7 +921,7 @@ namespace
                 actions.push_back({ &_own[i], &_foes[choices[i].target], choices[i], true });
             }
         }
-        // Foes pick a random move and a random target among yours.
+        // Foes choose too (foe_choice).
         for(int i = 0; i < _foe_count; ++i)
         {
             fighter& f = _foes[i];
@@ -827,54 +929,17 @@ namespace
             {
                 continue;
             }
-            int targets[max_own], tn = 0;
-            for(int k = 0; k < _own_count; ++k)
-            {
-                if(! _own[k].out())
-                {
-                    targets[tn++] = k;
-                }
-            }
             choice c;
-            c.kind = choice_kind::MOVE;
-            c.move = r.get_int(f.m->move_count);
-            int target = targets[r.get_int(tn)];
-            if(_s.smart)
-            {
-                // The CHALLENGE TOWER's smarter foes: the move and target that hit hardest (power x type x
-                // same-type bonus, weighted to finish the weakest), a status move only on a healthy target.
-                int best = -1;
-                for(int m = 0; m < f.m->move_count; ++m)
-                {
-                    const move& mv = move_data(f.m->moves[m]);
-                    for(int k = 0; k < tn; ++k)
-                    {
-                        const mon& t = *_own[targets[k]].m;
-                        int score;
-                        if(mv.category == move_category::STATUS)
-                        {
-                            score = t.st == status::NONE && mv.inflicts != status::NONE ? 120 : 0;
-                        }
-                        else
-                        {
-                            score = mv.power * effectiveness_x4(mv.type, t) * (f.m->has_type(mv.type) ? 3 : 2) / 2;
-                            score = score * mv.accuracy / 100;
-                            score += (t.max_hp - t.hp) * 40 / bn::max(1, int(t.max_hp));
-                        }
-                        score += r.get_int(20);
-                        if(score > best)
-                        {
-                            best = score;
-                            c.move = m;
-                            target = targets[k];
-                        }
-                    }
-                }
-            }
+            int target = 0;
+            foe_choice(f, c, target);
             actions.push_back({ &f, &_own[target], c, false });
         }
         // The BAG (medicine and POKé BALLS) first, then by speed (paralysis halves it); ties keep their order.
-        auto speed = [](const action& a){ return a.user->m->st == status::PARALYSIS ? a.user->m->spe / 2 : int(a.user->m->spe); };
+        auto speed = [](const action& a)
+        {
+            int spe = a.user->m->spe * stage_x100(a.user->stages[battle_stat::SPE]) / 100;
+            return a.user->m->st == status::PARALYSIS ? spe / 2 : spe;
+        };
         for(int i = 1; i < actions.size(); ++i)
         {
             for(int j = i; j > 0; --j)
@@ -956,14 +1021,15 @@ namespace
                 continue;
             }
             act.user->m->flags |= mon_flag::FOUGHT;
-            use_move(*act.user, act.user->m->moves[act.c.move], *act.target);
+            use_move(*act.user, act.c.move, *act.target);
         }
         end_of_turn();
     }
 
-    // End of turn: burn and poison, then Leftovers and the Sitrus Berry; yours first.
+    // End of turn: the weather, burn and poison, then Leftovers and the Sitrus Berry; yours first.
     void battle::end_of_turn()
     {
+        weather_turn();
         for(fighter* side : { _own, _foes })
         {
             int n = side == _own ? _own_count : _foe_count;
@@ -1098,34 +1164,457 @@ namespace
         return b;
     }
 
-    void battle::used(const used_ctx& c)
+    // ----- Moves -----
+    const char* stat_name(int stat)
     {
-        _animating = true;
-        play_move_fx(c.move_index, body_of(*c.user), body_of(*c.target));
-        _animating = false;
-        if(c.damage > 0)
+        constexpr const char* names[] = { "ATTACK", "DEFENSE", "SP. ATK", "SP. DEF", "SPEED", "accuracy", "evasiveness" };
+        return names[stat];
+    }
+
+    // Whether a non-damaging move would do nothing to this target (or its user): a status it can't take, stats
+    // already as far as they go, full HP, the weather it would start already blowing.
+    bool battle::would_fail(const fighter& user, const move& mv, const fighter& target) const
+    {
+        if(mv.weather != battle_weather::NONE)
         {
-            audio::play(audio::sfx::HIT);
-            flash(*c.target);
+            return _weather == mv.weather;
         }
-        if(c.damage >= 0)
+        if(mv.heal && mv.target == move_target::SELF)
         {
-            set_hp(*c.target, c.target->m->hp - c.damage);
+            return user.m->hp >= user.m->max_hp;
+        }
+        if(mv.inflicts != status::NONE)
+        {
+            const mon& t = *target.m;
+            static const int fire = type_index("FIRE"), poison = type_index("POISON"), steel = type_index("STEEL"),
+                             electric = type_index("ELECTRIC"), ice = type_index("ICE");
+            if(t.st != status::NONE)
+            {
+                return true;
+            }
+            switch(mv.inflicts)
+            {
+            case status::BURN: if(t.has_type(fire)) return true; break;
+            case status::POISON: if(t.has_type(poison) || t.has_type(steel)) return true; break;
+            case status::PARALYSIS: if(t.has_type(electric)) return true; break;
+            case status::FREEZE: if(t.has_type(ice)) return true; break;
+            default: break;
+            }
+            // Thunder Wave doesn't touch Ground types.
+            return mv.type == electric && move_effectiveness_x4(*user.m, mv, t) == 0;
+        }
+        if(mv.stat_count)
+        {
+            const fighter& who = mv.stat_self ? user : target;
+            for(int i = 0; i < mv.stat_count; ++i)
+            {
+                int now = who.stages[mv.stats[i].stat];
+                if((mv.stats[i].delta > 0 && now < 6) || (mv.stats[i].delta < 0 && now > -6))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // The colour a move gets in the menu against the chosen foe.
+    text_color battle::rating(const fighter& user, int slot, const fighter& target) const
+    {
+        const move& mv = move_data(user.m->move(slot));
+        if(! user.m->pp(slot))
+        {
+            return text_color::GRAY;
+        }
+        if(mv.category == move_category::STATUS)
+        {
+            return would_fail(user, mv, target) ? text_color::GRAY : text_color::YELLOW;
+        }
+        int eff = move_effectiveness_x4(*user.m, mv, *target.m);
+        if(eff == 0 || (target.m->abil().kind == ability_kind::DISGUISE && ! (target.m->flags & mon_flag::DISGUISE_USED)))
+        {
+            return eff == 0 ? text_color::GRAY : text_color::YELLOW;
+        }
+        return eff > 4 ? text_color::RED : eff < 4 ? text_color::INK : text_color::YELLOW;
+    }
+
+    damage_mods battle::mods_for(const fighter& user, const move& mv, const fighter& target, bool spread) const
+    {
+        damage_mods d;
+        bool physical = mv.category == move_category::PHYSICAL;
+        d.atk_stage = user.stages[physical ? battle_stat::ATK : battle_stat::SPA];
+        d.def_stage = target.stages[physical ? battle_stat::DEF : battle_stat::SPD];
+        d.weather = _weather;
+        d.spread = spread;
+        return d;
+    }
+
+    // The move's accuracy (%) with the user's accuracy and the target's evasiveness.
+    int battle::hit_chance(const fighter& user, const move& mv, const fighter& target) const
+    {
+        int stage = bn::clamp(user.stages[battle_stat::ACC] - target.stages[battle_stat::EVA], -6, 6);
+        return mv.accuracy * accuracy_stage_x100(stage) / 100;
+    }
+
+    // A move's stat changes on whoever they're for. Says what happened; false if nothing changed.
+    bool battle::change_stats(fighter& who, const move& mv, bool side_effect)
+    {
+        if(who.out())
+        {
+            return false;
+        }
+        bool any = false;
+        for(int i = 0; i < mv.stat_count; ++i)
+        {
+            int stat = mv.stats[i].stat, delta = mv.stats[i].delta;
+            int now = who.stages[stat];
+            int next = bn::clamp(now + delta, -6, 6);
+            bn::string<80> text(label(who));
+            text.append("'s ");
+            text.append(stat_name(stat));
+            if(next == now)
+            {
+                if(side_effect)
+                {
+                    continue;
+                }
+                text.append(delta > 0 ? " won't go any higher!" : " won't go any lower!");
+            }
+            else
+            {
+                who.stages[stat] = int8_t(next);
+                int d = next - now;
+                text.append(d >= 3 ? " rose drastically!" : d == 2 ? " rose sharply!" : d == 1 ? " rose!" :
+                            d == -1 ? " fell!" : d == -2 ? " harshly fell!" : " severely fell!");
+                any = true;
+            }
+            gui().say(text);
+        }
+        return any;
+    }
+
+    bool battle::start_weather(battle_weather w)
+    {
+        if(_weather == w)
+        {
+            return false;
+        }
+        _weather = w;
+        _weather_turns = 5;
+        constexpr const char* starts[] = { "", "The sunlight turned harsh!", "It started to rain!", "A sandstorm kicked up!",
+                                           "It started to hail!" };
+        gui().say(starts[int(w)]);
+        return true;
+    }
+
+    // End of turn: the weather goes on (a sandstorm or hail hurting all but the types it doesn't), or stops.
+    void battle::weather_turn()
+    {
+        if(_weather == battle_weather::NONE)
+        {
+            return;
+        }
+        int w = int(_weather);
+        if(--_weather_turns <= 0)
+        {
+            constexpr const char* ends[] = { "", "The sunlight faded.", "The rain stopped.", "The sandstorm subsided.",
+                                             "The hail stopped." };
+            _weather = battle_weather::NONE;
+            gui().say(ends[w]);
+            return;
+        }
+        constexpr const char* goes_on[] = { "", "The sunlight is strong.", "Rain continues to fall.", "The sandstorm rages.",
+                                            "Hail continues to fall." };
+        gui().say(goes_on[w]);
+        if(_weather != battle_weather::SAND && _weather != battle_weather::HAIL)
+        {
+            return;
+        }
+        static const int rock = type_index("ROCK"), ground = type_index("GROUND"), steel = type_index("STEEL"),
+                         ice = type_index("ICE");
+        for(fighter* side : { _own, _foes })
+        {
+            int n = side == _own ? _own_count : _foe_count;
+            for(int i = 0; i < n; ++i)
+            {
+                fighter& f = side[i];
+                if(f.out() || ! alive(true) || ! alive(false))
+                {
+                    continue;
+                }
+                const mon& m = *f.m;
+                bool safe = _weather == battle_weather::SAND ? m.has_type(rock) || m.has_type(ground) || m.has_type(steel) :
+                                                               m.has_type(ice);
+                if(safe)
+                {
+                    continue;
+                }
+                focus_on(f);
+                set_hp(f, m.hp - bn::max(1, m.max_hp / 16));
+                bn::string<64> text(label(f));
+                text.append(_weather == battle_weather::SAND ? " is buffeted by the sandstorm!" : " is pelted by hail!");
+                gui().say(text);
+                faint(f);
+            }
         }
     }
 
-    void battle::use_move(fighter& user, int move_index, fighter& target)
+    void battle::heal_by(fighter& f, int amount)
+    {
+        set_hp(f, bn::min(int(f.m->max_hp), f.m->hp + amount));
+    }
+
+    // What a foe does: a move with PP left (Struggle without) and one of yours. Most pick at random, favouring
+    // attacks and skipping moves that would fail; the CHALLENGE TOWER's think it through.
+    void battle::foe_choice(fighter& f, choice& c, int& target)
+    {
+        bn::random& r = rng();
+        int targets[max_own], tn = 0;
+        for(int k = 0; k < _own_count; ++k)
+        {
+            if(! _own[k].out())
+            {
+                targets[tn++] = k;
+            }
+        }
+        c.kind = choice_kind::MOVE;
+        target = targets[r.get_int(tn)];
+        if(f.m->out_of_pp())
+        {
+            c.move = -1;
+            return;
+        }
+        if(! _s.smart)
+        {
+            int weights[4], total = 0;
+            for(int m = 0; m < f.m->move_count; ++m)
+            {
+                const move& mv = move_data(f.m->move(m));
+                weights[m] = ! f.m->pp(m) ? 0 : mv.category != move_category::STATUS ? 3 :
+                             would_fail(f, mv, _own[target]) ? 0 : 1;
+                total += weights[m];
+            }
+            if(! total)
+            {
+                for(int m = 0; m < f.m->move_count; ++m)
+                {
+                    weights[m] = f.m->pp(m) ? 1 : 0;
+                    total += weights[m];
+                }
+            }
+            int roll = r.get_int(total);
+            c.move = 0;
+            for(int m = 0; m < f.m->move_count; ++m)
+            {
+                if(roll < weights[m])
+                {
+                    c.move = m;
+                    break;
+                }
+                roll -= weights[m];
+            }
+            return;
+        }
+        // The CHALLENGE TOWER's smarter foes: the move and target that hit hardest (power x type x same-type
+        // bonus, weighted to finish the weakest); a status move only when it helps.
+        int best = -1;
+        for(int m = 0; m < f.m->move_count; ++m)
+        {
+            if(! f.m->pp(m))
+            {
+                continue;
+            }
+            const move& mv = move_data(f.m->move(m));
+            for(int k = 0; k < tn; ++k)
+            {
+                const fighter& tf = _own[targets[k]];
+                const mon& t = *tf.m;
+                int score;
+                if(mv.category == move_category::STATUS)
+                {
+                    if(would_fail(f, mv, tf))
+                    {
+                        score = 0;
+                    }
+                    else if(mv.inflicts != status::NONE)
+                    {
+                        score = 120;
+                    }
+                    else if(mv.heal)
+                    {
+                        score = (f.m->max_hp - f.m->hp) * 160 / bn::max(1, int(f.m->max_hp));
+                    }
+                    else if(mv.weather != battle_weather::NONE)
+                    {
+                        score = 40;
+                    }
+                    else if(mv.stat_self)
+                    {
+                        score = 90 - 30 * f.stages[mv.stats[0].stat];
+                    }
+                    else
+                    {
+                        score = 50 + 10 * tf.stages[mv.stats[0].stat];
+                    }
+                }
+                else
+                {
+                    score = mv.power * move_effectiveness_x4(*f.m, mv, t) * (f.m->has_type(mv.type) ? 3 : 2) / 2;
+                    score = score * mv.accuracy / 100;
+                    score += (t.max_hp - t.hp) * 40 / bn::max(1, int(t.max_hp));
+                }
+                score += r.get_int(20);
+                if(score > best)
+                {
+                    best = score;
+                    c.move = m;
+                    target = targets[k];
+                }
+            }
+        }
+    }
+
+    // After "X used MOVE!" is out: the web's atkFx (at the first target), then the hits and the HP bars.
+    void battle::used(const used_ctx& c)
+    {
+        _animating = true;
+        play_move_fx(c.move_index, body_of(*c.user), body_of(*c.targets[0]));
+        _animating = false;
+        bool hit = false;
+        for(int i = 0; i < c.count; ++i)
+        {
+            hit |= c.damages[i] > 0;
+        }
+        if(hit)
+        {
+            audio::play(audio::sfx::HIT);
+            // Everyone hit blinks together.
+            for(int k = 0; k < 4; ++k)
+            {
+                for(int i = 0; i < c.count; ++i)
+                {
+                    fighter& t = *c.targets[i];
+                    bn::sprite_ptr* sp = t.own ? (_own_sprite && _own_sprite_index == &t - _own ? &*_own_sprite : nullptr) :
+                                                 (t.sprite ? &*t.sprite : nullptr);
+                    if(sp && c.damages[i] > 0)
+                    {
+                        sp->set_visible(false);
+                    }
+                }
+                wait(8);
+                for(int i = 0; i < c.count; ++i)
+                {
+                    fighter& t = *c.targets[i];
+                    bn::sprite_ptr* sp = t.own ? (_own_sprite && _own_sprite_index == &t - _own ? &*_own_sprite : nullptr) :
+                                                 (t.sprite ? &*t.sprite : nullptr);
+                    if(sp && c.damages[i] > 0)
+                    {
+                        sp->set_visible(true);
+                    }
+                }
+                wait(7);
+            }
+        }
+        for(int i = 0; i < c.count; ++i)
+        {
+            if(c.damages[i] > 0)
+            {
+                set_hp(*c.targets[i], c.targets[i]->m->hp - c.damages[i]);
+            }
+        }
+    }
+
+    // A move (slot -1: Struggle): PP, then whoever it's for: the user (Swords Dance, Recover), the field
+    // (weather), the chosen foe, or every foe (Earthquake, Growl).
+    void battle::use_move(fighter& user, int slot, fighter& chosen)
     {
         if(! can_act(user))
         {
             return;
+        }
+        bool struggle = slot < 0;
+        int move_index = struggle ? 0 : user.m->move(slot);
+        if(! struggle)
+        {
+            user.m->use_pp(slot);
         }
         const move& mv = move_data(move_index);
         bn::string<64> text(label(user));
         text.append(" used ");
         text.append(mv.name);
         text.append("!");
-        if(rng().get_int(100) >= mv.accuracy)
+
+        if(mv.target == move_target::SELF || mv.target == move_target::FIELD)
+        {
+            used_ctx c{ this, &user, { &user }, { -1 }, 1, move_index };
+            gui().say(text, used_hook, &c);
+            bool worked = false;
+            if(mv.weather != battle_weather::NONE)
+            {
+                worked |= start_weather(mv.weather);
+            }
+            if(mv.heal)
+            {
+                if(user.m->hp < user.m->max_hp)
+                {
+                    heal_by(user, bn::max(1, user.m->max_hp * mv.heal / 100));
+                    bn::string<64> healed(label(user));
+                    healed.append(" regained health!");
+                    gui().say(healed);
+                    worked = true;
+                }
+                else
+                {
+                    bn::string<64> full(label(user));
+                    full.append("'s HP is full!");
+                    gui().say(full);
+                    return;
+                }
+            }
+            if(mv.stat_count)
+            {
+                worked |= change_stats(user, mv, false);
+                return;     // (it said why if nothing rose)
+            }
+            if(! worked)
+            {
+                gui().say("But it failed!");
+            }
+            return;
+        }
+
+        // Who it's aimed at: the chosen one, or every foe still standing.
+        fighter* side = user.own ? _foes : _own;
+        int side_n = user.own ? _foe_count : _own_count;
+        fighter* aimed[max_targets];
+        int an = 0;
+        if(mv.target == move_target::FOES)
+        {
+            for(int i = 0; i < side_n; ++i)
+            {
+                if(! side[i].out())
+                {
+                    aimed[an++] = &side[i];
+                }
+            }
+        }
+        else
+        {
+            aimed[an++] = &chosen;
+        }
+        bool spread = an > 1;
+        // Accuracy, for each.
+        fighter* hit[max_targets];
+        int hn = 0;
+        for(int i = 0; i < an; ++i)
+        {
+            if(rng().get_int(100) < hit_chance(user, mv, *aimed[i]))
+            {
+                hit[hn++] = aimed[i];
+            }
+        }
+        if(! hn)
         {
             gui().say(text);
             text = label(user);
@@ -1133,65 +1622,180 @@ namespace
             gui().say(text);
             return;
         }
+
         if(mv.category == move_category::STATUS)
         {
-            used_ctx c{ this, &user, &target, move_index, -1 };
-            gui().say(text, used_hook, &c);
-            status had = target.m->st;
-            apply_status(target, mv.inflicts, 100);
-            if(target.m->st == had)
+            used_ctx c{ this, &user, {}, {}, hn, move_index };
+            for(int i = 0; i < hn; ++i)
             {
-                gui().say("But it failed!");
+                c.targets[i] = hit[i];
+                c.damages[i] = -1;
+            }
+            gui().say(text, used_hook, &c);
+            for(int i = 0; i < an; ++i)
+            {
+                fighter& t = *aimed[i];
+                bool was_hit = false;
+                for(int k = 0; k < hn; ++k)
+                {
+                    was_hit |= hit[k] == &t;
+                }
+                bn::string<64> line(label(t));
+                if(! was_hit)
+                {
+                    line.append(" avoided the attack!");
+                    gui().say(line);
+                    continue;
+                }
+                if(would_fail(user, mv, t) && ! mv.stat_count)
+                {
+                    if(spread)
+                    {
+                        line = "It didn't affect ";
+                        line.append(label(t));
+                        line.append("...");
+                        gui().say(line);
+                    }
+                    else
+                    {
+                        gui().say("But it failed!");
+                    }
+                    continue;
+                }
+                if(mv.inflicts != status::NONE)
+                {
+                    apply_status(t, mv.inflicts, 100);
+                }
+                if(mv.stat_count)
+                {
+                    change_stats(t, mv, false);
+                }
             }
             return;
         }
-        // Disguise takes the first hit (and the web game shows only that).
-        if(target.m->abil().kind == ability_kind::DISGUISE && ! (target.m->flags & mon_flag::DISGUISE_USED))
+
+        // Damage, for each one hit. Disguise takes the first hit; a FOCUS SASH holds on at full HP.
+        used_ctx c{ this, &user, {}, {}, hn, move_index };
+        bool disguised[max_targets] = {}, sash[max_targets] = {};
+        int effs[max_targets] = {};
+        for(int i = 0; i < hn; ++i)
         {
-            target.m->flags |= mon_flag::DISGUISE_USED;
-            text = label(target);
-            text.append("'s Disguise absorbed the hit - no damage!");
-            gui().say(text);
-            return;
+            fighter& tf = *hit[i];
+            mon& t = *tf.m;
+            c.targets[i] = &tf;
+            if(t.abil().kind == ability_kind::DISGUISE && ! (t.flags & mon_flag::DISGUISE_USED))
+            {
+                t.flags |= mon_flag::DISGUISE_USED;
+                disguised[i] = true;
+                c.damages[i] = 0;
+                effs[i] = 4;
+                continue;
+            }
+            damage_result r = calc_damage(*user.m, mv, t, rng(), mods_for(user, mv, tf, spread));
+            int dmg = bn::min(r.damage, int(t.hp));
+            if(t.item == held_item::FOCUS_SASH && ! (t.flags & mon_flag::SASH_USED) && t.hp == t.max_hp && r.damage >= t.hp)
+            {
+                dmg = t.hp - 1;
+                t.flags |= mon_flag::SASH_USED;
+                sash[i] = true;
+            }
+            c.damages[i] = dmg;
+            effs[i] = r.effectiveness_x4;
         }
-        damage_result r = calc_damage(*user.m, mv, *target.m, rng());
-        int dmg = r.damage;
-        mon& t = *target.m;
-        bool sash = false;
-        if(t.item == held_item::FOCUS_SASH && ! (t.flags & mon_flag::SASH_USED) && t.hp == t.max_hp && dmg >= t.hp)
-        {
-            dmg = t.hp - 1;
-            t.flags |= mon_flag::SASH_USED;
-            sash = true;
-        }
-        used_ctx c{ this, &user, &target, move_index, dmg };
         gui().say(text, used_hook, &c);
-        if(sash)
+        int dealt = 0;
+        for(int i = 0; i < an; ++i)
         {
-            text = label(target);
-            text.append(" hung on using its FOCUS SASH!");
-            gui().say(text);
+            fighter& t = *aimed[i];
+            int k = 0;
+            while(k < hn && hit[k] != &t)
+            {
+                ++k;
+            }
+            bn::string<80> line;
+            if(k == hn)
+            {
+                line = label(t);
+                line.append(" avoided the attack!");
+                gui().say(line);
+                continue;
+            }
+            if(disguised[k])
+            {
+                line = label(t);
+                line.append("'s Disguise absorbed the hit - no damage!");
+                gui().say(line);
+                continue;
+            }
+            dealt += bn::max(0, c.damages[k]);
+            if(sash[k])
+            {
+                line = label(t);
+                line.append(" hung on using its FOCUS SASH!");
+                gui().say(line);
+            }
+            if(effs[k] == 0)
+            {
+                line = "It doesn't affect ";
+                line.append(label(t));
+                line.append("...");
+                gui().say(line);
+                continue;
+            }
+            if(effs[k] != 4)
+            {
+                line = effs[k] > 4 ? "It's super effective" : "It's not very effective";
+                if(spread)
+                {
+                    line.append(" on ");
+                    line.append(label(t));
+                }
+                line.append(effs[k] > 4 ? "!" : "...");
+                gui().say(line);
+            }
+            if(mv.secondary != status::NONE)
+            {
+                apply_status(t, mv.secondary, mv.secondary_chance);
+            }
+            if(mv.stat_count && ! mv.stat_self && rng().get_int(100) < mv.stat_chance)
+            {
+                change_stats(t, mv, true);
+            }
         }
-        if(r.effectiveness_x4 == 0)
+        // The user's own side of it: its stats (Close Combat, Overheat), draining, recoil.
+        if(mv.stat_count && mv.stat_self && dealt > 0 && rng().get_int(100) < mv.stat_chance)
         {
-            text = "It doesn't affect ";
-            text.append(label(target));
-            text.append("...");
-            gui().say(text);
+            change_stats(user, mv, true);
         }
-        else if(r.effectiveness_x4 > 4)
+        if(mv.drain > 0 && dealt > 0 && ! user.out() && user.m->hp < user.m->max_hp)
         {
-            gui().say("It's super effective!");
+            heal_by(user, bn::max(1, dealt * mv.drain / 100));
+            bn::string<80> line;
+            for(int i = 0; i < hn; ++i)
+            {
+                if(c.damages[i] > 0)
+                {
+                    line = label(*hit[i]);
+                    break;
+                }
+            }
+            line.append(" had its energy drained!");
+            gui().say(line);
         }
-        else if(r.effectiveness_x4 < 4)
+        int recoil = struggle ? bn::max(1, user.m->max_hp / 4) : mv.drain < 0 && dealt > 0 ? bn::max(1, dealt * -mv.drain / 100) : 0;
+        if(recoil && ! user.out())
         {
-            gui().say("It's not very effective...");
+            focus_on(user);
+            set_hp(user, user.m->hp - recoil);
+            bn::string<64> line(label(user));
+            line.append(" is damaged by recoil!");
+            gui().say(line);
         }
-        if(mv.secondary != status::NONE)
+        for(int i = 0; i < hn; ++i)
         {
-            apply_status(target, mv.secondary, mv.secondary_chance);
+            faint(*hit[i]);
         }
-        faint(target);
+        faint(user);
     }
 
     void battle::throw_ball(fighter& target)
@@ -1411,23 +2015,6 @@ namespace
         if(f.own && _own_sprite && _own_sprite_index == &f - _own)
         {
             _own_sprite->set_visible(! f.out());
-        }
-    }
-
-    // The hit blinks the Pokémon twice (hitBlink .5s steps(2) 2).
-    void battle::flash(fighter& f)
-    {
-        bn::sprite_ptr* s = f.own ? (_own_sprite ? &*_own_sprite : nullptr) : (f.sprite ? &*f.sprite : nullptr);
-        if(! s)
-        {
-            return;
-        }
-        for(int i = 0; i < 4; ++i)
-        {
-            s->set_visible(false);
-            wait(8);
-            s->set_visible(true);
-            wait(7);
         }
     }
 

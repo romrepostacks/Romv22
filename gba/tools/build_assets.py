@@ -1405,9 +1405,13 @@ def build_game_data(data, out_inc):
     mv = []
     for m in data['moves']:
         sec = m.get('sec') or {}
-        mv.append('{%s, %d, %d, %s, %d, %s, %s, %d, %s}' % (
+        st = (m.get('stats') or [])[:3]
+        st_c = ', '.join('{%d, %d}' % (a, b) for a, b in st + [(0, 0)] * (3 - len(st)))
+        mv.append('{%s, %d, %d, %s, %d, %s, %s, %d, %s, %d, move_target::%s, %d, %d, {%s}, %d, %d, %s, battle_weather::%s}' % (
             c_text(m['n'].upper()), types.index(m['t']), m['p'], cat[m['c']], m['a'],
-            STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0), 'true' if m.get('punch') else 'false'))
+            STATUS[m.get('status')], STATUS[sec.get('status')], sec.get('chance', 0), 'true' if m.get('punch') else 'false',
+            m.get('pp', 10), (m.get('target') or 'one').upper(), m.get('drain', 0), m.get('heal', 0), st_c, len(st),
+            m.get('stat_chance', 100), 'true' if m.get('stat_self') else 'false', (m.get('weather') or 'none').upper()))
     L.append('constexpr move moves[] = {\n    ' + ',\n    '.join(mv) + '\n};\n')
     # Legendary and mythical Pokémon (Phase 7: the CHALLENGE TOWER's prizes), by species index.
     legend_nums = {144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385,
@@ -1531,6 +1535,7 @@ def inputs_hash():
     files = [os.path.join(ROOT, 'js', f) for f in ('app.js', 'dexdata.js', 'dexinfo.js', 'tileart.js', 'music.js')] + \
             [os.path.join(HERE, f) for f in ('export.js', 'build_assets.py', 'narrow_font.py')]
     files.append(os.path.join(ROOT, 'news.json'))
+    files.append(os.path.join(HERE, '..', 'data', 'moves_extra.json'))
     for f in files:
         h.update(open(f, 'rb').read())
     return h.hexdigest()

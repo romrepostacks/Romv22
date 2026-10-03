@@ -540,6 +540,18 @@ const species = [...usedSpecies].map(name=>{
 });
 for(const n of trainerSpecies) if(!usedSpecies.has(n)) throw new Error('no species ' + n);
 
+// The GBA's extra move data (tools/build_moves.js: PP, targets, draining, healing, stat changes, weather) and
+// the status moves it adds, which join the learnsets after every existing move has its index (saves hold them).
+const EXTRA = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'moves_extra.json'), 'utf8'));
+G.MOVEDATA.forEach((m, i)=>Object.assign(m, EXTRA.existing[i]));
+Object.assign(G.STRUGGLE, {pp:1, target:'one', drain:-25});
+for(const sp of species){
+  const extra = EXTRA.learn[G.slug(sp.name)];
+  if(!extra || !sp.learn.length) continue;
+  for(const [lv, ix] of extra) if(lv<=100) sp.learn.push([lv, addMove(EXTRA.added[ix - G.MOVEDATA.length])]);
+  sp.learn.sort((a, b)=>a[0]-b[0]);
+}
+
 // Music (js/music.js): 8th-note steps per channel.
 const music = G.MUSIC_TRACKS ? Object.fromEntries(Object.entries(G.MUSIC_TRACKS).map(([k, t])=>[k, {bpm:t.bpm,
   lead:t.lead, harm:t.harm, bass:t.bass, drum:t.drum}])) : {};

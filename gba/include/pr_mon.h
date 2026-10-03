@@ -3,6 +3,7 @@
 #ifndef PR_MON_H
 #define PR_MON_H
 
+#include "bn_math.h"
 #include "bn_string.h"
 #include "bn_random.h"
 #include "pr_game_types.h"
@@ -44,7 +45,7 @@ struct mon
     uint8_t sleep_turns = 0;
     held_item item = held_item::NONE;
     uint8_t flags = 0;
-    uint16_t moves[4] = {};
+    uint16_t slots[4] = {};             // a move each: its index (low 10 bits) and the PP used (high 6 bits)
     uint16_t hp = 0;
     uint16_t max_hp = 0;
     uint16_t atk = 0;
@@ -79,6 +80,47 @@ struct mon
         return level * 8;
     }
     [[nodiscard]] bool has_type(int type) const;
+
+    // The move in a slot, and its PP (the move's base PP; a POKéMON CENTER restores it).
+    [[nodiscard]] int move(int slot) const
+    {
+        return slots[slot] & 0x3ff;
+    }
+    void set_move(int slot, int move_index)
+    {
+        slots[slot] = uint16_t(move_index & 0x3ff);
+    }
+    [[nodiscard]] int max_pp(int slot) const;
+    [[nodiscard]] int pp(int slot) const
+    {
+        return bn::max(0, max_pp(slot) - (slots[slot] >> 10));
+    }
+    void use_pp(int slot)
+    {
+        if(pp(slot) > 0)
+        {
+            slots[slot] = uint16_t(slots[slot] + (1 << 10));
+        }
+    }
+    void restore_pp()
+    {
+        for(uint16_t& s : slots)
+        {
+            s &= 0x3ff;
+        }
+    }
+    // Every move is out of PP: it can only Struggle.
+    [[nodiscard]] bool out_of_pp() const
+    {
+        for(int i = 0; i < move_count; ++i)
+        {
+            if(pp(i) > 0)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
     [[nodiscard]] const ability& abil() const;
 
     // The stats for its level (and species). A hand-edited one keeps each stat's place between the min and max
@@ -111,9 +153,25 @@ struct damage_result
     int effectiveness_x4;     // 0, 1 (1/4), 2 (1/2), 4 (x1), 8, 16
 };
 
+// What a battle adds to the damage formula: stat stages (-6..6), the weather, and a move that hits several.
+struct damage_mods
+{
+    int atk_stage = 0;
+    int def_stage = 0;
+    battle_weather weather = battle_weather::NONE;
+    bool spread = false;
+};
+// A stat stage's multiplier x100 (2/8 .. 8/2), and accuracy's (3/9 .. 9/3).
+[[nodiscard]] int stage_x100(int stage);
+[[nodiscard]] int accuracy_stage_x100(int stage);
+
 [[nodiscard]] const move& move_data(int index);
 [[nodiscard]] int effectiveness_x4(int move_type, const mon& target);
-[[nodiscard]] damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn::random& random);
+[[nodiscard]] damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn::random& random,
+                                        const damage_mods& mods = damage_mods());
+// The type multiplier x4 with the target's ability (Levitate, Volt Absorb...) and the user's Corrosion.
+[[nodiscard]] int move_effectiveness_x4(const mon& user, const move& mv, const mon& target);
+[[nodiscard]] int type_index(const char* name);
 [[nodiscard]] const char* type_name(int type);
 // movesAt(): the four moves a species knows at a level.
 int moves_at(const species& s, int level, uint16_t* out);

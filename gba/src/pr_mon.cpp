@@ -109,7 +109,7 @@ mon mon::make(species_id id, int level, held_item item)
     m.species_index = uint16_t(id);
     m.level = uint8_t(level);
     m.item = item;
-    m.move_count = uint8_t(moves_at(m.data(), level, m.moves));
+    m.move_count = uint8_t(moves_at(m.data(), level, m.slots));
     m.recalc_stats();
     m.hp = m.max_hp;
     return m;
@@ -202,8 +202,14 @@ void mon::recalc_stats(int old_level, const base_stats* old_base)
     }
 }
 
+int mon::max_pp(int slot) const
+{
+    return move_data(move(slot)).pp;
+}
+
 void mon::heal()
 {
+    restore_pp();
     hp = max_hp;
     st = status::NONE;
     sleep_turns = 0;
@@ -264,11 +270,11 @@ void mon::_learn_moves_at(int at_level, ui& ui)
         // Struggle goes once it knows something real.
         for(int k = 0; k < move_count; ++k)
         {
-            if(moves[k] == 0)
+            if(move(k) == 0)
             {
                 for(int j = k; j < move_count - 1; ++j)
                 {
-                    moves[j] = moves[j + 1];
+                    slots[j] = slots[j + 1];
                 }
                 --move_count;
                 --k;
@@ -277,7 +283,7 @@ void mon::_learn_moves_at(int at_level, ui& ui)
         bool known = false;
         for(int k = 0; k < move_count; ++k)
         {
-            known |= moves[k] == e.move;
+            known |= move(k) == e.move;
         }
         if(known)
         {
@@ -293,7 +299,7 @@ void mon::_learn_moves_at(int at_level, ui& ui)
         }
         else
         {
-            moves[move_count++] = e.move;
+            set_move(move_count++, e.move);
             text.append(" learned ");
             text.append(move_data(e.move).name);
             text.append("!");
@@ -341,14 +347,32 @@ int effectiveness_x4(int move_type, const mon& target)
     return eff;
 }
 
-// damage(): ((2L/5+2) * P * A/D / 50 + 2) * STAB * type * random(0.85-1), with the abilities and held
-// items that change it. Computed in floating point, as the browser does.
-damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn::random& random)
+int stage_x100(int stage)
 {
-    bool physical = mv.category == move_category::PHYSICAL;
-    double atk_stat = physical ? user.atk : user.spa;
-    double def_stat = bn::max(1, int(physical ? target.def : target.spd));
-    double stab = user.has_type(mv.type) ? 1.5 : 1;
+    stage = bn::clamp(stage, -6, 6);
+    return stage >= 0 ? (2 + stage) * 100 / 2 : 200 / (2 - stage);
+}
+
+int accuracy_stage_x100(int stage)
+{
+    stage = bn::clamp(stage, -6, 6);
+    return stage >= 0 ? (3 + stage) * 100 / 3 : 300 / (3 - stage);
+}
+
+int type_index(const char* name)
+{
+    for(int i = 0; i < int(sizeof(game_data::type_names) / sizeof(game_data::type_names[0])); ++i)
+    {
+        if(bn::string_view(game_data::type_names[i]) == name)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int move_effectiveness_x4(const mon& user, const move& mv, const mon& target)
+{
     int eff_x4 = effectiveness_x4(mv.type, target);
     const ability& ta = target.abil();
     const ability& ua = user.abil();
@@ -370,6 +394,34 @@ damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn
         }
         eff_x4 = e ? e : 4;
     }
+    return eff_x4;
+}
+
+// damage(): ((2L/5+2) * P * A/D / 50 + 2) * STAB * type * random(0.85-1), with the abilities and held
+// items that change it, and the battle's stat stages, weather and spread. Computed in floating point, as the
+// browser does.
+damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn::random& random, const damage_mods& mods)
+{
+    bool physical = mv.category == move_category::PHYSICAL;
+    double atk_stat = (physical ? user.atk : user.spa) * stage_x100(mods.atk_stage) / 100.0;
+    double def_stat = bn::max(1, int(physical ? target.def : target.spd)) * stage_x100(mods.def_stage) / 100.0;
+    double stab = user.has_type(mv.type) ? 1.5 : 1;
+    int eff_x4 = move_effectiveness_x4(user, mv, target);
+    const ability& ua = user.abil();
+    static const int water = type_index("WATER"), fire = type_index("FIRE"), rock = type_index("ROCK");
+    double weather = 1;
+    if(mods.weather == battle_weather::RAIN)
+    {
+        weather = mv.type == water ? 1.5 : mv.type == fire ? 0.5 : 1;
+    }
+    else if(mods.weather == battle_weather::SUN)
+    {
+        weather = mv.type == fire ? 1.5 : mv.type == water ? 0.5 : 1;
+    }
+    else if(mods.weather == battle_weather::SAND && ! physical && target.has_type(rock))
+    {
+        def_stat *= 1.5;    // a sandstorm raises Rock types' SP. DEF
+    }
     double rand = 0.85 + (random.get_int(65536) / 65536.0) * 0.15;
     double power = mv.power;
     if(ua.kind == ability_kind::BOOST && ua.type == mv.type && user.hp * 3 <= user.max_hp)
@@ -381,7 +433,11 @@ damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn
         power *= 1.2;
     }
     double level = user.level;
-    double base = (((2 * level / 5 + 2) * power * (atk_stat / def_stat)) / 50 + 2) * stab * (eff_x4 / 4.0) * rand;
+    double base = (((2 * level / 5 + 2) * power * (atk_stat / def_stat)) / 50 + 2) * stab * (eff_x4 / 4.0) * rand * weather;
+    if(mods.spread)
+    {
+        base *= 0.75;   // a move that hits more than one
+    }
     int dmg = int(base);
     if(user.st == status::BURN && physical)
     {

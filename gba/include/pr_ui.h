@@ -30,8 +30,10 @@ enum class text_color
     WHITE,      // white text with a dark shadow (battle messages, dark screens)
     HUD,        // dark text on the cream HP boxes
     PLANK,      // dark brown on the area name plank
-    RED,        // OPTION's chosen value
-    BLUE        // headings on light pages
+    RED,        // OPTION's chosen value; a super effective move
+    BLUE,       // headings on light pages
+    YELLOW,     // a move that hits for normal damage
+    GRAY        // a move that would have no effect
 };
 
 // The window layer: a 32x32 tile map over everything; boxes are drawn in 8x8 tiles.
@@ -64,6 +66,7 @@ struct menu_spec
     bool cancel = true;                     // B returns -1
     window_style style = window_style::WINDOW;
     text_color color = text_color::INK;
+    const text_color* colors = nullptr;     // each option's own colour (instead of color)
     // Called when the cursor moves (to show a description); ctx is passed back.
     void (*on_move)(void* ctx, int index) = nullptr;
     void* ctx = nullptr;

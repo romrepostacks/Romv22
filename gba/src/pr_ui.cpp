@@ -63,6 +63,18 @@ namespace
         make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0),
         make(0xc0, 0xd8, 0xf0), make(0, 0, 0), make(0x30, 0x58, 0xb0), make(0, 0, 0)
     };
+    constexpr bn::color yellow_colors[] = {
+        bn::color(31, 0, 31), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0),
+        make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0),
+        make(0xf0, 0xe0, 0xa0), make(0, 0, 0), make(0xc8, 0x90, 0x00), make(0, 0, 0)
+    };
+    constexpr bn::color gray_colors[] = {
+        bn::color(31, 0, 31), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0),
+        make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0), make(0, 0, 0),
+        make(0xe8, 0xe8, 0xe8), make(0, 0, 0), make(0xa0, 0xa0, 0xa8), make(0, 0, 0)
+    };
+    constexpr bn::sprite_palette_item yellow_palette(yellow_colors, bn::bpp_mode::BPP_4);
+    constexpr bn::sprite_palette_item gray_palette(gray_colors, bn::bpp_mode::BPP_4);
     constexpr bn::sprite_palette_item ink_palette(ink_colors, bn::bpp_mode::BPP_4);
     constexpr bn::sprite_palette_item white_palette(white_colors, bn::bpp_mode::BPP_4);
     constexpr bn::sprite_palette_item hud_palette(hud_colors, bn::bpp_mode::BPP_4);
@@ -79,6 +91,8 @@ namespace
         case text_color::PLANK: return plank_palette;
         case text_color::RED: return red_palette;
         case text_color::BLUE: return blue_palette;
+        case text_color::YELLOW: return yellow_palette;
+        case text_color::GRAY: return gray_palette;
         default: return ink_palette;
         }
     }
@@ -664,7 +678,7 @@ int ui::menu(const menu_spec& s)
                 bool last_column = s.columns == 1 || k % s.columns == s.columns - 1;
                 int room = last_column ? (s.tx + s.tw) * 8 - 4 - option_x(k) - (rows < s.count ? 10 : 0)
                                        : s.column_width - 9;
-                print_fit(option_x(k), option_y(k), s.options[i], room, s.color, texts);
+                print_fit(option_x(k), option_y(k), s.options[i], room, s.colors ? s.colors[i] : s.color, texts);
             }
         }
         // Scroll marks when there's more above or below.

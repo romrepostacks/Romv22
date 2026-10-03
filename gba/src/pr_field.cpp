@@ -1628,7 +1628,7 @@ void overworld::move_prompts()
         bool known = false;
         for(int k = 0; k < m.move_count; ++k)
         {
-            known |= m.moves[k] == p.move;
+            known |= m.move(k) == p.move;
         }
         if(known || m.empty())
         {
@@ -1659,7 +1659,7 @@ void overworld::move_prompts()
             bn::string_view views[5];
             for(int k = 0; k < m.move_count; ++k)
             {
-                views[k] = move_data(m.moves[k]).name;
+                views[k] = move_data(m.move(k)).name;
             }
             views[m.move_count] = "DON'T LEARN";
             forget = u.list(views, m.move_count + 1);
@@ -1678,8 +1678,8 @@ void overworld::move_prompts()
             say(text);
             continue;
         }
-        const char* old = move_data(m.moves[forget]).name;
-        m.moves[forget] = p.move;
+        const char* old = move_data(m.move(forget)).name;
+        m.set_move(forget, p.move);
         say("1, 2, and... ... Poof!");
         text = who;
         text.append(" forgot ");

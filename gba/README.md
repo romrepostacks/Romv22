@@ -3,9 +3,9 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.2**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
+Version **1.3**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
 own data, plus the two story phases planned after it (STORY.md phases 6 and 7): NUZLOCKE mode and ADVENTURE
-MODE with the CHALLENGE TOWER, and shiny Pokémon. The web game doesn't have these yet; the GBA builds them
+MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves. The web game doesn't have these yet; the GBA builds them
 from the plan.
 
 ## What's in it
@@ -25,6 +25,16 @@ from the plan.
   (type immunities and boosts, Iron Fist, Merciless, Corrosion, Disguise), held items (LEFTOVERS,
   LIFE ORB, FOCUS SASH, SITRUS BERRY, CHOICE SCARF), EXP and EXP SHARE, level-ups, new moves, evolution
   and prize money all follow the web game. Every move has the web game's animation.
+- **Moves beyond the web game (GBA only):** every move has its real PP (shown in battle and on the
+  summary; a POKéMON CENTER, home or the PC restores it; out of PP, a Pokémon STRUGGLEs). The learnsets
+  gain the main series' stat moves (GROWL, LEER, SWORDS DANCE, CALM MIND, DRAGON DANCE...), healing moves
+  (RECOVER, ROOST, SYNTHESIS...) and the four weathers (SUNNY DAY, RAIN DANCE, SANDSTORM, HAIL, for five
+  turns). Stat stages work as in the main series, as do side effects (PSYCHIC lowering SP. DEF, CLOSE
+  COMBAT lowering the user's), draining (ABSORB, GIGA DRAIN), recoil (DOUBLE-EDGE) and spread moves that hit
+  every foe (EARTHQUAKE, ROCK SLIDE, GROWL) at 3/4 power. FIGHT asks for the target first, then shows the
+  moves coloured for it: red super effective, yellow a normal hit, dark not very effective, grey no effect
+  (or it would fail, or no PP); B goes back to change the target. Data: `tools/build_moves.js` from
+  PokeAPI's CSVs into `data/moves_extra.json`.
 - **Catching as in Emerald:** each species' real catch rate with Gen 3's formula (the guardian uses the web
   game's odds). Then the POKéDEX registration page and the nickname prompt.
 - **Menus:** the POKéDEX (list, INFO, AREA, SIZE), the party screen (6 Pokémon, 10 from your fourth badge),
@@ -53,8 +63,8 @@ from the plan.
   DIVE and the other story rewards still come at the same points.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 and 1.1
-  saves load in 1.2; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.2
+  saves load in 1.3; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) is for the web app only: a GBA has one screen and one set of
 buttons.
