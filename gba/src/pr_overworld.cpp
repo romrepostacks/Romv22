@@ -363,6 +363,9 @@ void overworld::sweep_ash(int tx, int ty)
 void overworld::build_bg()
 {
     // The tileset's tiles go at index 0 so the generated cells can be used as they are.
+    // The weather's palette goes too: left in place it can split the free banks so a 14-bank tileset
+    // doesn't fit. update_weather() brings it back after the map.
+    _weather.reset();
     _bg_map.reset();
     _bg.reset();
     const tileset& ts = wd::tilesets[_tileset];

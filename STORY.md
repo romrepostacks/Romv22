@@ -2,6 +2,9 @@
 
 All names are placeholders the owner can change. Original story; Pokémon species are the game's existing pool.
 
+The web version has been retired: the Game Boy Advance build (`gba/`) is the only supported version. The
+"web:" notes below are history.
+
 ## The three threads
 - **Team Tempest (villains).** Want to wake **Lugia**, guardian of the sea and sky, to command the storms.
   Admin **Vesper** leads them in Vellorin. Grunts appear from Marrow Pass onward; their HQ is hidden in Portmere.

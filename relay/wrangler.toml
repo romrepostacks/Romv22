@@ -1,9 +1,0 @@
-# Deploy with: npx wrangler deploy   (from this folder)
-# The token is a secret, set once with: npx wrangler secret put GITHUB_TOKEN
-name = "party-royale-feedback"
-main = "worker.js"
-compatibility_date = "2026-09-01"
-
-[vars]
-REPO = "romrepostacks/Romv22"
-ALLOW_ORIGIN = "https://romrepostacks.github.io"

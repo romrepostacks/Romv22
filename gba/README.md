@@ -3,10 +3,10 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.6**: the whole game, from the professor's welcome to the Hall of Fame, built on the web game's
-own data, plus the two story phases planned after it (STORY.md phases 6 and 7): NUZLOCKE mode and ADVENTURE
-MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves. The web game doesn't have these yet; the GBA builds them
-from the plan.
+Version **1.7**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
+NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
+The GBA is now the only supported version of the game.
 
 ## What's in it
 
@@ -66,17 +66,16 @@ from the plan.
   BATTLE draft) and start in SPIRECREST TOWN as CHAMPION. Neither is offered in a NUZLOCKE run.
 - **Shiny Pokémon:** any wild Pokémon (and your starter, and the tower's legendary) can be shiny: 1 in
   4096, twice that in ADVENTURE MODE and 1.25 times in a NUZLOCKE run. Shinies use their real shiny colours
-  (from PokeAPI's sprites, in sprites/pokemon/shiny) in battle, the party, the PC and the summary (marked
+  (from PokeAPI's sprites, in sprites/pokemon/shiny) in battle and on the summary (marked
   SHINY), and sparkle when they appear. In a NUZLOCKE run, a shiny can always be caught (the shiny clause).
 - **Skip story text:** scenes, the professor's calls and the rivals' goodbyes complete themselves; SURF,
   DIVE and the other story rewards still come at the same points.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.5
-  saves load in 1.6; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.6
+  saves load in 1.7; saves from 0.3 and earlier aren't compatible.
 
-Phase 8 (per-device layouts and controllers) is for the web app only: a GBA has one screen and one set of
-buttons.
+Phase 8 (per-device layouts and controllers) was planned for the web app, which has been retired.
 
 Catching differs from the web game on purpose: the web game uses a flat 25% chance at full HP for every
 species, so a ball thrown at a healthy Pokémon usually failed. The GBA build uses Emerald's formula instead

@@ -1,9 +1,0 @@
-{
-  "name": "party-royale",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Original Pokémon-inspired party battler/overworld game.",
-  "scripts": {
-    "start": "node server.js"
-  }
-}

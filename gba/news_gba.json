@@ -1,7 +1,16 @@
 {
-  "_howto": "The GBA build's own WHAT'S NEW entries, shown before the web game's news.json changelog (newest first). Player-facing only.",
-  "motd": "Version 1.6: the MASTER BALL, and a gift from WREN at the Sunken Shrine!",
+  "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
+  "motd": "Version 1.7: no more crashes on the PC or when walking out of the weather!",
   "changelog": [
+    {
+      "version": "GBA 1.7",
+      "date": "2026-10-07",
+      "title": "Crash Fixes",
+      "changes": [
+        "Fixed a crash when walking from an area with weather (rain, fog, snow or a cave) into a bigger town, such as ROUTE 3 into TIDALKEEP CITY or ROUTE 5 into WISPGATE CITY",
+        "Fixed a crash when opening a PC box holding many different POKéMON. Icons in the PC and the party now share their colours, so a shiny's icon shows its normal colours (it's still shiny in battle and on its summary)"
+      ]
+    },
     {
       "version": "GBA 1.6",
       "date": "2026-10-03",

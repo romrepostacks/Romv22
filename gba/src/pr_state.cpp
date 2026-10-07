@@ -146,7 +146,7 @@ namespace
     static_assert(sizeof(save_block) <= clear_mark_offset, "the save must leave room for the clear mark");
     constexpr char clear_tag[8] = { 'P', 'R', 'C', 'L', 'E', 'A', 'R', '1' };
 
-    BN_DATA_EWRAM_BSS game_state current;
+    BN_DATA_EWRAM game_state current;      // not _BSS: game_state has default member values (GCC 16 rejects them in .sbss)
     bool active = false;
     bn::random random_generator;
 }
