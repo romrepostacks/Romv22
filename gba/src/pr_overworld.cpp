@@ -363,8 +363,11 @@ void overworld::sweep_ash(int tx, int ty)
 void overworld::build_bg()
 {
     // The tileset's tiles go at index 0 so the generated cells can be used as they are.
+    // The weather's palette bank goes too (update_weather() puts it back): left where it was, it can split
+    // the free banks so a bigger tileset (up to 14 of the 16) finds no room and Butano stops.
     _bg_map.reset();
     _bg.reset();
+    _weather.reset();
     const tileset& ts = wd::tilesets[_tileset];
     bn::bg_tiles::set_allow_offset(false);
     bn::regular_bg_tiles_item tiles_item(bn::span<const bn::tile>(ts.tiles, ts.tiles_count), bn::bpp_mode::BPP_4);

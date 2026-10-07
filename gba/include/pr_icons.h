@@ -2,7 +2,9 @@
 #ifndef PR_ICONS_H
 #define PR_ICONS_H
 
+#include "bn_optional.h"
 #include "bn_sprite_palette_item.h"
+#include "bn_sprite_palette_ptr.h"
 #include "bn_sprite_ptr.h"
 
 #include "pr_game_data.h"
@@ -33,7 +35,12 @@ inline void apply_shiny(bn::sprite_ptr& sprite, int species_index, bool shiny, m
     }
     const bn::color* colors = view == mon_view::FRONT ? shiny_data::front[species_index] :
                               view == mon_view::BACK ? shiny_data::back[species_index] : shiny_data::icon[species_index];
-    sprite.set_palette(bn::sprite_palette_item(bn::span<const bn::color>(colors, 16), bn::bpp_mode::BPP_4));
+    // A screen full of shinies could run out of sprite palettes: those past the 16th keep their usual colours.
+    bn::sprite_palette_item item(bn::span<const bn::color>(colors, 16), bn::bpp_mode::BPP_4);
+    if(bn::optional<bn::sprite_palette_ptr> pal = item.create_palette_optional())
+    {
+        sprite.set_palette(*pal);
+    }
 }
 
 inline void apply_shiny(bn::sprite_ptr& sprite, const mon& m, mon_view view)
