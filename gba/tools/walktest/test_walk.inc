@@ -20,9 +20,9 @@ static void test_setup()
         g.name[0]='W'; g.name[1]='A'; g.name[2]='L'; g.name[3]='K';
         g.story = pr::story::STARTER | pr::story::CALL1 | pr::story::CALL2 | pr::story::CALL3;
         g.run.skip_story = true;
-        g.party[0] = pr::mon::make(pr::species_id::PIKACHU, 100);
-        g.party[1] = pr::mon::make(pr::species_id::CHARMANDER, 100);
-        g.party[2] = pr::mon::make(pr::species_id::EEVEE, 100);
+        g.party[0] = pr::mon::make(pr::species_id::SKELEDIRGE, 100);
+        g.party[1] = pr::mon::make(pr::species_id::MEOWSCARADA, 100);
+        g.party[2] = pr::mon::make(pr::species_id::KORAIDON, 100);
         g.party[0].item = pr::held_item::LEFTOVERS;
         g.party[1].item = pr::held_item::SITRUS_BERRY;
         g.party[2].item = pr::held_item::CHOICE_SCARF;
