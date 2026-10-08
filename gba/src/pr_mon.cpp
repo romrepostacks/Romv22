@@ -247,7 +247,7 @@ void mon::grant_xp(int amount, ui& ui)
         text.append(bn::to_string<4>(level));
         text.append("!");
         ui.say(text);
-        _learn_moves_at(level, ui);
+        learn_moves_at(level, ui);
         _try_evolve(ui);
     }
     if(level >= cap)
@@ -256,8 +256,7 @@ void mon::grant_xp(int amount, ui& ui)
     }
 }
 
-// learnMovesAt(): an empty slot takes a new move straight away; with four, it waits for after the battle.
-void mon::_learn_moves_at(int at_level, ui& ui)
+void mon::learn_moves_at(int at_level, ui& ui)
 {
     const pr::species& s = data();
     for(int i = 0; i < s.learnset_count; ++i)
@@ -315,15 +314,20 @@ void mon::_try_evolve(ui& ui)
     {
         return;
     }
+    evolve_into(s.evolves_to, ui);
+}
+
+void mon::evolve_into(int species, ui& ui)
+{
     bn::string<96> text(name());
-    base_stats old = s.base;
-    species_index = uint16_t(s.evolves_to);
+    base_stats old = data().base;
+    species_index = uint16_t(species);
     recalc_stats(level, &old);
     text.append(" evolved into ");
     text.append(data().name);
     text.append("!");
     ui.say(text);
-    _learn_moves_at(level, ui);
+    learn_moves_at(level, ui);
 }
 
 const move& move_data(int index)

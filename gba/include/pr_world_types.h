@@ -56,7 +56,9 @@ enum class person_role : uint8_t
     CLERK,
     MOM,
     TOWER,          // the CHALLENGE TOWER's guide (ADVENTURE MODE only)
-    TRADER          // TRADEWIND VILLAGE's trader
+    TRADER,         // TRADEWIND VILLAGE's trader
+    DAYCARE,        // CINDERGATE TOWN's DAY CARE (GBA 1.8)
+    TUTOR           // the MOVE TUTOR in every POKéMON CENTER (GBA 1.8)
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of

@@ -332,6 +332,17 @@ battle_report battle_scene(const encounter& e)
         {
             trainer_team(*s, t);
         }
+        if(e.rematch)
+        {
+            // A rematch: their whole team (up to six), a little above your party's level.
+            int level = bn::min(100, g.average_level() + 2);
+            int n = bn::min(int(t.team_count), 6);
+            s->foe_count = n;
+            for(int i = 0; i < n; ++i)
+            {
+                s->foes[i] = mon::make(t.team[i], level, g.badges() >= 4 ? held_item::LEFTOVERS : held_item::NONE);
+            }
+        }
     }
     else
     {
@@ -362,6 +373,10 @@ battle_report battle_scene(const encounter& e)
     }
     clear_pending_moves();
     battle_report report = run_battle(*s);
+    if(e.rematch && report.outcome == battle_outcome::WON)
+    {
+        g.extra.rematched.set(world_data::maps[e.map].trainers[e.trainer_index].id);
+    }
     if(counts)
     {
         g.run.encounter_used.set(area);

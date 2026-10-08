@@ -131,9 +131,12 @@ struct mon
     // room for wait in the pending list for after the battle (movePromptNext).
     void grant_xp(int amount, ui& ui);
     void set_species(int index);
+    // learnMovesAt(): an empty slot takes a new move straight away; with four, it waits for after the battle.
+    void learn_moves_at(int at_level, ui& ui);
+    // "X evolved into Y!", with the new species' stats and moves (a level, a stone or the LINKING CORD).
+    void evolve_into(int species, ui& ui);
 
 private:
-    void _learn_moves_at(int at_level, ui& ui);
     void _try_evolve(ui& ui);
 };
 

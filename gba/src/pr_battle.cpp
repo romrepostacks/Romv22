@@ -869,6 +869,12 @@ namespace
                     continue;
                 }
                 item_id id = item_id(it);
+                const item_info& info = game_data::items[int(id)];
+                if(info.pocket != 1 && ! (info.heal || info.cure != status::NONE || info.revive || info.full))
+                {
+                    u.say_timed("That can't be used in battle.", 60);   // stones, TMs, REPEL... (GBA 1.8)
+                    continue;
+                }
                 if(game_data::items[int(id)].pocket == 1)
                 {
                     bn::string<48> ask("Throw the ");

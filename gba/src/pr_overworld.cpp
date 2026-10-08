@@ -1486,7 +1486,9 @@ void overworld::arrive()
         }
         return;
     }
-    bool can_fight = g.first_able() >= 0 && ! g.has(story::CHEAT_NO_WILD);
+    // REPEL, the DAY CARE and EGGS count the step; REPEL keeps wild Pokémon away (GBA 1.8).
+    bool spoke = step_counters();
+    bool can_fight = g.first_able() >= 0 && ! g.has(story::CHEAT_NO_WILD) && ! g.extra.repel_steps && ! spoke;
     if(b == behaviour::TALL_GRASS && rng().get_int(100) < grass_percent && can_fight)
     {
         wild_battle(false);

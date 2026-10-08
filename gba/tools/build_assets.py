@@ -26,12 +26,42 @@ MAX_TRAINERS = 256      # bits in game_state::beaten
 MAX_ITEM_BALLS = 256    # bits in game_state::picked
 ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal', 'hyperpotion',
             'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod',      # ITEM_INFO order
-            'greatball', 'ultraball', 'rarecandy', 'masterball']      # GBA only (GBA_ITEMS)
+            'greatball', 'ultraball', 'rarecandy', 'masterball',      # GBA only (GBA_ITEMS)
+            'maxpotion', 'repel', 'superrepel', 'maxrepel', 'escaperope', 'goodrod', 'superrod',     # GBA 1.8
+            'firestone', 'waterstone', 'thunderstone', 'leafstone', 'moonstone', 'sunstone', 'shinystone', 'duskstone',
+            'dawnstone', 'icestone', 'ovalstone', 'razorclaw', 'razorfang', 'linkingcord']
+            # ... then the TMs (add_extras)
 # GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
 GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
              'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
              'masterball': {'name': 'MASTER BALL', 'pocket': 1, 'desc': 'The best ball there is. It catches any wild POKéMON without fail.', 'price': 0},
-             'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800}}
+             'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800},
+             # GBA 1.8
+             'maxpotion': {'name': 'MAX POTION', 'pocket': 0, 'desc': 'A spray-type medicine. It fully restores the HP of one POKéMON.', 'price': 2500, 'heal': 999},
+             'repel': {'name': 'REPEL', 'pocket': 0, 'desc': 'Keeps wild POKéMON away for 100 steps.', 'price': 350},
+             'superrepel': {'name': 'SUPER REPEL', 'pocket': 0, 'desc': 'Keeps wild POKéMON away for 200 steps.', 'price': 500},
+             'maxrepel': {'name': 'MAX REPEL', 'pocket': 0, 'desc': 'Keeps wild POKéMON away for 250 steps.', 'price': 700},
+             'escaperope': {'name': 'ESCAPE ROPE', 'pocket': 0, 'desc': 'Use it in a cave or under the sea to return to the last POKéMON CENTER.', 'price': 550},
+             'goodrod': {'name': 'GOOD ROD', 'pocket': 4, 'desc': 'A new, good-quality fishing rod. Bigger POKéMON bite.'},
+             'superrod': {'name': 'SUPER ROD', 'pocket': 4, 'desc': 'An awesome, high-tech fishing rod. Rare POKéMON bite.'},
+             'firestone': {'name': 'FIRE STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'waterstone': {'name': 'WATER STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'thunderstone': {'name': 'THUNDER STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'leafstone': {'name': 'LEAF STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'moonstone': {'name': 'MOON STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'sunstone': {'name': 'SUN STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'shinystone': {'name': 'SHINY STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'duskstone': {'name': 'DUSK STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'dawnstone': {'name': 'DAWN STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'icestone': {'name': 'ICE STONE', 'pocket': 0, 'desc': 'A peculiar stone that makes certain species of POKéMON evolve.', 'price': 2100},
+             'ovalstone': {'name': 'OVAL STONE', 'pocket': 0, 'desc': 'A round stone. It makes a certain POKéMON evolve.', 'price': 3000},
+             'razorclaw': {'name': 'RAZOR CLAW', 'pocket': 0, 'desc': 'A sharply hooked claw. It makes a certain POKéMON evolve.', 'price': 3000},
+             'razorfang': {'name': 'RAZOR FANG', 'pocket': 0, 'desc': 'A sharp fang. It makes a certain POKéMON evolve.', 'price': 3000},
+             'linkingcord': {'name': 'LINKING CORD', 'pocket': 0, 'desc': 'A mysterious cord. POKéMON that evolve by trading evolve when it is used on them.', 'price': 3000}}
+EVO_ITEMS = {'fire-stone': 'firestone', 'water-stone': 'waterstone', 'thunder-stone': 'thunderstone', 'leaf-stone': 'leafstone',
+             'moon-stone': 'moonstone', 'sun-stone': 'sunstone', 'shiny-stone': 'shinystone', 'dusk-stone': 'duskstone',
+             'dawn-stone': 'dawnstone', 'ice-stone': 'icestone', 'oval-stone': 'ovalstone', 'razor-claw': 'razorclaw',
+             'razor-fang': 'razorfang', 'linking-cord': 'linkingcord'}
 STATUS = {None: 'status::NONE', 'psn': 'status::POISON', 'brn': 'status::BURN', 'par': 'status::PARALYSIS',
           'slp': 'status::SLEEP', 'frz': 'status::FREEZE'}
 
@@ -374,7 +404,8 @@ def build_world(exp, data, out_inc):
         rows = []
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
-            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER'}.get(n.get('role', ''), 'NONE')
+            role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER', 'daycare': 'DAYCARE',
+                    'tutor': 'TUTOR'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -476,6 +507,12 @@ def build_world(exp, data, out_inc):
             d = center_door[0]
             people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'down', 'role': 'trader', 'wander': False,
                            'lines': ['TRADER: "Any POKéMON for any POKéMON!"']})
+        if a['name'] == DAYCARE_TOWN and center_door and not any(n.get('role') == 'daycare' for n in people):
+            # GBA 1.8: the DAY CARE lady, on open ground near the POKéMON CENTER.
+            d = center_door[0]
+            x, y = free_spot(a, d['x'] + 3, d['y'] + 1)
+            people.append({'kind': 'oldwoman', 'x': x, 'y': y, 'facing': 'down', 'role': 'daycare', 'wander': False,
+                           'lines': ['DAY CARE: "I raise POKéMON for TRAINERS."']})
         people_rows(p, people)
         trainer_rows(p, a['trainers'], ('area', ai), ai)
         its = []
@@ -537,7 +574,12 @@ def build_world(exp, data, out_inc):
         p = 'room%d_' % ri
         info = room_ts[r['art']]
         L.append('constexpr uint8_t %sbehaviour[] = {%s};' % (p, ', '.join(str(v) for row in r['behaviour'] for v in row)))
-        people_rows(p, r['people'])
+        people = r['people']
+        if r['kind'] == 'center' and not any(n.get('role') == 'tutor' for n in people):
+            # GBA 1.8: the MOVE TUTOR in every POKéMON CENTER, by the right-hand wall.
+            people.append({'kind': 'gentleman', 'x': 11, 'y': 6, 'facing': 'left', 'role': 'tutor', 'wander': False,
+                           'lines': ['MOVE TUTOR: "I can help POKéMON remember moves."']})
+        people_rows(p, people)
         area = by_index[r['area']]
         trainer_rows(p, r['trainers'], ('room', ri), area)
         things = []
@@ -1521,6 +1563,83 @@ ABILITY_KIND = {'flavor': 'FLAVOR', 'boost': 'BOOST', 'immune': 'IMMUNE', 'punch
                 'corrosion': 'CORROSION', 'disguise': 'DISGUISE'}
 HELD = ['none', 'leftovers', 'lifeorb', 'scarf', 'sash', 'sitrus']
 
+DAYCARE_TOWN = 'Cindergate Town'
+
+def free_spot(a, x, y):
+    """The nearest open path tile to (x, y) in an area: nobody on it, and not right below a door."""
+    beh = a['behaviour']
+    taken = {(n['x'], n['y']) for n in a['people']} | {(t['x'], t['y']) for t in a['trainers']} | \
+            {(sg['x'], sg['y']) for sg in a['signs']} | {(it['x'], it['y']) for it in a['items']} | \
+            {(d['x'], d['y'] + k) for d in a['doors'] for k in (0, 1)}
+    for r in range(0, 12):
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                tx, ty = x + dx, y + dy
+                if max(abs(dx), abs(dy)) == r and 0 <= ty < len(beh) and 0 <= tx < len(beh[0]) and beh[ty][tx] == 0 \
+                        and (tx, ty) not in taken:
+                    return tx, ty
+    raise SystemExit('no free spot near (%d, %d) in %s' % (x, y, a['name']))
+
+def add_extras(data):
+    """GBA 1.8 (data/extras.json, from tools/build_extras.py): evolutions by item (stones, the LINKING CORD) and the
+    level-up ones the data had no level for (friendship, a known move, a place: a stand-in level), egg groups and
+    base forms for the DAY CARE, and the TMs that teach moves this game has."""
+    ex = json.load(open(os.path.join(HERE, '..', 'data', 'extras.json'), encoding='utf8'))
+    sp = data['species']
+    names = [s['name'] for s in sp]
+    by_num = {s['num']: i for i, s in enumerate(sp) if s['num'] < 10000}
+    into = {}           # species index -> the level its pre-evolution evolves into it at
+    for s in sp:
+        if s['evo'] and s['evo']['to'] in names:
+            into[names.index(s['evo']['to'])] = s['evo']['level']
+    evo_items = set()
+    for e in ex['evolutions']:
+        a, b = by_num.get(e['from']), by_num.get(e['to'])
+        if a is None or b is None:
+            continue
+        if 'item' in e:
+            evo_items.add((a, b, EVO_ITEMS[e['item']]))
+        elif not sp[a]['evo']:
+            sp[a]['evo'] = {'to': names[b], 'level': e['level'] or min(60, max(20, into.get(a, 0) + 10))}
+            into[b] = sp[a]['evo']['level']
+    data['evo_items'] = sorted(evo_items)
+    # Egg groups (two nibbles; 15 = can't breed) and the base form an EGG hatches into.
+    data['egg_groups'], data['babies'] = [], []
+    for i, s in enumerate(sp):
+        g = ex['egg_groups'].get(str(s['num']), [15]) if s['num'] < 10000 else [15]
+        data['egg_groups'].append(g[0] | ((g[1] if len(g) > 1 else g[0]) << 4))
+        n = s['num']
+        while s['num'] < 10000 and ex['evolves_from'].get(str(n)) in by_num:
+            n = ex['evolves_from'][str(n)]
+        data['babies'].append(by_num.get(n, i))
+    # TMs (Ultra Sun / Moon's numbers), reusable; sold in the MART from a badge count that rises with power.
+    norm = lambda t: re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-')
+    move_index = {norm(m['n']): i for i, m in enumerate(data['moves'])}
+    data['tms'] = []
+    for t in ex['tms']:
+        if t['move'] not in move_index:
+            continue
+        mi = move_index[t['move']]
+        m = data['moves'][mi]
+        key = 'tm%02d' % t['tm']
+        status = m['c'] == 'status' or not m['p']
+        price, badges = (1000, 0) if status or m['p'] <= 60 else (2000, 2) if m['p'] <= 80 else (3000, 4) if m['p'] <= 95 else (5000, 6)
+        ITEM_IDS.append(key)
+        what = 'A %s move%s.' % (m['t'].upper(), '' if status else ', power %d' % m['p'])
+        GBA_ITEMS[key] = {'name': 'TM%02d %s' % (t['tm'], m['n'].upper()), 'pocket': 2, 'price': price,
+                          'desc': what + ' Teach it again and again.'}
+        data['tms'].append({'move': mi, 'item': key, 'badges': badges, 'slug': t['move']})
+    if len(ITEM_IDS) > 255:
+        raise SystemExit('%d kinds of items (max 255)' % len(ITEM_IDS))
+    data['tm_compat'] = []
+    for s in sp:
+        can = set(ex['tm_compat'].get(str(s['num']), []))
+        bits = [0] * ((len(data['tms']) + 7) // 8)
+        for k, t in enumerate(data['tms']):
+            if t['slug'] in can:
+                bits[k >> 3] |= 1 << (k & 7)
+        data['tm_compat'].append(bits)
+
 def build_game_data(data, out_inc):
     types = data['types']
     L = ['// Generated by tools/build_assets.py from the web game; do not edit.',
@@ -1593,6 +1712,17 @@ def build_game_data(data, out_inc):
             c_text(it['name']), it['pocket'], c_text(it['desc']), it.get('price', 0), it.get('heal', 0),
             STATUS[it.get('cure')], 'true' if it.get('revive') else 'false', 'true' if it.get('full') else 'false'))
     L.append('constexpr item_info items[] = {\n    %s\n};' % ',\n    '.join(its))
+    # GBA 1.8: evolution items, egg groups and base forms, TMs.
+    L.append('constexpr evo_item evo_items[] = {%s};' % ', '.join(
+        '{%d, %d, item_id::%s}' % (a, b, it.upper()) for a, b, it in data['evo_items']))
+    L.append('constexpr int evo_items_count = %d;' % len(data['evo_items']))
+    L.append('constexpr uint8_t egg_groups[] = {%s};' % ', '.join(map(str, data['egg_groups'])))
+    L.append('constexpr uint16_t babies[] = {%s};' % ', '.join(map(str, data['babies'])))
+    L.append('constexpr tm_info tms[] = {%s};' % ', '.join(
+        '{%d, item_id::%s, %d}' % (t['move'], t['item'].upper(), t['badges']) for t in data['tms']))
+    L.append('constexpr int tms_count = %d;' % len(data['tms']))
+    L.append('constexpr uint8_t tm_compat[][%d] = {%s};' % (len(data['tm_compat'][0]), ', '.join(
+        '{%s}' % ', '.join(map(str, b)) for b in data['tm_compat'])))
     held = data['held_items']
     L.append('constexpr held_item_info held_items[] = {%s};' % ', '.join(
         '{%s, %s}' % (c_text(held[h]['n'].upper()), c_text(held[h].get('desc', ''))) for h in HELD))
@@ -1671,6 +1801,7 @@ def inputs_hash():
             [os.path.join(HERE, f) for f in ('export.js', 'build_assets.py', 'narrow_font.py')]
     files.append(os.path.join(ROOT, 'js', 'moveextra.js'))
     files.append(os.path.join(HERE, '..', 'news_gba.json'))
+    files.append(os.path.join(HERE, '..', 'data', 'extras.json'))
     for f in files:
         h.update(open(f, 'rb').read())
     return h.hexdigest()
@@ -1696,6 +1827,7 @@ def main():
             os.remove(os.path.join(inc, f))
     subprocess.run(['node', os.path.join(HERE, 'export.js'), EXP], check=True)
     data = json.load(open(os.path.join(EXP, 'data.json'), encoding='utf8'))
+    add_extras(data)
     build_world(EXP, data, inc)
     build_game_data(data, inc)
     build_music(data, inc)

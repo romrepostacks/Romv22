@@ -569,6 +569,122 @@ namespace
 {
     constexpr const char* pocket_names[] = { "ITEMS", "POKé BALLS", "TMs & HMs", "BERRIES", "KEY ITEMS" };
     int bag_pocket = 1;
+
+    // The TM an item is (game_data::tms index), or -1.
+    int tm_of(item_id id)
+    {
+        for(int i = 0; i < game_data::tms_count; ++i)
+        {
+            if(game_data::tms[i].item == id)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // GBA 1.8: a TM on a party member. It's never used up; a fifth move waits for the "forget a move" prompt
+    // the overworld runs when the bag closes.
+    bn::string<96> teach_tm(int tm, mon& m)
+    {
+        const tm_info& t = game_data::tms[tm];
+        bn::string<96> text(m.name());
+        if(! (game_data::tm_compat[m.species_index][tm >> 3] & (1 << (tm & 7))))
+        {
+            text.append(" can't learn ");
+            text.append(move_data(t.move).name);
+            text.append(".");
+            return text;
+        }
+        for(int k = 0; k < m.move_count; ++k)
+        {
+            if(m.move(k) == t.move)
+            {
+                text.append(" already knows ");
+                text.append(move_data(t.move).name);
+                text.append(".");
+                return text;
+            }
+        }
+        // Struggle goes once it knows something real.
+        for(int k = 0; k < m.move_count; ++k)
+        {
+            if(m.move(k) == 0)
+            {
+                for(int j = k; j < m.move_count - 1; ++j)
+                {
+                    m.slots[j] = m.slots[j + 1];
+                }
+                --m.move_count;
+                --k;
+            }
+        }
+        if(m.move_count < 4)
+        {
+            m.set_move(m.move_count++, t.move);
+            audio::play(audio::sfx::OBTAIN);
+            text.append(" learned ");
+            text.append(move_data(t.move).name);
+            text.append("!");
+            return text;
+        }
+        add_pending_move(&m, t.move);
+        text.append(" wants to learn ");
+        text.append(move_data(t.move).name);
+        text.append("...");
+        return text;
+    }
+
+    // GBA 1.8: a stone (or the LINKING CORD) on a party member: it evolves if that's its item. A Pokémon
+    // with two ways (CLAMPERL) asks which.
+    bn::string<96> use_evolver(item_id id, mon& m)
+    {
+        game_state& g = state();
+        ui& u = gui();
+        int targets[4];
+        int n = 0;
+        for(int k = 0; k < game_data::evo_items_count && n < 4; ++k)
+        {
+            const evo_item& e = game_data::evo_items[k];
+            if(e.item == id && e.from == m.species_index)
+            {
+                targets[n++] = e.to;
+            }
+        }
+        if(! n || m.fainted())
+        {
+            return bn::string<96>("It won't have any effect.");
+        }
+        int to = targets[0];
+        if(n > 1)
+        {
+            bn::string_view views[5];
+            for(int k = 0; k < n; ++k)
+            {
+                views[k] = game_data::species_list[targets[k]].name;
+            }
+            views[n] = "CANCEL";
+            u.show_text("Evolve into which?");
+            int k = u.list(views, n + 1);
+            u.clear_text();
+            if(k < 0 || k >= n)
+            {
+                return bn::string<96>();
+            }
+            to = targets[k];
+        }
+        g.items[int(id)] = uint8_t(g.items[int(id)] - 1);
+        audio::play(audio::sfx::OBTAIN);
+        bn::string<96> text("What? ");
+        text.append(m.name());
+        text.append(" is evolving!");
+        u.say(text);
+        m.evolve_into(to, u);
+        g.mark_seen(to);
+        g.mark_owned(to);
+        u.clear_text();
+        return bn::string<96>();
+    }
 }
 
 int bag_screen(bag_mode mode)
@@ -581,7 +697,7 @@ int bag_screen(bag_mode mode)
     {
         bn::regular_bg_ptr bg = bn::regular_bg_items::bag_bg.create_bg(8, 48);
         bg.set_priority(3);
-        int index = 0;
+        int index = 0, top = 0;
         bool redraw = true;
         bool faded = true;
         bn::vector<bn::sprite_ptr, 64> texts;
@@ -615,9 +731,12 @@ int bag_screen(bag_mode mode)
                 title.append(pocket_names[bag_pocket]);
                 title.append(" >");
                 u.print(52 - u.width(title) / 2, 4, title, text_color::INK, texts);
-                for(int i = 0; i <= count && i < 7; ++i)
+                // Seven rows at a time; the list scrolls with the cursor (the TMs make a long pocket).
+                top = bn::clamp(top, bn::max(0, index - 6), index);
+                for(int k = 0; k < 7 && top + k <= count; ++k)
                 {
-                    int y = 13 + i * 15;
+                    int i = top + k;
+                    int y = 13 + k * 15;
                     if(i == count)
                     {
                         u.print(126, y, "CLOSE BAG", text_color::INK, texts);
@@ -626,10 +745,23 @@ int bag_screen(bag_mode mode)
                     const item_info& it = game_data::items[ids[i]];
                     bn::string<8> n("x");
                     n.append(bn::to_string<4>(g.items[ids[i]]));
-                    u.print_fit(126, y, it.name, 232 - u.width(n, true) - 4 - 126, text_color::INK, texts, true);
-                    u.print(232 - u.width(n, true), y, n, text_color::INK, texts, true);
+                    bool tm = it.pocket == 2 && it.price;       // TMs are kept for good: no count
+                    int room = 232 - (tm ? 0 : u.width(n, true) + 4) - 126;
+                    u.print_fit(126, y, it.name, room, text_color::INK, texts, true);
+                    if(! tm)
+                    {
+                        u.print(232 - u.width(n, true), y, n, text_color::INK, texts, true);
+                    }
                 }
-                cursor = bn::sprite_items::cursor.create_sprite(sx(118 + 4), sy(13 + index * 15 + 6));
+                if(top > 0)
+                {
+                    u.print(230, 4, "^", text_color::INK, texts, true);
+                }
+                if(top + 7 <= count)
+                {
+                    u.print(230, 13 + 7 * 15 - 6, "v", text_color::INK, texts, true);
+                }
+                cursor = bn::sprite_items::cursor.create_sprite(sx(118 + 4), sy(13 + (index - top) * 15 + 6));
                 cursor->set_bg_priority(0);
                 dots.clear();
                 for(int k = 0; k < 5; ++k)
@@ -682,6 +814,7 @@ int bag_screen(bag_mode mode)
             {
                 bag_pocket = (bag_pocket + (bn::keypad::left_pressed() ? 4 : 1)) % 5;
                 index = 0;
+                top = 0;
                 redraw = true;
                 anim = 10;
                 anim_kind = 0;
@@ -712,9 +845,31 @@ int bag_screen(bag_mode mode)
                 }
                 bool medicine = it.heal || it.cure != status::NONE || it.revive || it.full;
                 bool candy = id == item_id::RARECANDY;
-                if(! medicine && ! candy)
+                int tm = tm_of(id);
+                bool evolver = false;
+                for(int k = 0; k < game_data::evo_items_count; ++k)
                 {
-                    continue;   // only medicine (and the RARE CANDY) works from the field
+                    evolver |= game_data::evo_items[k].item == id;
+                }
+                if(id == item_id::ESCAPEROPE)
+                {
+                    result = int(id);   // the overworld knows whether it works here
+                    break;
+                }
+                if(id == item_id::REPEL || id == item_id::SUPERREPEL || id == item_id::MAXREPEL)
+                {
+                    int steps = id == item_id::REPEL ? 100 : id == item_id::SUPERREPEL ? 200 : 250;
+                    g.items[int(id)] = uint8_t(g.items[int(id)] - 1);
+                    g.extra.repel_steps = uint16_t(bn::max(int(g.extra.repel_steps), steps));
+                    audio::play(audio::sfx::BALL);
+                    said = it.name;
+                    said.append(" was used. Wild POKéMON will stay away for a while.");
+                    redraw = true;
+                    continue;
+                }
+                if(! medicine && ! candy && tm < 0 && ! evolver)
+                {
+                    continue;   // only medicine, the RARE CANDY, evolution items and TMs work on a Pokémon
                 }
                 // Who on (bagOpen's list: "NAME hp/max", CANCEL).
                 bn::string<32> labels[max_party + 1];
@@ -729,8 +884,18 @@ int bag_screen(bag_mode mode)
                     views[i] = labels[i];
                 }
                 views[g.party_count] = "CANCEL";
+                texts.clear();      // the item list's text would show through the party list
+                cursor.reset();
                 int who = u.list(views, g.party_count + 1);
-                if(who >= 0 && who < g.party_count && candy)
+                if(who >= 0 && who < g.party_count && tm >= 0)
+                {
+                    said = teach_tm(tm, g.party[who]);
+                }
+                else if(who >= 0 && who < g.party_count && evolver)
+                {
+                    said = use_evolver(id, g.party[who]);
+                }
+                else if(who >= 0 && who < g.party_count && candy)
                 {
                     // One level up (grantXp's level-up: new moves, evolution); not past the NUZLOCKE cap.
                     mon& m = g.party[who];

@@ -3,7 +3,7 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.7**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+Version **1.8**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
 web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
 NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
 The GBA is now the only supported version of the game.
@@ -70,10 +70,14 @@ The GBA is now the only supported version of the game.
   SHINY), and sparkle when they appear. In a NUZLOCKE run, a shiny can always be caught (the shiny clause).
 - **Skip story text:** scenes, the professor's calls and the rivals' goodbyes complete themselves; SURF,
   DIVE and the other story rewards still come at the same points.
+- **Items and side activities (1.8):** evolution stones and the LINKING CORD for trade evolutions, 73 TMs
+  (by badges) and the MOVE TUTOR in every POKéMON CENTER, REPELS and the ESCAPE ROPE, the GOOD and SUPER
+  RODS, once-a-day rematches with route trainers, and the DAY CARE in CINDERGATE TOWN, which raises two
+  POKéMON and finds EGGS (no genders: any two that share an egg group, or DITTO, can breed).
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.6
-  saves load in 1.7; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.7
+  saves load in 1.8; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) was planned for the web app, which has been retired.
 
@@ -92,7 +96,8 @@ The ROM is built from the web game's own data, so the two stay in step:
    - a tileset per area (with strips of its neighbours) and per kind of room: 8x8 tiles (flips
      de-duplicated) packed into 4bpp palette banks, 16x16 metatiles and animation frames
    - every map's metatiles and tile behaviours, with signs, doors, people, trainers and item balls
-   - species, moves (with their animation scripts), items, music, window frame tiles, sprites, backgrounds
+   - species, moves (with their animation scripts), items (with TMs, evolution items, egg groups and
+     TM compatibility from `data/extras.json`, made once by `tools/build_extras.py` from PokeAPI's CSVs), music, window frame tiles, sprites, backgrounds
      and C++ headers
 3. Butano compiles `src/` and the generated data into `party-royale.gba`.
 

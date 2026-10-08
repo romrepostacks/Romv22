@@ -144,6 +144,23 @@ struct held_item_info
     const char* desc;
 };
 
+// GBA 1.8: an item that evolves one species into another when it's used on it (stones, the LINKING CORD).
+struct evo_item
+{
+    uint16_t from;
+    uint16_t to;
+    item_id item;
+};
+
+// GBA 1.8: a TM (it can be used again and again): the move it teaches, its item, and the badges the MART
+// wants to see before it sells it.
+struct tm_info
+{
+    uint16_t move;
+    item_id item;
+    uint8_t badges;
+};
+
 struct species
 {
     const char* name;

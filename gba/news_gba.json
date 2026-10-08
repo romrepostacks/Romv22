@@ -1,7 +1,24 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 1.7: no more crashes on the PC or when walking out of the weather!",
+  "motd": "Version 1.8: TMs, evolution stones, the Day Care and eggs, rematches, Repel and better rods!",
   "changelog": [
+    {
+      "version": "GBA 1.8",
+      "date": "2026-10-08",
+      "title": "Stones, TMs and the Day Care",
+      "changes": [
+        "Evolution stones (FIRE, WATER, THUNDER, LEAF, MOON, SUN, SHINY, DUSK, DAWN and ICE), sold at the MART's new EVOLUTION counter once you have 3 badges. EEVEE, CLAMPERL and the others that never evolved now can",
+        "Trade evolutions use the LINKING CORD, from the same counter, alongside the OVAL STONE, RAZOR CLAW and RAZOR FANG. POKéMON whose evolution needed something this game doesn't have now evolve at a level",
+        "TMs: the MART's TMs counter sells 73 of them, with stronger moves unlocking as you earn badges. A TM never runs out",
+        "The MOVE TUTOR in every POKéMON CENTER teaches back any move your POKéMON could have learned by its level",
+        "REPEL, SUPER REPEL, MAX REPEL and the ESCAPE ROPE, in every MART",
+        "The GOOD ROD (3 badges) and SUPER ROD (6 badges), from the FISHERMAN who gave you the OLD ROD: fewer misses, higher levels and rarer catches",
+        "Trainer rematches: route trainers will battle again once a day (every 30 minutes of play), with their full team at your level",
+        "The DAY CARE in CINDERGATE TOWN raises up to two POKéMON as you walk. Two that get along may leave an EGG, which hatches into a level 1 POKéMON",
+        "The MAX POTION, in the MART from 6 badges",
+        "Using an item that only works outside battle now says so instead of doing nothing"
+      ]
+    },
     {
       "version": "GBA 1.7",
       "date": "2026-10-07",

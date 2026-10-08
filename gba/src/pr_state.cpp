@@ -13,18 +13,22 @@ namespace pr
 namespace
 {
     constexpr char save_tag[8] = { 'P', 'R', 'O', 'Y', 'A', 'L', 'E', '1' };
-    constexpr int save_version = 8;
+    constexpr int save_version = 9;
     // Older saves: game_state up to `visited` (save version 4: GBA 1.0), then `run` (5: GBA 1.1), then `tower` (6:
     // GBA 1.2-1.4). Their bag had 13 kinds of items; version 7 (GBA 1.5) added three and version 8 (GBA 1.6) one
-    // more, each moving everything after the bag along.
+    // more, each moving everything after the bag along; version 9 (GBA 1.8) added the stones, REPELS, rods and TMs
+    // to the bag, and `extra` at the end.
     constexpr int v4_game_size = 20324;
     constexpr int v5_game_size = 21724;
     constexpr int v6_game_size = 21728;
-    constexpr int v7_game_size = 21736;     // GBA 1.5: 16 kinds of items (version 8, GBA 1.6: the MASTER BALL)
+    constexpr int v7_game_size = 21736;     // GBA 1.5: 16 kinds of items
+    constexpr int v8_game_size = 21736;     // GBA 1.6-1.7: 17 (the MASTER BALL)
     constexpr int old_items_count = 13;
     constexpr int bag_growth = 2 * (items_count - old_items_count);     // items and pc_items
     static_assert(offsetof(game_state, run) == v4_game_size + bag_growth, "save version 4 must be game_state's prefix");
     static_assert(offsetof(game_state, tower) == v5_game_size + bag_growth, "save version 5 must be game_state's prefix");
+    static_assert((int(offsetof(game_state, tower) + sizeof(tower_state)) - 2 * (items_count - 17) + 3) / 4 * 4 == v8_game_size,
+                  "save version 8 must be game_state's prefix");
     static_assert(offsetof(game_state, pc_items) == offsetof(game_state, items) + items_count, "the bag's layout");
     static_assert(offsetof(game_state, party) == offsetof(game_state, pc_items) + items_count, "the bag's layout");
 
@@ -66,7 +70,8 @@ namespace
             }
         }
         if((block.version == 4 && block.size == v4_game_size) || (block.version == 5 && block.size == v5_game_size) ||
-           (block.version == 6 && block.size == v6_game_size) || (block.version == 7 && block.size == v7_game_size))
+           (block.version == 6 && block.size == v6_game_size) || (block.version == 7 && block.size == v7_game_size) ||
+           (block.version == 8 && block.size == v8_game_size))
         {
             // An older save: its checksum right after its game_state.
             int old_size = block.size;
@@ -87,7 +92,7 @@ namespace
             auto* g = reinterpret_cast<uint8_t*>(&block.game);
             int items_at = int(offsetof(game_state, items)), pc_at = int(offsetof(game_state, pc_items));
             int party_at = int(offsetof(game_state, party));
-            int old_items = block.version == 7 ? 16 : old_items_count;
+            int old_items = block.version == 8 ? 17 : block.version == 7 ? 16 : old_items_count;
             int old_pc_at = items_at + old_items, old_party_at = old_pc_at + old_items;
             int tail = old_size - old_party_at;
             for(int i = tail - 1; i >= 0; --i)
@@ -128,6 +133,8 @@ namespace
             {
                 block.game.map = int16_t(block.game.map + 2);
             }
+            // (The old save's last padding bytes landed at the start of `extra`.)
+            block.game.extra = extras_state();
             block.version = save_version;
             block.size = int(sizeof(game_state));
             return true;

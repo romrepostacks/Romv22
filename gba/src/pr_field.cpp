@@ -360,7 +360,8 @@ void overworld::talk_to(int index)
     a.sprite->set_tiles(person_sprites[int(a.kind)]->tiles_item(), a.facing == direction::DOWN ? 0 : a.facing == direction::UP ? 3 : 6);
     a.sprite->set_horizontal_flip(a.facing == direction::RIGHT);
     tick();
-    // A fisherman who isn't battling hands out the OLD ROD.
+    // A fisherman who isn't battling hands out the OLD ROD; later on (3 and 6 badges, GBA 1.8) the GOOD ROD
+    // and the SUPER ROD.
     if(a.kind == person_kind::fisher && ! a.tr && ! g.item_count(item_id::OLDROD))
     {
         g.add_item(item_id::OLDROD, 1);
@@ -368,6 +369,24 @@ void overworld::talk_to(int index)
         say("Nothing beats the thrill of a bite. Here, you have this OLD ROD!");
         obtain_named("OLD ROD", 1, "KEY ITEMS");
         say("Face any water and press A to cast your line. Good luck!");
+        save_game();
+        return;
+    }
+    if(a.kind == person_kind::fisher && ! a.tr && g.badges() >= 3 && ! g.item_count(item_id::GOODROD))
+    {
+        g.add_item(item_id::GOODROD, 1);
+        say("Still fishing with that OLD ROD? You've earned better!");
+        obtain_named("GOOD ROD", 1, "KEY ITEMS");
+        say("Bigger POKéMON bite on a GOOD ROD. Give it a try!");
+        save_game();
+        return;
+    }
+    if(a.kind == person_kind::fisher && ! a.tr && g.badges() >= 6 && ! g.item_count(item_id::SUPERROD))
+    {
+        g.add_item(item_id::SUPERROD, 1);
+        say("You've got the look of a true angler. Take my SUPER ROD!");
+        obtain_named("SUPER ROD", 1, "KEY ITEMS");
+        say("Even rare POKéMON bite on that one. Good luck!");
         save_game();
         return;
     }
@@ -381,6 +400,10 @@ void overworld::talk_to(int index)
         for(int i = 0; i < a.tr->after_count; ++i)
         {
             say(a.tr->after[i]);
+        }
+        if(offer_rematch(index))
+        {
+            return;
         }
         if(a.tr->role == trainer_role::TOWER)
         {
@@ -409,6 +432,12 @@ void overworld::talk_to(int index)
         break;
     case person_role::TRADER:
         trader();
+        break;
+    case person_role::DAYCARE:
+        daycare();
+        break;
+    case person_role::TUTOR:
+        move_tutor();
         break;
     default:
         for(int i = 0; i < p.lines_count; ++i)
@@ -471,7 +500,9 @@ void overworld::water_action(int tx, int ty)
     game_state& g = state();
     ui& u = gui();
     bool surf = can_surf() && ! g.surfing;
-    bool fish = g.item_count(item_id::OLDROD);
+    int rod = g.item_count(item_id::SUPERROD) ? 2 : g.item_count(item_id::GOODROD) ? 1 : 0;
+    bool fish = g.item_count(item_id::OLDROD) || rod;
+    constexpr const char* rod_names[] = { "OLD ROD", "GOOD ROD", "SUPER ROD" };
     if(! surf && ! fish)
     {
         say("The water is dyed a deep blue...");
@@ -480,7 +511,10 @@ void overworld::water_action(int tx, int ty)
     int pick = -1;      // 0 SURF, 1 FISH
     if(surf != fish)
     {
-        u.show_text(surf ? "The water is dyed a deep blue... Would you like to SURF?" : "Would you like to fish with the OLD ROD?");
+        bn::string<64> ask("Would you like to fish with the ");
+        ask.append(rod_names[rod]);
+        ask.append("?");
+        u.show_text(surf ? bn::string_view("The water is dyed a deep blue... Would you like to SURF?") : bn::string_view(ask));
         bool yes = u.yes_no();
         u.clear_text();
         pick = yes ? (surf ? 0 : 1) : -1;
@@ -499,7 +533,7 @@ void overworld::water_action(int tx, int ty)
     }
     else if(pick == 1)
     {
-        go_fish();
+        go_fish(rod);
     }
 }
 
@@ -535,26 +569,55 @@ void overworld::start_surf(int tx, int ty)
 }
 
 // Emerald's fishing: cast, a wait, then "Oh! A bite!" (a single wild Pokémon) or "Not even a nibble...".
-void overworld::go_fish()
+// The OLD ROD (0) catches the area's fish a little under your level; the GOOD ROD (1) bites more often, at
+// your level, from the surf's pool too; the SUPER ROD (2) nearly always bites, a little higher, and now and
+// then hooks a rare Water type from anywhere (GBA 1.8).
+void overworld::go_fish(int rod)
 {
     game_state& g = state();
+    bn::random& r = rng();
+    constexpr const char* rod_names[] = { "OLD ROD", "GOOD ROD", "SUPER ROD" };
     audio::play(audio::sfx::BALL);
     bn::string<48> text(g.name);
-    text.append(" used the OLD ROD!");
+    text.append(" used the ");
+    text.append(rod_names[rod]);
+    text.append("!");
     say(text);
     say(". . . . . .");
-    if(rng().get_int(10) < 3)
+    constexpr int miss[] = { 30, 15, 5 };
+    if(r.get_int(100) < miss[rod])
     {
         say("Not even a nibble...");
         return;
     }
     audio::play(audio::sfx::SPOT);
     say("Oh! A bite!");
-    int n = _map->area->fish_count;
-    species_id s = _map->fish[rng().get_int(n)];
-    // wildLevel() - 2, at least 3.
-    int wild = bn::max(2, bn::min(int(_map->level_cap), g.average_level() - 2 + rng().get_int(3)));
-    fixed_battle(s, bn::max(3, wild - 2));
+    int fish = _map->area->fish_count, water = rod ? _map->area->water_count : 0;
+    int k = r.get_int(fish + water);
+    species_id s = k < fish ? _map->fish[k] : _map->water[k - fish];
+    if(rod == 2 && r.get_int(10) == 0)
+    {
+        int water_type = type_index("WATER");
+        for(int tries = 0; tries < 200; ++tries)
+        {
+            int sp = r.get_int(species_count);
+            bool legend = false;
+            for(int i = 0; i < game_data::legendaries_count; ++i)
+            {
+                legend |= game_data::legendaries[i] == sp;
+            }
+            const species& d = game_data::species_list[sp];
+            if(! legend && (d.type1 == water_type || d.type2 == water_type))
+            {
+                s = species_id(sp);
+                break;
+            }
+        }
+    }
+    // wildLevel() - 2, at least 3 (the better rods: wildLevel(), then + 2).
+    int wild = bn::max(2, bn::min(int(_map->level_cap), g.average_level() - 2 + r.get_int(3)));
+    constexpr int bonus[] = { -2, 0, 2 };
+    fixed_battle(s, bn::clamp(wild + bonus[rod], 3, 100));
 }
 
 // ----- DIVE -----
@@ -814,9 +877,10 @@ void overworld::mart()
     };
     show_money();
     int badges = g.badges();
-    item_id stock[14];
+    item_id stock[20];
     int stock_count = 0;
-    for(item_id id : { item_id::POKEBALL, item_id::POTION, item_id::ANTIDOTE, item_id::PARLYZHEAL, item_id::AWAKENING })
+    for(item_id id : { item_id::POKEBALL, item_id::POTION, item_id::ANTIDOTE, item_id::PARLYZHEAL, item_id::AWAKENING,
+                       item_id::REPEL, item_id::ESCAPEROPE })
     {
         stock[stock_count++] = id;
     }
@@ -825,73 +889,110 @@ void overworld::mart()
         stock[stock_count++] = item_id::GREATBALL;
         stock[stock_count++] = item_id::SUPERPOTION;
         stock[stock_count++] = item_id::BURNHEAL;
+        stock[stock_count++] = item_id::SUPERREPEL;
     }
     if(badges >= 5)
     {
         stock[stock_count++] = item_id::ULTRABALL;
         stock[stock_count++] = item_id::HYPERPOTION;
         stock[stock_count++] = item_id::REVIVE;
+        stock[stock_count++] = item_id::MAXREPEL;
+    }
+    if(badges >= 6)
+    {
+        stock[stock_count++] = item_id::MAXPOTION;
     }
     if(badges >= 8)
     {
         stock[stock_count++] = item_id::FULLRESTORE;
     }
-    while(true)
+    // GBA 1.8: the TMs (more with more badges; each bought once, as it's never used up) and the evolution items
+    // (from the 3rd badge).
+    item_id tm_stock[game_data::tms_count];
+    int tm_count = 0;
+    item_id evo_stock[14];
+    int evo_count = 0;
+    if(badges >= 3)
     {
-        u.show_text("Welcome! How may I serve you?");
-        constexpr bn::string_view top[] = { "BUY", "SELL", "SEE YA!" };
-        int pick = u.list(top, 3);
-        u.clear_text();
-        if(pick == 0)
+        for(item_id id : { item_id::FIRESTONE, item_id::WATERSTONE, item_id::THUNDERSTONE, item_id::LEAFSTONE,
+                           item_id::MOONSTONE, item_id::SUNSTONE, item_id::SHINYSTONE, item_id::DUSKSTONE,
+                           item_id::DAWNSTONE, item_id::ICESTONE, item_id::OVALSTONE, item_id::RAZORCLAW,
+                           item_id::RAZORFANG, item_id::LINKINGCORD })
         {
-            bn::string<32> labels[15];
-            bn::string_view views[15];
-            for(int i = 0; i < stock_count; ++i)
+            evo_stock[evo_count++] = id;
+        }
+    }
+    // BUY from a list: how many (x1, x5, x10), then OK? A TM comes alone.
+    auto buy = [&](const item_id* list, int count, bool tms)
+    {
+        int last = 0;
+        while(true)
+        {
+            item_id shown[game_data::tms_count + 1];
+            bn::string<32> labels[game_data::tms_count + 1];
+            bn::string_view views[game_data::tms_count + 1];
+            int n = 0;
+            for(int i = 0; i < count; ++i)
             {
-                const item_info& it = game_data::items[int(stock[i])];
-                labels[i] = it.name;
-                labels[i].append("  $");
-                labels[i].append(bn::to_string<6>(it.price));
-                views[i] = labels[i];
+                if(tms && g.item_count(list[i]))
+                {
+                    continue;       // already yours
+                }
+                const item_info& it = game_data::items[int(list[i])];
+                shown[n] = list[i];
+                labels[n] = it.name;
+                labels[n].append("  $");
+                labels[n].append(bn::to_string<6>(it.price));
+                views[n] = labels[n];
+                ++n;
             }
-            views[stock_count] = "CANCEL";
-            int last = 0;
-            while(true)
+            if(! n)
             {
-                u.show_text("What would you like?");
-                int k = u.list(views, stock_count + 1, last);
-                u.clear_text();
-                if(k < 0 || k == stock_count)
-                {
-                    break;
-                }
-                last = k;
-                item_id id = stock[k];
-                const item_info& it = game_data::items[int(id)];
-                int max = bn::min(99, int(g.money / it.price));
-                if(! max)
-                {
-                    u.say_timed("You don't have enough money.", 72);
-                    continue;
-                }
-                int qs[3] = { 1, 5, 10 };
+                u.say_timed("You already have every TM I sell!", 72);
+                return;
+            }
+            views[n] = "CANCEL";
+            u.show_text("What would you like?");
+            // (A long list is wide enough to cover the money window: it comes back after.)
+            money.clear();
+            u.win().clear(0, 0, 12, 4);
+            int k = u.list(views, n + 1, bn::min(last, n));
+            u.clear_text();
+            show_money();
+            if(k < 0 || k == n)
+            {
+                return;
+            }
+            last = k;
+            item_id id = shown[k];
+            const item_info& it = game_data::items[int(id)];
+            int max = bn::min(tms ? 1 : 99, int(g.money / it.price));
+            if(! max)
+            {
+                u.say_timed("You don't have enough money.", 72);
+                continue;
+            }
+            int qs[3] = { 1, 5, 10 };
+            int q = 1;
+            bn::string<96> text(it.name);
+            if(! tms)
+            {
                 bn::string<24> ql[4];
                 bn::string_view qv[4];
                 int qn = 0;
-                for(int q : qs)
+                for(int x : qs)
                 {
-                    if(q <= max)
+                    if(x <= max)
                     {
                         ql[qn] = "x";
-                        ql[qn].append(bn::to_string<4>(q));
+                        ql[qn].append(bn::to_string<4>(x));
                         ql[qn].append("  $");
-                        ql[qn].append(bn::to_string<8>(q * it.price));
+                        ql[qn].append(bn::to_string<8>(x * it.price));
                         qv[qn] = ql[qn];
                         ++qn;
                     }
                 }
                 qv[qn] = "CANCEL";
-                bn::string<96> text(it.name);
                 text.append("? Certainly. How many would you like?");
                 u.show_text(text);
                 int qi = u.list(qv, qn + 1);
@@ -900,27 +1001,70 @@ void overworld::mart()
                 {
                     continue;
                 }
-                int q = qs[qi];
-                text = it.name;
-                text.append(", and you want ");
-                text.append(bn::to_string<4>(q));
-                text.append("? That will be $");
-                text.append(bn::to_string<8>(q * it.price));
-                text.append(". OK?");
-                u.show_text(text);
-                bool yes = u.yes_no();
-                u.clear_text();
-                if(! yes)
-                {
-                    continue;
-                }
-                g.money -= uint32_t(q * it.price);
-                g.add_item(id, q);
-                save_game();
-                show_money();
-                audio::play(audio::sfx::BALL);
-                u.say_timed("Here you go! Thank you very much.", 54);
+                q = qs[qi];
             }
+            text = it.name;
+            text.append(", and you want ");
+            text.append(bn::to_string<4>(q));
+            text.append("? That will be $");
+            text.append(bn::to_string<8>(q * it.price));
+            text.append(". OK?");
+            u.show_text(text);
+            bool yes = u.yes_no();
+            u.clear_text();
+            if(! yes)
+            {
+                continue;
+            }
+            g.money -= uint32_t(q * it.price);
+            g.add_item(id, q);
+            save_game();
+            show_money();
+            audio::play(audio::sfx::BALL);
+            u.say_timed("Here you go! Thank you very much.", 54);
+        }
+    };
+    while(true)
+    {
+        tm_count = 0;
+        for(int i = 0; i < game_data::tms_count; ++i)
+        {
+            if(game_data::tms[i].badges <= badges)
+            {
+                tm_stock[tm_count++] = game_data::tms[i].item;
+            }
+        }
+        u.show_text("Welcome! How may I serve you?");
+        bn::string_view top[5];
+        int top_ids[5];
+        int top_count = 0;
+        top_ids[top_count] = 0;
+        top[top_count++] = "BUY";
+        top_ids[top_count] = 2;
+        top[top_count++] = "TMs";
+        if(evo_count)
+        {
+            top_ids[top_count] = 3;
+            top[top_count++] = "EVOLUTION";
+        }
+        top_ids[top_count] = 1;
+        top[top_count++] = "SELL";
+        top_ids[top_count] = 4;
+        top[top_count++] = "SEE YA!";
+        int chosen = u.list(top, top_count);
+        int pick = chosen < 0 ? 4 : top_ids[chosen];
+        u.clear_text();
+        if(pick == 0)
+        {
+            buy(stock, stock_count, false);
+        }
+        else if(pick == 2)
+        {
+            buy(tm_stock, tm_count, true);
+        }
+        else if(pick == 3)
+        {
+            buy(evo_stock, evo_count, false);
         }
         else if(pick == 1)
         {
@@ -950,7 +1094,9 @@ void overworld::mart()
                 }
                 views[n] = "CANCEL";
                 u.show_text("What would you like to sell?");
+                money.clear();
                 int k = u.list(views, n + 1);
+                show_money();
                 u.clear_text();
                 if(k < 0 || k >= n)
                 {
@@ -2353,12 +2499,18 @@ void overworld::start_menu()
             resume();
             break;
         case 2:
+        {
             suspend();
-            bag_screen(bag_mode::FIELD);
+            int used = bag_screen(bag_mode::FIELD);
             save_game();
             resume();
-            move_prompts();     // a RARE CANDY's new moves
+            move_prompts();     // a RARE CANDY's (or a TM's, or an evolution's) new moves
+            if(used == int(item_id::ESCAPEROPE) && escape_rope())
+            {
+                return;
+            }
             break;
+        }
         case 3:
         {
             // Fast travel from the map, except from inside the CHALLENGE TOWER or the POKéMON LEAGUE.
@@ -2715,6 +2867,502 @@ void overworld::save_menu()
     {
         start_menu();
     }
+}
+
+
+// ----- GBA 1.8: the ESCAPE ROPE, the MOVE TUTOR, the DAY CARE and EGGS, REPEL and rematches -----
+namespace
+{
+    constexpr int frames_per_day = 60 * 1800;   // a day of play: 30 minutes (current_time_of_day)
+
+    bool in_group(int groups, int group)
+    {
+        return (groups & 15) == group || (groups >> 4) == group;
+    }
+
+    bool is_ditto(const mon& m)
+    {
+        return in_group(game_data::egg_groups[m.species_index], 13);
+    }
+
+    // Whether two Pokémon left at the DAY CARE can have an EGG: a shared egg group, or one of them DITTO
+    // (but not both); never one that can't breed (legendaries, babies). This game has no genders.
+    bool breeds(const mon& a, const mon& b)
+    {
+        int ga = game_data::egg_groups[a.species_index], gb = game_data::egg_groups[b.species_index];
+        if(in_group(ga, 15) || in_group(gb, 15))
+        {
+            return false;
+        }
+        if(is_ditto(a) || is_ditto(b))
+        {
+            return is_ditto(a) != is_ditto(b);
+        }
+        return in_group(gb, ga & 15) || in_group(gb, ga >> 4);
+    }
+
+    // The level a Pokémon left at the DAY CARE has reached: 1 EXP a step, up to the level cap.
+    int daycare_level(const mon& m, uint32_t steps, uint32_t& xp)
+    {
+        int level = m.level;
+        int cap = bn::min(100, level_cap_now());
+        xp = m.xp + steps;
+        while(level < cap && xp >= uint32_t(level * 8))
+        {
+            xp -= uint32_t(level * 8);
+            ++level;
+        }
+        if(level >= cap)
+        {
+            xp = 0;
+        }
+        return level;
+    }
+
+    // Struggle goes once it knows something real.
+    void drop_struggle(mon& m)
+    {
+        for(int k = 0; k < m.move_count; ++k)
+        {
+            if(m.move(k) == 0)
+            {
+                for(int j = k; j < m.move_count - 1; ++j)
+                {
+                    m.slots[j] = m.slots[j + 1];
+                }
+                --m.move_count;
+                --k;
+            }
+        }
+    }
+}
+
+// The ESCAPE ROPE (from the bag): out of a cave or the sea floor, to the door of the last POKéMON CENTER.
+bool overworld::escape_rope()
+{
+    game_state& g = state();
+    bool deep = _map->area && ! _map->is_room() &&
+                (_map->area->theme == area_theme::CAVE || _map->area->theme == area_theme::DEEP);
+    if(! deep || g.tower.active || ! g.item_count(item_id::ESCAPEROPE))
+    {
+        say("This can't be used here.");
+        return false;
+    }
+    g.items[int(item_id::ESCAPEROPE)] = uint8_t(g.items[int(item_id::ESCAPEROPE)] - 1);
+    bn::string<48> text(g.name);
+    text.append(" used the ESCAPE ROPE!");
+    say(text);
+    int area = g.last_heal;
+    if(area < 0 || ! wd::maps[area].area || ! (wd::maps[area].area->flags & area_flag::CENTER))
+    {
+        area = 0;
+    }
+    suspend();
+    fast_travel(area);
+    return true;
+}
+
+// The MOVE TUTOR (every POKéMON CENTER): a move from the Pokémon's level-up list, up to its level.
+void overworld::move_tutor()
+{
+    game_state& g = state();
+    ui& u = gui();
+    say("MOVE TUTOR: \"I can help a POKéMON remember a move it learned before, or one it should have learned by now.\"");
+    while(true)
+    {
+        u.show_text("Remember a move?");
+        bool yes = u.yes_no();
+        u.clear_text();
+        if(! yes)
+        {
+            say("MOVE TUTOR: \"Come back anytime!\"");
+            return;
+        }
+        suspend();
+        int pick = party_screen(party_mode::CHOOSE, "Which POKéMON?");
+        resume();
+        if(pick < 0)
+        {
+            continue;
+        }
+        mon& m = g.party[pick];
+        const species& sp = m.data();
+        uint16_t moves[64];
+        int n = 0;
+        for(int i = 0; i < sp.learnset_count && n < 64; ++i)
+        {
+            const learn_entry& e = sp.learnset[i];
+            bool skip = e.level > m.level || e.move == 0;
+            for(int k = 0; k < m.move_count && ! skip; ++k)
+            {
+                skip = m.move(k) == e.move;
+            }
+            for(int k = 0; k < n && ! skip; ++k)
+            {
+                skip = moves[k] == e.move;
+            }
+            if(! skip)
+            {
+                moves[n++] = e.move;
+            }
+        }
+        bn::string<96> text(m.name());
+        if(! n)
+        {
+            text.append(" has no moves to remember.");
+            say(text);
+            continue;
+        }
+        bn::string_view views[65];
+        for(int k = 0; k < n; ++k)
+        {
+            views[k] = move_data(moves[k]).name;
+        }
+        views[n] = "CANCEL";
+        u.show_text("Which move should it remember?");
+        int k = u.list(views, n + 1);
+        u.clear_text();
+        if(k < 0 || k >= n)
+        {
+            continue;
+        }
+        drop_struggle(m);
+        if(m.move_count < 4)
+        {
+            m.set_move(m.move_count++, moves[k]);
+            audio::play(audio::sfx::OBTAIN);
+            text.append(" learned ");
+            text.append(move_data(moves[k]).name);
+            text.append("!");
+            say(text);
+        }
+        else
+        {
+            add_pending_move(&m, moves[k]);
+            move_prompts();
+        }
+        save_game();
+    }
+}
+
+// The DAY CARE (CINDERGATE TOWN): up to two Pokémon gain a level's EXP as you walk, and two that can breed now
+// and then leave an EGG. Taking one back costs $100, plus $100 a level it grew.
+void overworld::daycare()
+{
+    game_state& g = state();
+    ui& u = gui();
+    extras_state& x = g.extra;
+    if(x.egg_waiting)
+    {
+        say("DAY CARE: \"Ah, there you are! We were raising your POKéMON, and my, were we surprised!\"");
+        say("DAY CARE: \"Your POKéMON had an EGG! We don't know how it got there. Do you want it?\"");
+        u.show_text("Take the EGG?");
+        bool yes = u.yes_no();
+        u.clear_text();
+        if(yes && x.egg_count >= egg_slots)
+        {
+            say("DAY CARE: \"You're carrying too many EGGs already. Come back once one has hatched.\"");
+        }
+        else if(yes)
+        {
+            const mon& parent = is_ditto(x.daycare[0]) ? x.daycare[1] : x.daycare[0];
+            egg& e = x.eggs[x.egg_count++];
+            e.species = game_data::babies[parent.species_index];
+            e.steps = uint16_t(egg_hatch_steps);
+            e.shiny = roll_shiny();
+            x.egg_waiting = false;
+            audio::play(audio::sfx::OBTAIN);
+            bn::string<48> text(g.name);
+            text.append(" received the EGG!");
+            say(text);
+            say("DAY CARE: \"Keep it with you as you walk, and it'll hatch before long.\"");
+            save_game();
+        }
+        else
+        {
+            x.egg_waiting = false;
+            say("DAY CARE: \"Well then, I'll keep it. Thank you!\"");
+        }
+    }
+    say("DAY CARE: \"I'm the DAY CARE lady. Leave a POKéMON or two with me, and they'll grow as you walk.\"");
+    while(true)
+    {
+        int in_care = 0;
+        for(int i = 0; i < 2; ++i)
+        {
+            const mon& m = x.daycare[i];
+            if(m.empty())
+            {
+                continue;
+            }
+            ++in_care;
+            uint32_t xp;
+            int grown = daycare_level(m, x.daycare_steps[i], xp) - m.level;
+            bn::string<96> text("Your ");
+            text.append(m.name());
+            if(grown)
+            {
+                text.append(" has grown by ");
+                text.append(bn::to_string<4>(grown));
+                text.append(grown == 1 ? " level." : " levels.");
+            }
+            else
+            {
+                text.append(" is doing just fine.");
+            }
+            say(text);
+        }
+        if(in_care == 2)
+        {
+            say(breeds(x.daycare[0], x.daycare[1]) ? "DAY CARE: \"Those two get along very well!\""
+                                                   : "DAY CARE: \"Those two prefer to play with other POKéMON.\"");
+        }
+        if(x.egg_count)
+        {
+            bn::string<48> text("You're carrying ");
+            text.append(bn::to_string<4>(x.egg_count));
+            text.append(x.egg_count == 1 ? " EGG." : " EGGs.");
+            say(text);
+        }
+        bn::string_view options[3];
+        int ids[3];
+        int n = 0;
+        if(in_care < 2)
+        {
+            ids[n] = 0;
+            options[n++] = "LEAVE ONE";
+        }
+        if(in_care)
+        {
+            ids[n] = 1;
+            options[n++] = "TAKE ONE BACK";
+        }
+        ids[n] = 2;
+        options[n++] = "CANCEL";
+        u.show_text("What would you like to do?");
+        int k = u.list(options, n);
+        u.clear_text();
+        int pick = k < 0 ? 2 : ids[k];
+        if(pick == 2)
+        {
+            say("DAY CARE: \"Come again!\"");
+            return;
+        }
+        if(pick == 0)
+        {
+            suspend();
+            int who = party_screen(party_mode::CHOOSE, "Leave which POKéMON?");
+            resume();
+            if(who < 0)
+            {
+                continue;
+            }
+            mon& m = g.party[who];
+            if(g.party_count <= 1 || (g.able_count() <= 1 && ! m.fainted()))
+            {
+                say("DAY CARE: \"That's your only POKéMON that can battle! Keep it with you.\"");
+                continue;
+            }
+            int slot = x.daycare[0].empty() ? 0 : 1;
+            x.daycare[slot] = m;
+            x.daycare[slot].heal();
+            x.daycare_steps[slot] = 0;
+            x.egg_steps = 0;
+            for(int i = who; i < g.party_count - 1; ++i)
+            {
+                g.party[i] = g.party[i + 1];
+            }
+            g.party[g.party_count - 1] = mon();
+            --g.party_count;
+            bn::string<64> text("Left ");
+            text.append(x.daycare[slot].name());
+            text.append(" at the DAY CARE.");
+            say(text);
+            save_game();
+            continue;
+        }
+        // Take one back.
+        bn::string<40> labels[2];
+        bn::string_view views[3];
+        int slots[2];
+        int m_count = 0;
+        for(int i = 0; i < 2; ++i)
+        {
+            const mon& m = x.daycare[i];
+            if(m.empty())
+            {
+                continue;
+            }
+            uint32_t xp;
+            int level = daycare_level(m, x.daycare_steps[i], xp);
+            labels[m_count] = m.name();
+            labels[m_count].append(" Lv");
+            labels[m_count].append(bn::to_string<4>(level));
+            labels[m_count].append("  $");
+            labels[m_count].append(bn::to_string<6>(100 + 100 * (level - m.level)));
+            views[m_count] = labels[m_count];
+            slots[m_count++] = i;
+        }
+        views[m_count] = "CANCEL";
+        u.show_text("Take back which one?");
+        int t = u.list(views, m_count + 1);
+        u.clear_text();
+        if(t < 0 || t >= m_count)
+        {
+            continue;
+        }
+        int slot = slots[t];
+        if(g.party_count >= g.party_cap())
+        {
+            say("DAY CARE: \"Your party is full. Make some room first.\"");
+            continue;
+        }
+        uint32_t xp;
+        int level = daycare_level(x.daycare[slot], x.daycare_steps[slot], xp);
+        int cost = 100 + 100 * (level - x.daycare[slot].level);
+        if(g.money < uint32_t(cost))
+        {
+            say("DAY CARE: \"You don't have enough money.\"");
+            continue;
+        }
+        g.money -= uint32_t(cost);
+        mon& m = g.party[g.party_count++];
+        m = x.daycare[slot];
+        x.daycare[slot] = mon();
+        x.daycare_steps[slot] = 0;
+        x.egg_steps = 0;
+        bn::string<64> text("Got back ");
+        text.append(m.name());
+        text.append(" from the DAY CARE.");
+        audio::play(audio::sfx::OBTAIN);
+        say(text);
+        while(m.level < level)
+        {
+            ++m.level;
+            m.recalc_stats(m.level - 1);
+            m.learn_moves_at(m.level, u);
+        }
+        m.xp = uint16_t(xp);
+        m.heal();
+        move_prompts();
+        save_game();
+    }
+}
+
+// Each step: REPEL counts down, the DAY CARE's Pokémon gain EXP (and may leave an EGG), and the EGGS you carry
+// get closer to hatching. Returns true if something was said.
+bool overworld::step_counters()
+{
+    game_state& g = state();
+    extras_state& x = g.extra;
+    bool spoke = false;
+    if(x.repel_steps && ! --x.repel_steps)
+    {
+        say("REPEL's effect wore off...");
+        spoke = true;
+    }
+    for(int i = 0; i < 2; ++i)
+    {
+        if(! x.daycare[i].empty() && x.daycare_steps[i] < 1000000)
+        {
+            ++x.daycare_steps[i];
+        }
+    }
+    if(! x.daycare[0].empty() && ! x.daycare[1].empty() && ! x.egg_waiting && ++x.egg_steps >= egg_lay_steps)
+    {
+        x.egg_steps = 0;
+        bool same = x.daycare[0].species_index == x.daycare[1].species_index;
+        if(breeds(x.daycare[0], x.daycare[1]) && rng().get_int(100) < (same ? 70 : 50))
+        {
+            x.egg_waiting = true;
+        }
+    }
+    for(int i = 0; i < x.egg_count; ++i)
+    {
+        if(x.eggs[i].steps > 1)
+        {
+            --x.eggs[i].steps;
+        }
+        else if(! spoke)
+        {
+            spoke = hatch(i);
+        }
+    }
+    return spoke;
+}
+
+// "Oh?" ... an EGG hatches into a level 1 Pokémon: into the party, or the PC if it's full.
+bool overworld::hatch(int slot)
+{
+    game_state& g = state();
+    extras_state& x = g.extra;
+    egg e = x.eggs[slot];
+    mon m = mon::make(species_id(e.species), 1);
+    if(e.shiny)
+    {
+        m.traits |= mon_trait::SHINY;
+    }
+    int box_slot;
+    if(! g.add_mon(m, box_slot))
+    {
+        return false;   // nowhere to put it: it waits (one step from hatching)
+    }
+    for(int i = slot; i < x.egg_count - 1; ++i)
+    {
+        x.eggs[i] = x.eggs[i + 1];
+    }
+    x.eggs[x.egg_count - 1] = egg();
+    --x.egg_count;
+    set_player_frame(0);
+    say("Oh?");
+    say(". . . . . .");
+    audio::play(audio::sfx::OBTAIN);
+    bn::string<64> text(game_data::species_list[e.species].name);
+    text.append(e.shiny ? " hatched from the EGG! It's SHINY!" : " hatched from the EGG!");
+    say(text);
+    if(box_slot >= 0)
+    {
+        say("It was sent to the PC.");
+    }
+    g.mark_seen(e.species);
+    g.mark_owned(e.species);
+    save_game();
+    return true;
+}
+
+// A route trainer you've beaten will battle again once a day (30 minutes of play), stronger than before.
+bool overworld::offer_rematch(int index)
+{
+    game_state& g = state();
+    ui& u = gui();
+    actor& a = _actors[index];
+    if(a.tr->role != trainer_role::ROUTE || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
+       g.first_able() < 0 || g.tower.active)
+    {
+        return false;
+    }
+    int today = int(g.play_frames / frames_per_day);
+    if(g.extra.rematch_day != today)
+    {
+        g.extra.rematch_day = uint16_t(today);
+        g.extra.rematched = bitset<256>();
+    }
+    if(g.extra.rematched.test(a.tr->id))
+    {
+        return false;
+    }
+    bn::string<128> text;
+    upper(text, a.tr->title);
+    text.append(": \"I've been training since we last battled. How about a rematch?\"");
+    u.show_text(text);
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(yes)
+    {
+        start_trainer_battle(index);
+        _battle->rematch = true;
+    }
+    return true;
 }
 
 }

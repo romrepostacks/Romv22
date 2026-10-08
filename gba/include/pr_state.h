@@ -149,6 +149,31 @@ struct tower_state
     int16_t legend = -1;                // the species the SUMMONING STONE called, waiting in its chamber
 };
 
+// GBA 1.8 (save version 9): REPEL, trainer rematches, the DAY CARE and the EGGS you carry. All zero to start.
+constexpr int egg_slots = 6;
+constexpr int egg_hatch_steps = 600;
+constexpr int egg_lay_steps = 256;      // the DAY CARE checks for an EGG this often
+
+struct egg
+{
+    uint16_t species = 0;
+    uint16_t steps = 0;                 // left before it hatches
+    bool shiny = false;
+};
+
+struct extras_state
+{
+    uint16_t repel_steps = 0;           // wild POKéMON stay away while this counts down
+    uint16_t rematch_day = 0;           // the day (of play time) `rematched` is for
+    bitset<256> rematched;              // route trainers beaten again today
+    mon daycare[2];                     // level 0: empty
+    uint32_t daycare_steps[2] = {};     // steps walked since it was left (its EXP)
+    uint16_t egg_steps = 0;             // toward the DAY CARE's next check for an EGG
+    bool egg_waiting = false;           // the DAY CARE lady has an EGG for you
+    uint8_t egg_count = 0;
+    egg eggs[egg_slots];
+};
+
 struct game_state
 {
     int16_t map = 0;                    // world_data::maps index (an area or a room)
@@ -180,6 +205,7 @@ struct game_state
     bitset<64> visited;                 // areas you've been to (the region map, the TRAINER CARD)
     run_state run;                      // (added in save version 5; older saves get the defaults)
     tower_state tower;                  // (added in save version 6)
+    extras_state extra;                 // (added in save version 9)
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1

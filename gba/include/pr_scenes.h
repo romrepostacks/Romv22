@@ -28,6 +28,7 @@ struct encounter
     bool water = false;
     bool scripted = false;          // the professor's ZIGZAGOON: never a NUZLOCKE encounter
     bool tower_legend = false;      // the CHALLENGE TOWER's summoned legendary (shiny as rolled at the stone)
+    bool rematch = false;           // a route trainer battling again (GBA 1.8): stronger, once a day
 };
 
 enum class battle_outcome

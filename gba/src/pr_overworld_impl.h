@@ -161,7 +161,7 @@ public:
     void legend_talk(int index);
     void water_action(int tx, int ty);
     void start_surf(int tx, int ty);
-    void go_fish();
+    void go_fish(int rod);
     void dive_action();
     void surface_action();
     void enter_room(const door& d);
@@ -196,6 +196,13 @@ public:
     bool safari_gate();
     void trader();
     bool find_hidden(int tx, int ty);
+    // GBA 1.8: the ESCAPE ROPE, the MOVE TUTOR, the DAY CARE, EGGS and REPEL's countdown, and rematches.
+    bool escape_rope();
+    void move_tutor();
+    void daycare();
+    bool step_counters();
+    bool hatch(int slot);
+    bool offer_rematch(int index);
     void update_glints();
     void fast_travel(int area);
     void save_menu();
