@@ -1637,7 +1637,8 @@ def add_extras(data):
         data['babies'].append(by_num.get(n, i))
     # TMs (Ultra Sun / Moon's numbers), reusable; sold in the MART from a badge count that rises with power.
     norm = lambda t: re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-')
-    move_index = {norm(m['n']): i for i, m in enumerate(data['moves'])}
+    # Only 1.x moves get TMs: a new TM would shift every held item's id, and saves hold item ids.
+    move_index = {norm(m['n']): i for i, m in enumerate(data['moves'][:data.get('moves_v1', len(data['moves']))])}
     data['tms'] = []
     for t in ex['tms']:
         if t['move'] not in move_index:
@@ -1694,7 +1695,8 @@ def build_game_data(data, out_inc):
     legend_nums = {144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385,
                    386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642,
                    643, 644, 645, 646, 647, 648, 649, 716, 717, 718, 719, 720, 721, 785, 786, 787, 788, 789, 790, 791, 792,
-                   800, 801, 802, 807, 808, 809}
+                   800, 801, 802, 807, 808, 809, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 905, 1001, 1002,
+                   1003, 1004, 1007, 1008, 1014, 1015, 1016, 1017, 1024, 1025}
     legends = [i for i, sp in enumerate(data['species']) if sp['num'] in legend_nums]
     L.append('constexpr uint16_t legendaries[] = {%s};' % ', '.join(map(str, legends)))
     L.append('constexpr int legendaries_count = %d;\n' % len(legends))

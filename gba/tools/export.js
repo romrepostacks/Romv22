@@ -28,7 +28,7 @@ vm.runInContext(src + `
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
 // The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
@@ -512,7 +512,7 @@ const species = [...usedSpecies].map(name=>{
   const info = G.DEXINFO[num] || {h:0, w:0, g:''};
   const ab = d.ability || {n:'', desc:'', type:'flavor'};
   return {name:d.name, num, types:d.types, base:d.base, capture:rate, evo:evo && evo.to && evo.level && usedSpecies.has(evo.to) ? evo : null,
-    learn:(d.learn || []).filter(([lv])=>lv<=100).map(([lv, mi])=>[lv, addMove(G.MOVEDATA[mi])]),
+    learn:d.learn || [],
     moves:d.learn ? [] : d.moves.map(addMove),   // hand-made entries without a learnset know these four
     ability:{n:ab.n || '', desc:ab.desc || '', type:ab.type || 'flavor', of:ab.boostType || ab.immuneType || ''},
     height:info.h, weight:info.w, genus:info.g, curated:G.CURATED_DEX.includes(d)};
@@ -521,15 +521,19 @@ for(const n of trainerSpecies) if(!usedSpecies.has(n)) throw new Error('no speci
 
 // The GBA's extra move data (tools/build_moves.js: PP, targets, draining, healing, stat changes, weather) and
 // the status moves it adds, which join the learnsets after every existing move has its index (saves hold them).
-const EXTRA = G.MOVE_EXTRA;
-G.MOVEDATA.forEach((m, i)=>Object.assign(m, EXTRA.existing[i]));
+// 2.0's species (PROC_RAW_GEN89) and the moves only they learn come last, so every 1.x move keeps its index.
+const EXTRA = G.MOVE_EXTRA, gen89 = new Set(G.GEN89);
 Object.assign(G.STRUGGLE, {pp:1, target:'one', drain:-25});
-for(const sp of species){
+const learnOf = (sp, rows)=>rows.filter(([lv])=>lv<=100).map(([lv, mi])=>[lv, addMove(G.moveByIndex(mi))]);
+const addLearn = sp=>{
   const extra = EXTRA.learn[G.slug(sp.name)];
-  if(!extra || !sp.learn.length) continue;
-  for(const [lv, ix] of extra) if(lv<=100) sp.learn.push([lv, addMove(EXTRA.added[ix - G.MOVEDATA.length])]);
+  if(extra && sp.learn.length) sp.learn.push(...learnOf(sp, extra));
   sp.learn.sort((a, b)=>a[0]-b[0]);
-}
+};
+for(const sp of species) if(!gen89.has(sp.name)) sp.learn = learnOf(sp, sp.learn);
+for(const sp of species) if(!gen89.has(sp.name)) addLearn(sp);
+const moves_v1 = moves.length;
+for(const sp of species) if(gen89.has(sp.name)){ sp.learn = learnOf(sp, sp.learn); addLearn(sp); }
 
 // Music (js/music.js): 8th-note steps per channel.
 const music = G.MUSIC_TRACKS ? Object.fromEntries(Object.entries(G.MUSIC_TRACKS).map(([k, t])=>[k, {bpm:t.bpm,
@@ -540,7 +544,7 @@ const music = G.MUSIC_TRACKS ? Object.fromEntries(Object.entries(G.MUSIC_TRACKS)
 for(const m of moves) m.fx = G.mfxScript(m);
 fs.writeFileSync(path.join(OUT, 'data.json'), JSON.stringify({
   pix:G.PIX, type_col:G.TYPE_COL,
-  areas, rooms, people, surf, species, moves, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
+  areas, rooms, people, surf, species, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
   starter_trios:G.STARTER_TRIOS, prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO, held_items:G.ITEMS, prof_calls:G.PROF_CALLS,
   elites:G.ELITES, time_types:G.TIME_TYPES, night_visitors:G.NIGHT_VISITORS, tempest_pool:G.TEMPEST_POOL, admin:G.ADMIN,
   music, weather:G.WEATHER, wallpapers:G.WALLPAPERS, wall_names:G.WALL_NAMES,
