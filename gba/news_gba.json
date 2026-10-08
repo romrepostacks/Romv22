@@ -1,7 +1,25 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 1.9.1: give your POKéMON held items, from LEFTOVERS to the CHOICE SCARF!",
+  "motd": "Version 2.0.0: sail from PORTMERE to CALDERRA, a new region in Adventure Mode!",
   "changelog": [
+    {
+      "version": "GBA 2.0.0",
+      "date": "2026-10-08",
+      "title": "The Calderra region",
+      "changes": [
+        "Every POKéMON up to Gen 9 joins the game",
+        "CALDERRA, a second region themed on RAIKOU, ENTEI and SUICUNE: take the ferry from PORTMERE in Adventure Mode",
+        "Three branches from PORT CALDER, open in any order: STORMREACH, the MISTRAL LAKES and CINDERDEEP, with eight new gyms",
+        "TEAM ECLIPSE, your new rival KAI, HO-OH at the ASHEN TOWER, and a new ELITE FOUR and CHAMPION",
+        "The level cap in CALDERRA is 200, and its trainers battle smarter and carry a FULL RESTORE",
+        "PROF. EMBER at PORT CALDER gives you a Gen 8 or 9 starter",
+        "RAIKOU, ENTEI and SUICUNE roam the region after you meet them",
+        "A MOVE TUTOR sells new moves, the POKéDEX counts each region, and a full national POKéDEX doubles your shiny odds",
+        "After the CALDERRA LEAGUE, its leaders rematch at level 200 and the CHALLENGE TOWER climbs to 200",
+        "The REGION MAP shows the region you are in and fast-travels within it",
+        "Saves from 1.9 carry over"
+      ]
+    },
     {
       "version": "GBA 1.9.1",
       "date": "2026-10-08",

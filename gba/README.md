@@ -3,13 +3,17 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.9.1**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+Version **2.0.0**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
 web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
 NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
 The GBA is now the only supported version of the game.
 
 ## What's in it
 
+- **Calderra (2.0, Adventure Mode):** a second region reached by ferry from PORTMERE, themed on RAIKOU, ENTEI and
+  SUICUNE. Three branches from PORT CALDER open in any order (STORMREACH, the MISTRAL LAKES, CINDERDEEP) with
+  eight gyms, TEAM ECLIPSE, the rival KAI, HO-OH's ASHEN TOWER and its own LEAGUE. Every Pokémon up to Gen 9,
+  a Gen 8/9 starter from PROF. EMBER, roaming beasts, a MOVE TUTOR, and a level cap of 200 with smarter trainers.
 - **All of Vellorin:** every town, route, cave and sea area of the web game (34 areas, plus three GBA-only ones) and every building
   inside them, with the same layouts, art and people, joined seamlessly like Emerald's map connections.
   Water and flowers animate, and each area has its weather (rain, snow, ash, fog, the depths) and the time
@@ -81,7 +85,7 @@ The GBA is now the only supported version of the game.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
 - **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.8.1
-  saves load in 1.9.x; saves from 0.3 and earlier aren't compatible.
+  saves load in 2.0.0; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) was planned for the web app, which has been retired.
 
