@@ -76,6 +76,14 @@ Easter eggs to include: a statue of Wren and the Vellorin gym leaders in Calderr
 - Needs a look: stat formulas past 100, the XP curve to 200, and screens that assume 3-digit HP and levels.
 - Only the new region's trainers get the smarter AI (the Challenge Tower's move scoring today), and its bosses also switch out of bad matchups and use one healing item per battle.
 
+## Stage 3c: Extras (Kyle approved all six, 2026-10-08)
+1. **Calderra region map with fast travel.** Fast travel already exists on Vellorin's map (gba/src/pr_field.cpp); add a Calderra page and a way to switch between regions on the map.
+2. **Roaming beasts.** New system: after its shrine, each beast moves between the routes of its own branch whenever you change area, can appear in grass there, and flees after a turn. Its HP and status carry over between encounters (stored in the save's spare space).
+3. **A new starter at Port Calder.** Choose one of Grookey, Scorbunny, Sobble, Sprigatito, Fuecoco or Quaxly as a welcome gift on arrival.
+4. **Move Relearner and Move Tutor in Port Calder.** The Relearner teaches any level-up move a Pokémon has passed; the Tutor teaches a rotating set of the new Gen 8/9 moves for money.
+5. **A Pokédex per region, plus a national completion reward.** The POKéDEX screen gets Vellorin, Calderra and National tabs; completing the national Pokédex doubles shiny odds.
+6. **Calderra post-game.** Gym leader rematches at level 200 after the Calderra League, and Challenge Tower floors that keep scaling up to 200.
+
 ## Stage 4: Test and ship
 - Scripted emulator run through every new area (same harness as 1.9.0's playthrough test).
 - Old 1.9.0 save loads, migrates and can reach the new region.
