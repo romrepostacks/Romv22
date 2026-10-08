@@ -49,10 +49,12 @@ Working name: **Calderra**, a region built around a great crater. The legend say
 
 Layout (locked in by Kyle, 2026-10-08): a tree, not a grid. Map: [calderra-map.png](calderra-map.png), 32 areas.
 - One start, **Port Calder**, where the ferry lands. Three branches leave it and all end at the **Crater Rim**.
-- Branch 1, **Stormreach** (thunder plains, Raikou): Electric, Flying and Normal gyms. Open from the start.
-- Branch 2, **Mistral Lakes** (cold lakes and the north wind, Suicune): Ice and Water gyms. Its entrance at Port Calder opens after branch 1.
-- Branch 3, **Cinderdeep** (volcanic highlands, Entei): Rock, Fire and Ground gyms. Its entrance opens after branch 2.
-- The Rim ends of branches 2 and 3 are blocked from the Rim side until you have walked that branch from Port Calder once; after that they work both ways as shortcuts.
+- Three branches, all open from the start; the player picks which beast to chase first and can walk back to Port Calder and switch branches at any time (Kyle, 2026-10-08):
+  - **Stormreach** (thunder plains, Raikou): Electric, Flying and Normal gyms.
+  - **Mistral Lakes** (cold lakes and the north wind, Suicune): Ice and Water gyms.
+  - **Cinderdeep** (volcanic highlands, Entei): Rock, Fire and Ground gyms.
+- Because the order is free, levels follow progress, not place: each gym leader's team scales with how many Calderra badges you already have (your 1st badge is always the easiest, your 8th the hardest), and wild Pokémon and route trainers scale the same way.
+- Each branch's Rim end is blocked from the Rim side until you have walked that branch from Port Calder once; after that it works both ways as a shortcut.
 - From the Rim, once all three beasts are free: the **Ashen Tower** (Ho-Oh), Victory Road and the Calderra League.
 - Six optional side areas branch off gym towns (Windmill Fields, Static Fields, Glacier Cave, Hidden Falls, Geode Hollow, Hot Springs).
 
