@@ -162,7 +162,7 @@ namespace
     {
         game_state& g = state();
         int clears = bn::max(0, g.run.tower_clears - 1);
-        return bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
+        return bn::min(g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
     }
 }
 
@@ -3083,7 +3083,7 @@ namespace
     int daycare_level(const mon& m, uint32_t steps, uint32_t& xp)
     {
         int level = m.level;
-        int cap = bn::min(100, level_cap_now());
+        int cap = level_cap_now();
         xp = m.xp + steps;
         while(level < cap && xp >= uint32_t(level * 8))
         {
@@ -3137,20 +3137,125 @@ bool overworld::escape_rope()
 }
 
 // The MOVE TUTOR (every POKéMON CENTER): a move from the Pokémon's level-up list, up to its level.
+// Calderra's MOVE TUTOR (2.0.0): four of the Gen 8 and 9 moves each day, for money, to a POKéMON of the
+// move's type (NORMAL moves to anyone).
+void overworld::tutor_new_move()
+{
+    game_state& g = state();
+    ui& u = gui();
+    constexpr int fresh = game_data::moves_count - game_data::moves_v1;
+    int today = int(g.play_frames / frames_per_day);
+    int moves[4], prices[4];
+    bn::string<32> labels[5];
+    bn::string_view views[5];
+    for(int k = 0; k < 4; ++k)
+    {
+        moves[k] = game_data::moves_v1 + (today * 4 + k) % fresh;
+        const move& mv = move_data(moves[k]);
+        prices[k] = mv.category == move_category::STATUS || mv.power <= 70 ? 3000 : mv.power <= 95 ? 5000 : 8000;
+        labels[k] = mv.name;
+        labels[k].append(" $");
+        labels[k].append(bn::to_string<6>(prices[k]));
+        views[k] = labels[k];
+    }
+    views[4] = "CANCEL";
+    u.show_text("Today's moves:");
+    int k = u.list(views, 5);
+    u.clear_text();
+    if(k < 0 || k >= 4)
+    {
+        return;
+    }
+    if(g.money < uint32_t(prices[k]))
+    {
+        say("MOVE TUTOR: \"You'll need more money than that, I'm afraid.\"");
+        return;
+    }
+    suspend();
+    int pick = party_screen(party_mode::CHOOSE, "Teach which POKéMON?");
+    resume();
+    if(pick < 0)
+    {
+        return;
+    }
+    mon& m = g.party[pick];
+    const move& mv = move_data(moves[k]);
+    bn::string<96> text(m.name());
+    bool known = false;
+    for(int i = 0; i < m.move_count; ++i)
+    {
+        known |= m.move(i) == moves[k];
+    }
+    if(known)
+    {
+        text.append(" already knows it.");
+        say(text);
+        return;
+    }
+    if(mv.type != 0 && ! m.has_type(mv.type))
+    {
+        text.append(" can't learn a move of that type.");
+        say(text);
+        return;
+    }
+    g.money -= uint32_t(prices[k]);
+    drop_struggle(m);
+    if(m.move_count < 4)
+    {
+        m.set_move(m.move_count++, uint16_t(moves[k]));
+        audio::play(audio::sfx::OBTAIN);
+        text.append(" learned ");
+        text.append(mv.name);
+        text.append("!");
+        say(text);
+    }
+    else
+    {
+        add_pending_move(&m, uint16_t(moves[k]));
+        move_prompts();
+    }
+    save_game();
+}
+
 void overworld::move_tutor()
 {
     game_state& g = state();
     ui& u = gui();
     say("MOVE TUTOR: \"I can help a POKéMON remember a move it learned before, or one it should have learned by now.\"");
+    bool calderra = map_region(_map_index) == 2;
+    if(calderra)
+    {
+        say("MOVE TUTOR: \"Here in CALDERRA I also teach new moves, a different four each day. For a fee, of course!\"");
+    }
     while(true)
     {
-        u.show_text("Remember a move?");
-        bool yes = u.yes_no();
-        u.clear_text();
-        if(! yes)
+        if(calderra)
         {
-            say("MOVE TUTOR: \"Come back anytime!\"");
-            return;
+            constexpr bn::string_view options[] = { "REMEMBER A MOVE", "LEARN A NEW MOVE", "CANCEL" };
+            u.show_text("What would you like?");
+            int c = u.list(options, 3);
+            u.clear_text();
+            if(c == 1)
+            {
+                tutor_new_move();
+                continue;
+            }
+            if(c != 0)
+            {
+                say("MOVE TUTOR: \"Come back anytime!\"");
+                return;
+            }
+        }
+        else
+        {
+            u.show_text("Remember a move?");
+            bool yes = u.yes_no();
+            u.clear_text();
+            if(! yes)
+            {
+                say("MOVE TUTOR: \"Come back anytime!\"");
+                return;
+            }
         }
         suspend();
         int pick = party_screen(party_mode::CHOOSE, "Which POKéMON?");
@@ -3510,7 +3615,9 @@ bool overworld::offer_rematch(int index)
     game_state& g = state();
     ui& u = gui();
     actor& a = _actors[index];
-    if(a.tr->role != trainer_role::ROUTE || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
+    // 2.0.0: once you're CALDERRA's CHAMPION, its GYM LEADERS take rematches too, at level 200.
+    bool leader = a.tr->role == trainer_role::LEADER && map_region(_map_index) == 2 && g.flags.test(flag::CALDERRA_CHAMPION);
+    if((a.tr->role != trainer_role::ROUTE && ! leader) || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
        g.first_able() < 0 || g.tower.active)
     {
         return false;

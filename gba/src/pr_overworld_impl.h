@@ -212,6 +212,7 @@ public:
     void tower_guide();
     void ferry();
     void calderra_prof();
+    void tutor_new_move();
     // The hidden editor's trigger: the tree beside DUSKMERE HOLLOW's MART, then A, B, A at the lone tree up and to its right.
     bool egg_watch();
     // The CHALLENGE TOWER (SPIRECREST TOWN): in at the door, up floor by floor, the SUMMONING STONE at the

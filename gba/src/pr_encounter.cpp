@@ -248,9 +248,11 @@ namespace
         int floor = bn::clamp(int(t.elite), 0, 4);
         int clears = g.run.tower_clears;
         bool master = floor == 4;
-        int base = bn::min(100, bn::max(50 + 3 * clears, g.average_level() + clears));
+        // 2.0.0: the floors climb to 200 once you're CALDERRA's CHAMPION.
+        int top = g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
+        int base = bn::min(top, bn::max(50 + 3 * clears, g.average_level() + clears));
         int size = master ? 6 : bn::min(6, 3 + (floor + 1) / 2 + clears / 2);
-        tower_team(s, type_index(floor_types[floor]), size, bn::min(100, base + floor + (master ? 2 : 0)), clears);
+        tower_team(s, type_index(floor_types[floor]), size, bn::min(top, base + floor + (master ? 2 : 0)), clears);
         s.smart = master || clears >= 2;
         s.opponent = &t;
     }
@@ -345,13 +347,18 @@ battle_report battle_scene(const encounter& e)
         if(e.rematch)
         {
             // A rematch: their whole team (up to six), a little above your party's level.
-            int level = bn::min(100, g.average_level() + 2);
-            int n = bn::min(int(t.team_count), 6);
+            // Calderra's GYM LEADERS (after its League): six, at level 200, filled out from their juniors' kinds.
+            bool leader = t.role == trainer_role::LEADER;
+            int level = leader ? 200 : bn::min(map_region(g.map) == 2 ? 200 : 100, g.average_level() + 2);
+            int n = leader ? 6 : bn::min(int(t.team_count), 6);
             s->foe_count = n;
             for(int i = 0; i < n; ++i)
             {
-                s->foes[i] = mon::make(t.team[i], level, g.badges() >= 4 ? held_item::LEFTOVERS : held_item::NONE);
+                species_id sp = i < t.team_count ? t.team[i] : t.fill_count ? t.fill[(i - t.team_count) % t.fill_count] : t.team[0];
+                s->foes[i] = mon::make(sp, level, g.badges() >= 4 ? held_item::LEFTOVERS : held_item::NONE);
             }
+            s->smart = s->smart || leader;
+            s->boss_heal = leader;
         }
     }
     else

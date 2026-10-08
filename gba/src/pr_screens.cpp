@@ -1071,7 +1071,7 @@ int bag_screen(bag_mode mode)
                 {
                     // One level up (grantXp's level-up: new moves, evolution); not past the NUZLOCKE cap.
                     mon& m = g.party[who];
-                    if(m.fainted() || m.level >= 100 || m.level >= level_cap_now())
+                    if(m.fainted() || m.level >= level_cap_now())
                     {
                         said = "It won't have any effect.";
                     }
@@ -2232,10 +2232,29 @@ void dex_screen(int register_species)
                             balls.push_back(b);
                         }
                     }
+                    // In Calderra, its own POKéDEX: the Gen 8 and 9 species (species_v1 on).
                     bn::string<16> seen("SEEN ");
-                    seen.append(bn::to_string<4>(seen_count()));
                     bn::string<16> own("OWN ");
-                    own.append(bn::to_string<4>(g.owned.count()));
+                    if(map_region(g.map) == 2)
+                    {
+                        int sn = 0, on = 0;
+                        for(int i = species_v1; i < species_count; ++i)
+                        {
+                            sn += g.seen.test(i);
+                            on += g.owned.test(i);
+                        }
+                        seen.append(bn::to_string<4>(sn));
+                        seen.append("/");
+                        seen.append(bn::to_string<4>(species_count - species_v1));
+                        own.append(bn::to_string<4>(on));
+                        own.append("/");
+                        own.append(bn::to_string<4>(species_count - species_v1));
+                    }
+                    else
+                    {
+                        seen.append(bn::to_string<4>(seen_count()));
+                        own.append(bn::to_string<4>(g.owned.count()));
+                    }
                     u.print(4, 132, seen, text_color::WHITE, texts, true);
                     u.print(4, 144, own, text_color::WHITE, texts, true);
                     auto viewer = [&](bn::optional<bn::sprite_ptr>& spr, int i, int y, bool small)
@@ -3125,7 +3144,7 @@ void edit_one(int index)
             if(row == 0)
             {
                 int old_level = m.level;
-                m.level = uint16_t(bn::clamp(int(m.level) + step, 1, 100));
+                m.level = uint16_t(bn::clamp(int(m.level) + step, 1, 200));
                 if(m.level != old_level)
                 {
                     m.xp = 0;

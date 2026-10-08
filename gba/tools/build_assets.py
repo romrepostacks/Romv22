@@ -532,7 +532,7 @@ def build_world(exp, data, out_inc):
         if a['name'] in FERRY_PORTS:
             hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
             x, y = free_spot(a, a['spawn']['x'] + 2, a['spawn']['y'], hid)
-            a['people'].append({'kind': 'fisher', 'x': x, 'y': y, 'facing': 'down', 'role': 'ferry', 'wander': False,
+            a['people'].append({'kind': 'gentleman', 'x': x, 'y': y, 'facing': 'down', 'role': 'ferry', 'wander': False,
                                 'lines': ['SAILOR: "The ferry sails between VELLORIN and CALDERRA."']})
             if a['region'] == 2:
                 # ...and PORT CALDER's professor, with the Calderra starters.
@@ -1741,6 +1741,9 @@ def build_game_data(data, out_inc):
             m.get('pp', 10), (m.get('target') or 'one').upper(), m.get('drain', 0), m.get('heal', 0), st_c, len(st),
             m.get('stat_chance', 100), 'true' if m.get('stat_self') else 'false', (m.get('weather') or 'none').upper()))
     L.append('constexpr move moves[] = {\n    ' + ',\n    '.join(mv) + '\n};\n')
+    L.append('constexpr int moves_count = %d;' % len(data['moves']))
+    L.append('// 2.0.0: the moves after this one came with Gen 8 and 9 (Calderra\'s MOVE TUTOR sells them).')
+    L.append('constexpr int moves_v1 = %d;\n' % data.get('moves_v1', len(data['moves'])))
     # Legendary and mythical Pokémon (Phase 7: the CHALLENGE TOWER's prizes), by species index.
     legend_nums = {144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385,
                    386, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 638, 639, 640, 641, 642,
@@ -1842,7 +1845,9 @@ def build_game_data(data, out_inc):
         assert e not in seen_names, 'duplicate species enum ' + e
         seen_names.add(e)
         E.append('    %s,' % e)
-    E += ['};\n', 'constexpr int species_count = %d;' % len(names), 'constexpr int types_count = %d;\n' % len(types)]
+    E += ['};\n', 'constexpr int species_count = %d;' % len(names), 'constexpr int types_count = %d;\n' % len(types),
+          '// 2.0.0: the species from here on came with Gen 8 and 9: CALDERRA\'s POKéDEX.',
+          'constexpr int species_v1 = %d;\n' % data.get('species_v1', len(names))]
     E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
           'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']

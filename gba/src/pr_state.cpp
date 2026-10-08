@@ -643,8 +643,13 @@ void set_device_cleared()
 bool roll_shiny()
 {
     // Out of 16384: 4 (1/4096), 8 in ADVENTURE MODE, 5 in a NUZLOCKE run.
+    // 2.0.0: twice that with the whole national POKéDEX owned.
     const run_state& run = state().run;
     int chances = run.adventure ? 8 : run.nuzlocke() ? 5 : 4;
+    if(state().owned.count() >= species_count)
+    {
+        chances *= 2;
+    }
     return rng().get_int(16384) < chances;
 }
 
