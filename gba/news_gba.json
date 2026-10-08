@@ -1,7 +1,20 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 2.0.0: sail from PORTMERE to CALDERRA, a new region in Adventure Mode!",
+  "motd": "Version 2.0.1: Party Royale is now POKé LEGENDS: LANDS OF NINE!",
   "changelog": [
+    {
+      "version": "GBA 2.0.1",
+      "date": "2026-10-08",
+      "title": "Lands of Nine",
+      "changes": [
+        "The game has a new name: POKé LEGENDS: LANDS OF NINE",
+        "A new title screen: RAIKOU, ENTEI and SUICUNE on the ridge at dusk, HO-OH overhead and nine twinkling stars",
+        "A statue of WREN and VELLORIN's GYM LEADERS now stands in PORT CALDER",
+        "Becoming CALDERRA's CHAMPION puts your team in the HALL OF FAME",
+        "RAIKOU, ENTEI and SUICUNE keep the damage you did when they run",
+        "Your rival KAI battles you at PORT CALDER and at the top of each branch before the CRATER RIM"
+      ]
+    },
     {
       "version": "GBA 2.0.0",
       "date": "2026-10-08",

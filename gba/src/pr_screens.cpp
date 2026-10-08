@@ -2756,11 +2756,10 @@ int region_map_screen(bool travel)
 
 // ---------------------------------------------------------------------------------------------------
 // The Hall of Fame, then the credits roll (A continues at THE END).
-void credits_screen()
+void hall_of_fame_screen(const char* region)
 {
     game_state& g = state();
     ui& u = gui();
-    audio::play_music("credits");
     ui::fade_out(8);
     u.win().clear_all();
     bn::bg_palettes::set_transparent_color(bn::color(1, 2, 3));
@@ -2790,23 +2789,33 @@ void credits_screen()
         }
         bn::string<64> line;
         upper(line, g.name);
-        line.append(" became the CHAMPION of VELLORIN!");
+        line.append(" became the CHAMPION of ");
+        line.append(region);
+        line.append("!");
         u.print(120 - u.width(line, true) / 2, 120, line, text_color::WHITE, texts, true);
         u.text().set_left_alignment();
         ui::fade_in(16);
         wait(300);
         ui::fade_out(24);
     }
+}
+
+void credits_screen()
+{
+    game_state& g = state();
+    ui& u = gui();
+    audio::play_music("credits");
+    hall_of_fame_screen("VELLORIN");
     {
         // The roll: up from the bottom, over 30 seconds.
         bn::string<64> champion;
         upper(champion, g.name);
         champion.append(", the new CHAMPION");
         bn::string<48> prof(game_data::prof_name);
-        const char* roll[] = { "PARTY ROYALE", "Vellorin Version", "", "STARRING", champion.c_str(), "WREN, rival and friend", prof.c_str(), "",
+        const char* roll[] = { "POKé LEGENDS", "LANDS OF NINE", "Vellorin", "", "STARRING", champion.c_str(), "WREN, rival and friend", prof.c_str(), "",
                                "THE GYM LEADERS", "RELL - SABLE - ORIN - ISKA", "JUNO - BRYN - HALE - CORVIN", "", "THE ELITE FOUR",
                                "MORROW - BRAKK - FERRIN - AURELLE", "", "ADMIN VESPER and TEAM TEMPEST", "and LUGIA, guardian of the sea and sky",
-                               "", "Made by the Party Royale team", "", "Thank you to every playtester", "who pressed FEEDBACK." };
+                               "", "Made by the Lands of Nine team", "", "Thank you to every playtester", "who pressed FEEDBACK." };
         constexpr int lines = int(sizeof(roll) / sizeof(roll[0]));
         constexpr int spacing = 18;
         bn::vector<bn::sprite_ptr, 96> texts;

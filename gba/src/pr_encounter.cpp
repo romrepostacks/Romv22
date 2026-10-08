@@ -386,6 +386,11 @@ battle_report battle_scene(const encounter& e)
                 m.max_hp = uint16_t(scaled);
                 m.hp = m.max_hp;
             }
+            // A roaming beast keeps the damage you did last time.
+            if(e.roamer >= 0 && g.roam_hp[e.roamer])
+            {
+                s->foes[0].hp = bn::min(g.roam_hp[e.roamer], s->foes[0].max_hp);
+            }
         }
     }
     clear_pending_moves();
@@ -397,9 +402,13 @@ battle_report battle_scene(const encounter& e)
         {
             g.flags.set(e.roamer);
             g.roam[e.roamer] = 0;
+            g.roam_hp[e.roamer] = 0;
         }
         else
         {
+            // Knocked out, it limps off and recovers; otherwise it keeps its wounds.
+            int hp = s->foes[0].hp;
+            g.roam_hp[e.roamer] = uint16_t(hp > 0 && hp < s->foes[0].max_hp ? hp : 0);
             roamers_move();
         }
     }

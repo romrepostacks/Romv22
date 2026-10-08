@@ -1,6 +1,6 @@
-# Party Royale
+# Poké Legends: Lands of Nine
 
-An original, Pokémon-inspired party-battler/overworld game for the **Game Boy Advance**. It runs in emulators
+Formerly Party Royale. An original, Pokémon-inspired party-battler/overworld game for the **Game Boy Advance**. It runs in emulators
 (Delta, mGBA) and on real hardware from a flash cart. The ROM is built from `gba/`; see `gba/README.md` for
 what's in it and how to build it.
 

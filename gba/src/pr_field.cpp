@@ -2148,6 +2148,10 @@ void overworld::after_story()
         {
             g.flags.set(flag::CALDERRA_CHAMPION);
             save_game();
+            suspend();
+            audio::play_music("credits");
+            hall_of_fame_screen("CALDERRA");
+            resume();
             story_say("SOLENNE: \"Calderra has a new CHAMPION. The beasts knew it before any of us did.\"");
             story_say("SOLENNE: \"The crater is yours to roam. And the GYM LEADERS are already asking for a rematch!\"");
         }

@@ -221,7 +221,8 @@ struct game_state
     uint8_t spare_bytes[3] = {};
     bitset<flag_slots> flags;           // story flags for Calderra and later regions
     int16_t roam[4] = {};               // Calderra's roaming beasts (legend_flag): the map each is on + 1, 0 if not
-    uint8_t spare[save_spare - 8] = {}; // zero; later versions add fields here without moving anything
+    uint16_t roam_hp[4] = {};           // 2.0.1: a roaming beast's HP left from your last battle, 0 if unhurt
+    uint8_t spare[save_spare - 16] = {}; // zero; later versions add fields here without moving anything
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1

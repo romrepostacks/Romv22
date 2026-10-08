@@ -5,6 +5,7 @@
 #include "bn_bg_palettes.h"
 #include "bn_common.h"
 #include "bn_keypad.h"
+#include "bn_math.h"
 #include "bn_optional.h"
 #include "bn_regular_bg_ptr.h"
 #include "bn_sprite_ptr.h"
@@ -13,7 +14,10 @@
 #include "bn_vector.h"
 
 #include "bn_regular_bg_items_intro_bg.h"
-#include "bn_regular_bg_items_title_bg.h"
+#include "bn_regular_bg_items_title_logo.h"
+#include "bn_regular_bg_items_title_sky.h"
+#include "bn_sprite_items_title_hooh.h"
+#include "bn_sprite_items_title_spark.h"
 #include "bn_sprite_items_cursor.h"
 #include "bn_sprite_items_prof_big.h"
 
@@ -31,7 +35,7 @@ namespace pr
 namespace
 {
     constexpr int start_poke_balls = 10;     // introFinish(): items {pokeball: 10}
-    constexpr const char* build_version = "2.0.0";
+    constexpr const char* build_version = "2.0.1";
 
     BN_DATA_EWRAM game_state saved_preview;
 
@@ -404,15 +408,28 @@ bool title_scene()
     audio::play_music("credits");
     bn::bg_palettes::set_transparent_color(bn::color(0, 0, 0));
     {
-        bn::regular_bg_ptr bg = bn::regular_bg_items::title_bg.create_bg(8, 48);
-        bg.set_priority(3);
+        bn::regular_bg_ptr sky = bn::regular_bg_items::title_sky.create_bg(0, 0);
+        sky.set_priority(3);
+        bn::regular_bg_ptr logo = bn::regular_bg_items::title_logo.create_bg(0, -80);
+        logo.set_priority(2);
+        // Nine twinkles, one for each land, and HO-OH crossing the dusk now and then.
+        constexpr int spark_xy[9][2] = { { -100, -66 }, { -62, -74 }, { -24, -70 }, { 30, -76 }, { 70, -68 },
+                                         { 104, -60 }, { -84, 0 }, { 0, -4 }, { 88, 2 } };
+        bn::vector<bn::sprite_ptr, 9> sparks;
+        int spark_t[9];
+        for(int i = 0; i < 9; ++i)
+        {
+            sparks.push_back(bn::sprite_items::title_spark.create_sprite(spark_xy[i][0], spark_xy[i][1]));
+            sparks.back().set_bg_priority(3);
+            sparks.back().set_visible(false);
+            spark_t[i] = -i * 23;
+        }
+        bn::sprite_ptr hooh = bn::sprite_items::title_hooh.create_sprite(-200, -40);
+        hooh.set_bg_priority(3);
+        hooh.set_horizontal_flip(true);
         bn::vector<bn::sprite_ptr, 32> title;
-        u.win().box(window_style::WINDOW, 3, 2, 24, 6);
-        u.text().set_center_alignment();
-        u.print(120, 26, "PARTY ROYALE", text_color::RED, title);
-        u.print(120, 42, "Vellorin Version", text_color::INK, title);
         bn::vector<bn::sprite_ptr, 16> press;
-        u.print(120, 112, "PRESS START", text_color::WHITE, press);
+        u.print(120, 100, "PRESS START", text_color::WHITE, press);
         u.text().set_left_alignment();
         // The message of the day (news.json motd): centred, or scrolling by if it's too wide.
         bn::vector<bn::sprite_ptr, 40> motd;
@@ -432,6 +449,28 @@ bool title_scene()
         {
             ++blink;
             rng().update();
+            // The logo drops in and settles with a bounce.
+            if(blink <= 48)
+            {
+                constexpr int8_t drop[] = { -80, -64, -48, -32, -18, -6, 4, 8, 6, 2, -2, -3, -2, 0 };
+                logo.set_y(drop[bn::min(blink / 4, 13)]);
+            }
+            for(int i = 0; i < 9; ++i)
+            {
+                int t = ++spark_t[i];
+                sparks[i].set_visible(t >= 0 && t < 24);
+                if(t >= 0 && t < 24)
+                {
+                    sparks[i].set_tiles(bn::sprite_items::title_spark.tiles_item(), t < 12 ? t / 4 : 3 - (t - 12) / 4);
+                }
+                else if(t >= 24)
+                {
+                    spark_t[i] = -40 - rng().get_int(120);
+                }
+            }
+            int fly = blink % 600;
+            hooh.set_visible(fly < 240);
+            hooh.set_position(150 - fly * 300 / 240, -50 + (bn::degrees_lut_sin((fly * 3) % 360) * 6).integer());
             for(bn::sprite_ptr& s : press)
             {
                 s.set_visible((blink / 30) % 2 == 0);

@@ -539,6 +539,26 @@ def build_world(exp, data, out_inc):
                 x, y = free_spot(a, x - 4, y, hid)
                 a['people'].append({'kind': 'prof', 'x': x, 'y': y, 'facing': 'down', 'role': 'prof', 'wander': False,
                                     'lines': ['PROF. EMBER: "Welcome to CALDERRA!"']})
+                # 2.0.1: the statue of WREN and VELLORIN's GYM LEADERS, who opened the port.
+                x, y = free_spot(a, a['spawn']['x'], a['spawn']['y'] - 3, hid)
+                a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
+                    'A stone statue of WREN, rival and friend, with VELLORIN\'s eight GYM LEADERS carved around the base.',
+                    'RELL, SABLE, ORIN, ISKA, JUNO, BRYN, HALE and CORVIN. "They crossed the sea so CALDERRA could open its port."']})
+
+    # 2.0.1: KAI before the CRATER RIM: on the dock at PORT CALDER, then at the top of each branch. Placed last,
+    # with trainer ids after every other one, so nothing already beaten moves.
+    hid_at = lambda a: {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+    for a in areas:
+        fight = KAI_FIGHTS.get(a['name'])
+        if not fight:
+            continue
+        dy, facing, team, intro, after = fight
+        x, y = free_spot(a, a['spawn']['x'], a['spawn']['y'] + dy, hid_at(a))
+        a['trainers'].append({'kind': 'rivalKai', 'x': x, 'y': y, 'facing': facing, 'role': 'route', 'title': 'Rival Kai',
+                              'team': team, 'intro': ['KAI: "%s"' % intro], 'after': ['KAI: "%s"' % after], 'vanish': True})
+        ids[('area', areas.index(a), len(a['trainers']) - 1)] = len(ids)
+    if len(ids) > MAX_TRAINERS:
+        raise SystemExit('%d trainers (max %d)' % (len(ids), MAX_TRAINERS))
 
     for ai, (a, info) in enumerate(zip(areas, area_info)):
         p = 'map%d_' % ai
@@ -1050,6 +1070,15 @@ BALL = []
 WRITTEN = set()      # graphics files this run produced
 
 FERRY_PORTS = ('Portmere Harbour', 'Port Calder')
+# KAI's early battles (2.0.1): area -> (rows from the spawn, facing, team, intro, after).
+KAI_BRANCH = (-3, 'down', ['Corviknight', 'Drakloak', 'Lokix', 'Bisharp'],
+              "You again? The beasts are up ahead, and I'm not losing this race!",
+              "Fine, go on. I'll be waiting at the CRATER RIM.")
+KAI_FIGHTS = {
+    'Port Calder': (3, 'up', ['Corvisquire', 'Drakloak', 'Lokix'],
+                    "New in CALDERRA? I'm KAI. I'm going to be the one who catches the three beasts. Let's see what you've got!",
+                    "Huh. Not bad for a tourist. See you on the road."),
+    'Stormbreak Ridge': KAI_BRANCH, 'Misty Climb': KAI_BRANCH, 'Cinder Steps': KAI_BRANCH}
 HIDDEN_FIRST_ID = 128     # hidden items' bits in game_state::picked (item balls use the low ones)
 
 
@@ -1606,9 +1635,13 @@ def build_backgrounds(data, gfx):
             px[x, y] = tuple(int(c0[k] + (c1[k] - c0[k]) * t) for k in range(3)) + (255,)
     save_bg(img, gfx, 'intro_bg', 'bpp_8')
 
-    # Title: a slice of the home town.
-    town = Image.open(os.path.join(EXP, 'map_0.png')).convert('RGB')
-    save_bg(town.crop((96, 120, 96 + 256, 120 + 256)).convert('RGBA'), gfx, 'title_bg', 'bpp_8')
+    # Title: the dusk sky with the beasts, the logo, a twinkle and HO-OH (drawn by tools/art/title_art.py).
+    art = lambda n: Image.open(os.path.join(HERE, '..', 'data', n + '.png')).convert('RGBA')
+    save_bg(art('title_sky'), gfx, 'title_sky', 'bpp_8')
+    save_bg(art('title_logo'), gfx, 'title_logo')
+    spark = art('title_spark')
+    save_sprite(gfx, 'title_spark', [spark.crop((0, i * 16, 16, i * 16 + 16)) for i in range(4)], 16, 16)
+    save_sprite(gfx, 'title_hooh', [art('title_hooh')], 64, 64)
 
     # Party screen: the web game's diagonal blue stripes (.pty), at GBA scale.
     img = Image.new('RGBA', (256, 256))
@@ -1637,6 +1670,17 @@ ABILITY_KIND = {'flavor': 'FLAVOR', 'boost': 'BOOST', 'immune': 'IMMUNE', 'punch
 HELD = ['none', 'leftovers', 'lifeorb', 'scarf', 'sash', 'sitrus']
 
 DAYCARE_TOWN = 'Cindergate Town'
+
+def add_statue(data):
+    """2.0.1: WREN in stone for PORT CALDER: the rival's standing frame in greys, the same from every side."""
+    f = data['people']['rival']['down'][0]
+    def stone(c):
+        if not c:
+            return 0
+        l = (c[0] * 3 + c[1] * 6 + c[2]) // 10
+        return [min(255, 72 + l * 3 // 4)] * 2 + [min(255, 80 + l * 3 // 4)]
+    frame = {'dy': 0, 'px': [[stone(c) for c in row] for row in f['px']]}
+    data['people']['statue'] = {d: [frame] * 3 for d in ('down', 'up', 'left')}
 
 def free_spot(a, x, y, also=()):
     """The nearest open path tile to (x, y) in an area: nobody on it, and not right below a door."""
@@ -1883,6 +1927,7 @@ def inputs_hash():
     files.append(os.path.join(ROOT, 'js', 'moveextra.js'))
     files.append(os.path.join(HERE, '..', 'news_gba.json'))
     files.append(os.path.join(HERE, '..', 'data', 'extras.json'))
+    files += [os.path.join(HERE, '..', 'data', 'title_%s.png' % n) for n in ('sky', 'logo', 'spark', 'hooh')]
     for f in files:
         h.update(open(f, 'rb').read())
     return h.hexdigest()
@@ -1909,6 +1954,7 @@ def main():
     subprocess.run(['node', os.path.join(HERE, 'export.js'), EXP], check=True)
     data = json.load(open(os.path.join(EXP, 'data.json'), encoding='utf8'))
     add_extras(data)
+    add_statue(data)
     build_world(EXP, data, inc)
     build_game_data(data, inc)
     build_music(data, inc)

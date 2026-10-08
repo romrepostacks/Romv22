@@ -52,6 +52,8 @@ void card_screen();
 int region_map_screen(bool travel = false);
 // The Hall of Fame and the credits roll (playCredits).
 void credits_screen();
+// The Hall of Fame alone: the party, and "became the CHAMPION of <region>!".
+void hall_of_fame_screen(const char* region);
 
 // An HP bar of `segments` 8 px sprites at screen (x, y), green / yellow / red as hpClass() picks.
 void draw_hp_bar(bn::ivector<bn::sprite_ptr>& bar, int x, int y, int segments, int hp, int max_hp);

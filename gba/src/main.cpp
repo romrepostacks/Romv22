@@ -1,4 +1,4 @@
-// Party Royale for Game Boy Advance: the title, then the overworld and its battles (or FREE BATTLE).
+// Poké Legends: Lands of Nine for Game Boy Advance: the title, then the overworld and its battles (or FREE BATTLE).
 #include "bn_core.h"
 
 #include "pr_audio.h"
