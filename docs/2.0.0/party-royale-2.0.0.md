@@ -16,14 +16,14 @@ Today (save version 9, gba/include/pr_state.h): about 22 KB of the cartridge's 3
 - Story progress is 32 flags; trainers beaten, item balls and rematches hold 256 each; visited areas hold 64. Vellorin alone uses a good share of these.
 - The bag is sized to exactly today's items, so every new item shifts everything after it.
 
-New layout (save version 10), sized for 9 regions with room to spare:
+New layout (save version 11; 1.9.0 already uses 10), sized for 9 regions with room to spare:
 - Pokémon: 2-byte level (up to 999), 2-byte move ids with their own PP byte (65,535 moves), 2-byte species (65,535 species, room for homebrew), plus 4 spare bytes for later (gender, held-item extras, forms). About 60 bytes each, about 25 KB for all 430.
 - Pokédex: 2,048 species. Story flags: 1,024. Trainers beaten, rematches and item balls: 2,048 each. Areas visited: 1,024. Bag: 256 item kinds.
 - A current-region number, and 1 KB of zeroed spare space at the end.
 - Every new field must treat zero as "not set yet", so later versions add features inside the spare space without moving anything, and old saves load as they are.
 - Total stays under 30 KB, inside the 32 KB chip with room for the existing "game cleared" mark.
 
-Converting saves: the ROM already upgrades old saves when it loads them (every save since 1.0 still works). 2.0.0 adds one more step that reads a 1.8.x/1.9.x save, copies everything across into the new layout, and saves it. Your current game opens in 2.0.0 exactly where you left it. To be safe, keep a copy of your .sav file before the first 2.0.0 load. If 1.9.0 changes the save itself (new Mart items grow the bag), the converter reads that version too.
+Converting saves: the ROM already upgrades old saves when it loads them (every save since 1.0 still works). 2.0.0 adds one more step that reads a 1.8.x/1.9.x save, copies everything across into the new layout, and saves it. Your current game opens in 2.0.0 exactly where you left it. To be safe, keep a copy of your .sav file before the first 2.0.0 load. 1.9.0 moved the save to version 10, so the converter reads versions 4 to 10.
 - Test: convert a real 1.8.1 save and a 1.9.0 save in the emulator, and check that the party, boxes, bag, badges, Pokédex, position and play time all match.
 
 ## Stage 1: Species to Gen 9
