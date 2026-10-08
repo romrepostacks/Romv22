@@ -185,6 +185,10 @@ namespace
         for(int i = 0; i < world_data::maps_count; ++i)
         {
             const map_def& m = world_data::maps[i];
+            if(map_region(i) != 1)
+            {
+                continue;       // Calderra's story is still ahead
+            }
             for(int k = 0; k < m.trainers_count; ++k)
             {
                 const trainer& t = m.trainers[k];
@@ -202,7 +206,7 @@ namespace
         g.add_item(item_id::HM08, 1);
         g.add_item(item_id::OLDROD, 1);
         g.money = 10000;
-        for(int i = 0; i < world_data::areas_count; ++i)
+        for(int i : world_data::area_maps)
         {
             const map_def& m = world_data::maps[i];
             if(m.area && (m.area->flags & area_flag::TOWER_TOWN))

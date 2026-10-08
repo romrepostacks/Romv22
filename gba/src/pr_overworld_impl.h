@@ -114,7 +114,7 @@ public:
     [[nodiscard]] bool walkable(int tx, int ty) const;          // WALKABLE (not counting people)
     [[nodiscard]] bool blocked(int tx, int ty) const;
     [[nodiscard]] bool water_at(int tx, int ty) const;
-    [[nodiscard]] bool area_flag(uint8_t flag) const;
+    [[nodiscard]] bool area_flag(uint16_t flag) const;
     [[nodiscard]] const area_info* area() const;                 // the area you're in (a room's: its town's)
     [[nodiscard]] int area_index() const;
     [[nodiscard]] bool deep() const;                              // under the sea, outside
@@ -179,7 +179,7 @@ public:
     void remove_actor(int index);
     int scene_npc(person_kind kind, int n, int min);
     void starter_event();
-    int starter_bag();
+    int starter_bag(const species_id* list, int count);
     void starter_thanks();
     void rival_leaves();
     void story_enter();
@@ -210,6 +210,8 @@ public:
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.
     void story_say(const bn::string_view& text);
     void tower_guide();
+    void ferry();
+    void calderra_prof();
     // The hidden editor's trigger: the tree beside DUSKMERE HOLLOW's MART, then A, B, A at the lone tree up and to its right.
     bool egg_watch();
     // The CHALLENGE TOWER (SPIRECREST TOWN): in at the door, up floor by floor, the SUMMONING STONE at the

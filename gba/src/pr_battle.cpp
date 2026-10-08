@@ -205,6 +205,7 @@ namespace
         int _own_sprite_index = -1;
         bool _animating = false;    // a move animation is moving the sprites (no bobbing)
         bool _nuz_caught = false;   // NUZLOCKE: this battle's one catch is made
+        bool _foe_healed = false;   // boss_heal: the foe's FULL RESTORE is spent
         battle_weather _weather = battle_weather::NONE;
         int _weather_turns = 0;
         int _hint = -1;             // the foe being picked (it blinks)
@@ -989,7 +990,7 @@ namespace
                 // The medicine goes to the Pokémon that was told to use it.
                 focus_on(*act.user);
                 bn::string<80> message;
-                bn::string<128> text(state().name);
+                bn::string<128> text(act.own || ! _s.opponent ? bn::string_view(state().name) : bn::string_view(_s.opponent->title));
                 text.append(" used a ");
                 text.append(game_data::items[int(act.c.item)].name);
                 text.append("! ");
@@ -1402,6 +1403,14 @@ namespace
         }
         c.kind = choice_kind::MOVE;
         target = targets[r.get_int(tn)];
+        // Calderra's bosses: one FULL RESTORE a battle, on a Pokémon down to a quarter of its HP.
+        if(_s.boss_heal && ! _foe_healed && f.m->hp * 4 <= f.m->max_hp)
+        {
+            _foe_healed = true;
+            c.kind = choice_kind::ITEM;
+            c.item = item_id::FULLRESTORE;
+            return;
+        }
         if(f.m->out_of_pp())
         {
             c.move = -1;

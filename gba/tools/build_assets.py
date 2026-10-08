@@ -22,8 +22,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GBA = os.path.dirname(HERE)
 ROOT = os.path.dirname(GBA)
 MAP_BANKS = 14          # BG palette banks a map tileset may use; the 15th is the weather's, the 16th the UI's
-MAX_TRAINERS = 256      # bits in game_state::beaten
-MAX_ITEM_BALLS = 256    # bits in game_state::picked
+MAX_TRAINERS = 2048     # bits in game_state::beaten
+MAX_ITEM_BALLS = 2048   # bits in game_state::picked
 ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awakening', 'burnheal', 'hyperpotion',
             'revive', 'fullrestore', 'hm03', 'hm08', 'oldrod',      # ITEM_INFO order
             'greatball', 'ultraball', 'rarecandy', 'masterball',      # GBA only (GBA_ITEMS)
@@ -334,7 +334,17 @@ def solid(color):
 
 def build_world(exp, data, out_inc):
     areas, rooms = data['areas'], data['rooms']
-    by_index = {a['index']: ai for ai, a in enumerate(areas)}
+    # Maps, trainer ids and item ids go region by region (its areas, then its rooms), so a new region only
+    # appends: an older region's numbers (saves hold them) never move.
+    ai_of = {a['index']: ai for ai, a in enumerate(areas)}
+    region_of = {a['index']: a['region'] for a in areas}
+    regions = sorted(set(region_of.values()))
+    map_order = []
+    for rg in regions:
+        map_order += [('area', ai) for ai, a in enumerate(areas) if a['region'] == rg]
+        map_order += [('room', ri) for ri, r in enumerate(rooms) if region_of[r['area']] == rg]
+    map_index = {k: mi for mi, k in enumerate(map_order)}
+    by_index = {a['index']: map_index[('area', ai)] for ai, a in enumerate(areas)}
     tilesets = []
     forest = art_image(data['art']['forest_fill'], (0x1e, 0x4a, 0x1c))
 
@@ -412,26 +422,22 @@ def build_world(exp, data, out_inc):
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
             role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER', 'daycare': 'DAYCARE',
-                    'tutor': 'TUTOR'}.get(n.get('role', ''), 'NONE')
+                    'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
             '{0, 0, person_kind::player, direction::DOWN, person_role::NONE, false, nullptr, 0}')))
 
-    map_rows = []
     room_index = {}       # (area, building) -> map index
     for i, r in enumerate(rooms):
-        room_index[(r['area'], r['building'])] = len(areas) + i
+        room_index[(r['area'], r['building'])] = map_index[('room', i)]
 
     # Trainer ids (bits in game_state::beaten), areas first then rooms; each area's gate keeper is its rival,
     # its gym's leader or the Champion.
     ids = {}
-    for ai, a in enumerate(areas):
-        for ti in range(len(a['trainers'])):
-            ids[('area', ai, ti)] = len(ids)
-    for ri, r in enumerate(rooms):
-        for ti in range(len(r['trainers'])):
-            ids[('room', ri, ti)] = len(ids)
+    for kind, i in map_order:
+        for ti in range((areas if kind == 'area' else rooms)[i]['trainers'].__len__()):
+            ids[(kind, i, ti)] = len(ids)
     if len(ids) > MAX_TRAINERS:
         raise SystemExit('%d trainers (max %d)' % (len(ids), MAX_TRAINERS))
     def leader_of(ai):
@@ -474,14 +480,65 @@ def build_world(exp, data, out_inc):
         L.append('constexpr uint8_t %s[] = {%s};' % (name, ', '.join('%d, %d' % (x, y) for x, y in pts) or '0'))
         return len(pts)
 
+    def add_guides(a):
+        people = a['people']
+        tower_door = [d for d in a['doors'] if d['kind'] == 'tower']
+        if tower_door and not any(n.get('role') == 'tower' for n in people):
+            # GBA only (Phase 7): the CHALLENGE TOWER's guide beside its door in SPIRECREST TOWN.
+            d = tower_door[0]
+            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'left', 'role': 'tower', 'wander': False,
+                           'lines': ['The CHALLENGE TOWER opens to CHAMPIONS.']})
+        center_door = [d for d in a['doors'] if d['kind'] == 'center']
+        if a.get('trade_town') and center_door and not any(n.get('role') == 'trader' for n in people):
+            # GBA only: TRADEWIND VILLAGE's TRADER beside the POKéMON CENTER.
+            d = center_door[0]
+            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'down', 'role': 'trader', 'wander': False,
+                           'lines': ['TRADER: "Any POKéMON for any POKéMON!"']})
+        if a['name'] == DAYCARE_TOWN and center_door and not any(n.get('role') == 'daycare' for n in people):
+            # GBA 1.8: the DAY CARE lady, on open ground near the POKéMON CENTER.
+            d = center_door[0]
+            x, y = free_spot(a, d['x'] + 3, d['y'] + 1)
+            people.append({'kind': 'oldwoman', 'x': x, 'y': y, 'facing': 'down', 'role': 'daycare', 'wander': False,
+                           'lines': ['DAY CARE: "I raise POKéMON for TRAINERS."']})
+    for a in areas:
+        add_guides(a)
+
+    # Item balls, then hidden items, region by region; Vellorin's hidden ones start at HIDDEN_FIRST_ID.
     item_count = 0
     item_ids = {}
-    for a in areas:
-        for it in a['items']:
-            item_ids[(a['index'], it['x'], it['y'])] = item_count
+    hidden = []
+    for rg in regions:
+        for a in areas:
+            if a['region'] != rg:
+                continue
+            for it in a['items']:
+                item_ids[(a['index'], it['x'], it['y'])] = item_count
+                item_count += 1
+        if rg == 1:
+            if item_count > HIDDEN_FIRST_ID:
+                raise SystemExit('%d item balls (max %d)' % (item_count, HIDDEN_FIRST_ID))
+            item_count = HIDDEN_FIRST_ID
+        for h in hidden_items(areas, rg):
+            h['area'] = by_index[areas[h['area']]['index']]
+            h['id'] = item_count
             item_count += 1
+            hidden.append(h)
     if item_count > MAX_ITEM_BALLS:
         raise SystemExit('%d item balls (max %d)' % (item_count, MAX_ITEM_BALLS))
+    map_rows = {}
+    # 2.0.0: the SAILOR who runs the ferry between the regions, near where you arrive (placed after the hidden
+    # items, so Vellorin's stay where they were).
+    for ai, a in enumerate(areas):
+        if a['name'] in FERRY_PORTS:
+            hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+            x, y = free_spot(a, a['spawn']['x'] + 2, a['spawn']['y'], hid)
+            a['people'].append({'kind': 'fisher', 'x': x, 'y': y, 'facing': 'down', 'role': 'ferry', 'wander': False,
+                                'lines': ['SAILOR: "The ferry sails between VELLORIN and CALDERRA."']})
+            if a['region'] == 2:
+                # ...and PORT CALDER's professor, with the Calderra starters.
+                x, y = free_spot(a, x - 4, y, hid)
+                a['people'].append({'kind': 'prof', 'x': x, 'y': y, 'facing': 'down', 'role': 'prof', 'wander': False,
+                                    'lines': ['PROF. EMBER: "Welcome to CALDERRA!"']})
 
     for ai, (a, info) in enumerate(zip(areas, area_info)):
         p = 'map%d_' % ai
@@ -502,26 +559,8 @@ def build_world(exp, data, out_inc):
             '{%d, %d, door_kind::%s, %d}' % (d['x'], d['y'], d['kind'].upper(), room_index[(a['index'], bi)])
             for bi, d in enumerate(a['doors'])), '{0, 0, door_kind::HOUSE, -1}')))
         people = a['people']
-        tower_door = [d for d in a['doors'] if d['kind'] == 'tower']
-        if tower_door and not any(n.get('role') == 'tower' for n in people):
-            # GBA only (Phase 7): the CHALLENGE TOWER's guide beside its door in SPIRECREST TOWN.
-            d = tower_door[0]
-            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'left', 'role': 'tower', 'wander': False,
-                           'lines': ['The CHALLENGE TOWER opens to CHAMPIONS.']})
-        center_door = [d for d in a['doors'] if d['kind'] == 'center']
-        if a.get('trade_town') and center_door and not any(n.get('role') == 'trader' for n in people):
-            # GBA only: TRADEWIND VILLAGE's TRADER beside the POKéMON CENTER.
-            d = center_door[0]
-            people.append({'kind': 'gentleman', 'x': d['x'] + 2, 'y': d['y'] + 1, 'facing': 'down', 'role': 'trader', 'wander': False,
-                           'lines': ['TRADER: "Any POKéMON for any POKéMON!"']})
-        if a['name'] == DAYCARE_TOWN and center_door and not any(n.get('role') == 'daycare' for n in people):
-            # GBA 1.8: the DAY CARE lady, on open ground near the POKéMON CENTER.
-            d = center_door[0]
-            x, y = free_spot(a, d['x'] + 3, d['y'] + 1)
-            people.append({'kind': 'oldwoman', 'x': x, 'y': y, 'facing': 'down', 'role': 'daycare', 'wander': False,
-                           'lines': ['DAY CARE: "I raise POKéMON for TRAINERS."']})
         people_rows(p, people)
-        trainer_rows(p, a['trainers'], ('area', ai), ai)
+        trainer_rows(p, a['trainers'], ('area', ai), by_index[a['index']])
         its = []
         for k, it in enumerate(a['items']):
             its.append('{%d, %d, item_id::%s, %d, %d}' % (it['x'], it['y'], it['id'].upper(), item_ids[(a['index'], it['x'], it['y'])],
@@ -537,10 +576,10 @@ def build_world(exp, data, out_inc):
             for j, (x, y) in enumerate(st['items']):
                 sits.append('{%d, %d, %d}' % (x, y, sm['item_meta'][j]))
             L.append('constexpr strip_item %sitems[] = {%s};' % (q, nonempty(', '.join(sits), '{0, 0, 0}')))
-            links.append('{%d, %d, %d, %d, %d, %s, %s, %d, %d, %d, %d, %d, %sstrip, %sitems, %d}' % (
+            links.append('{%d, %d, %d, %d, %d, %s, %s, %d, link_need::%s, %d, %d, %d, %d, %sstrip, %sitems, %d}' % (
                 target, ln['ox'], ln['oy'], ln['w'], ln['h'], c_text(ln['name'].upper()), 'true' if ln['gate'] else 'false',
-                ln['badges'], st['x'], st['y'], st['w'], st['h'], q, q, len(st['items'])))
-        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, "", false, 0, 0, 0, 0, 0, nullptr, nullptr, 0}')))
+                ln['badges'], (ln.get('need') or 'none').upper(), st['x'], st['y'], st['w'], st['h'], q, q, len(st['items'])))
+        L.append('constexpr link %slinks[] = {%s};' % (p, nonempty(', '.join(links), '{-1, 0, 0, 0, 0, "", false, 0, link_need::NONE, 0, 0, 0, 0, nullptr, nullptr, 0}')))
         np_ = species_array(p + 'pool', a['area_pool'])
         nw = species_array(p + 'water', a['water'])
         nf = species_array(p + 'fish', a['fish'])
@@ -560,21 +599,22 @@ def build_world(exp, data, out_inc):
         if a.get('tower_town'): flags.append('area_flag::TOWER_TOWN')
         if a.get('safari'): flags.append('area_flag::SAFARI')
         if a.get('trade_town'): flags.append('area_flag::TRADE_TOWN')
+        if a.get('shrine'): flags.append('area_flag::SHRINE')
         legend = a['legend']
         if a['own_pool']:
             flags.append('area_flag::OWN_POOL')
-        L.append('constexpr area_info %sarea = {area_kind::%s, area_theme::%s, area_weather::%s, %s, %d, %d, %d, %d, %d, %s, '
+        L.append('constexpr area_info %sarea = {area_kind::%s, area_theme::%s, area_weather::%s, %s, %d, %d, %d, %d, %d, %d, %s, '
                  '%sdive, %d, %sshafts, %d, %s, %d, %d, %d, %d, %s};' % (
-            p, kind, theme, weather, ' | '.join(flags) or '0', a['tier'], a['at'][0], a['at'][1],
+            p, kind, theme, weather, ' | '.join(flags) or '0', a['tier'], a['region'], a['at'][0], a['at'][1],
             by_index.get(a['dive'], -1) if a['dive'] >= 0 else -1, by_index.get(a['surface'], -1) if a['surface'] >= 0 else -1,
             c_text(a['scene']), p, nd, p, ns,
             'species_id::%s' % enum_name(legend['name']) if legend else 'species_id::PIDGEY', legend['x'] if legend else -1,
             legend['y'] if legend else -1, nw, nf, '%sclean' % p if info['clean_meta'] is not None else 'nullptr'))
-        map_rows.append('{%s, %d, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
+        map_rows[by_index[a['index']]] = ('{%s, %d, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
                         'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0, %d, gate_kind::%s, %s, %s, &%sarea, %swater, %sfish, %s, nullptr}' % (
             c_text(a['name'].upper()), info['ts'], a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
             p, len(a['trainers']), p, len(a['items']), p, len(a['links']), p, np_,
-            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4), leaders[ai], gate,
+            a['spawn']['x'], a['spawn']['y'], min(50, 8 + a['tier'] * 4) if a['region'] == 1 else 0, leaders[ai], gate,
             c_text(a['name'].upper()), c_text(a['leader_name']), p, p, p, c_text(clean_text(a['desc']))))
 
     for ri, r in enumerate(rooms):
@@ -587,7 +627,7 @@ def build_world(exp, data, out_inc):
             people.append({'kind': 'gentleman', 'x': 11, 'y': 6, 'facing': 'left', 'role': 'tutor', 'wander': False,
                            'lines': ['MOVE TUTOR: "I can help POKéMON remember moves."']})
         people_rows(p, people)
-        area = by_index[r['area']]
+        area, aai = by_index[r['area']], ai_of[r['area']]
         trainer_rows(p, r['trainers'], ('room', ri), area)
         things = []
         for ti, t in enumerate(r['things']):
@@ -604,23 +644,24 @@ def build_world(exp, data, out_inc):
         theme = (r.get('theme') or '').upper() or ('LEAGUE' if r['kind'] in ('summit', 'chamber') else 'NONE')
         L.append('constexpr room_info %sroom = {room_kind::%s, gym_theme::%s, %sgates, %d, %d, %s, %d};' % (
             p, kind, theme, p, len(r['gates']), info['gate_meta'], 'true' if r['home'] else 'false', r.get('floor', -1)))
-        map_rows.append('{%s, %d, %d, %d, %s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
+        map_rows[map_index[('room', ri)]] = ('{%s, %d, %d, %d, %s_map, %sbehaviour, nullptr, 0, nullptr, 0, %speople, %d, %strainers, %d, nullptr, 0, '
                         '%sthings, %d, nullptr, 0, nullptr, 0, %d, %d, %d, %d, %d, %d, %d, gate_kind::NONE, %s, %s, nullptr, nullptr, nullptr, "", &%sroom}' % (
             c_text(name), info['ts'], r['w'], r['h'], 'room_' + r['art'], p, p, len(r['people']), p, len(r['trainers']),
-            p, len(r['things']), r['spawn']['x'], r['spawn']['y'], min(50, 8 + areas[area]['tier'] * 4), area,
-            r['door']['x'], r['door']['y'], leaders[area] if r['kind'] in ('gym', 'league') else -1,
+            p, len(r['things']), r['spawn']['x'], r['spawn']['y'], min(50, 8 + areas[aai]['tier'] * 4) if areas[aai]['region'] == 1 else 0,
+            area, r['door']['x'], r['door']['y'], leaders[aai] if r['kind'] in ('gym', 'league') else -1,
             c_text(gym.get('name', '')), c_text(gym.get('leader', '')), p))
     # Room metatile maps go before the map table (shared by every room of a look).
     room_maps = ['constexpr uint16_t room_%s_map[] = {%s};' % (k, ', '.join(map(str, v['meta']))) for k, v in sorted(room_ts.items())]
     L += room_maps
-    L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows))
+    L.append('\nconstexpr map_def maps[] = {\n    %s\n};\n' % ',\n    '.join(map_rows[i] for i in range(len(map_order))))
+    L.append('// The areas\' map indices (each region\'s rooms follow its areas).')
+    L.append('constexpr int16_t area_maps[] = {%s};' % ', '.join(str(i) for i, (k, _) in enumerate(map_order) if k == 'area'))
     L.append('constexpr int areas_count = %d;' % len(areas))
-    hidden = hidden_items(areas)
     L.append('// GBA only: hidden items (press A facing the spot), by area.')
     L.append('constexpr hidden_item hidden_items[] = {%s};' % ', '.join(
         '{%d, %d, %d, item_id::%s, %d, %d}' % (h['area'], h['x'], h['y'], h['item'].upper(), h['count'], h['id']) for h in hidden))
     L.append('constexpr int hidden_items_count = %d;' % len(hidden))
-    L.append('constexpr int maps_count = %d;' % (len(areas) + len(rooms)))
+    L.append('constexpr int maps_count = %d;' % len(map_order))
     L.append('constexpr int trainers_count = %d;' % len(ids))
     L.append('constexpr int items_count = %d;\n' % item_count)
     L.append('}\n\n#endif')
@@ -998,17 +1039,18 @@ def build_ui_tiles(out_inc):
 BALL = []
 WRITTEN = set()      # graphics files this run produced
 
+FERRY_PORTS = ('Portmere Harbour', 'Port Calder')
 HIDDEN_FIRST_ID = 128     # hidden items' bits in game_state::picked (item balls use the low ones)
 
 
-def hidden_items(areas):
+def hidden_items(areas, region):
     """GBA only: hidden items along the way, a fixed few per area on reachable open ground (a nook or a dead end
     when there is one), out of the way of doors, signs and people. Rare Candies and better balls."""
     import random
     out = []
     for ai, a in enumerate(areas):
-        if a['at'][0] >= 100:
-            continue        # under the sea
+        if a['region'] != region or a['deep']:
+            continue        # another region, or under the sea
         beh = a['behaviour']
         h, w = len(beh), len(beh[0])
         sx, sy = a['spawn']['x'], a['spawn']['y']
@@ -1044,9 +1086,7 @@ def hidden_items(areas):
         late = a['tier'] >= 12
         for k, (x, y) in enumerate(picks):
             item, count = ('rarecandy', 1) if (k + ai) % 2 == 0 else ('ultraball' if late else 'greatball', 3)
-            out.append({'area': ai, 'x': x, 'y': y, 'item': item, 'count': count, 'id': HIDDEN_FIRST_ID + len(out)})
-    if len(out) > MAX_ITEM_BALLS - HIDDEN_FIRST_ID:
-        raise SystemExit('%d hidden items (max %d)' % (len(out), MAX_ITEM_BALLS - HIDDEN_FIRST_ID))
+            out.append({'area': ai, 'x': x, 'y': y, 'item': item, 'count': count})
     return out
 
 
@@ -1588,10 +1628,10 @@ HELD = ['none', 'leftovers', 'lifeorb', 'scarf', 'sash', 'sitrus']
 
 DAYCARE_TOWN = 'Cindergate Town'
 
-def free_spot(a, x, y):
+def free_spot(a, x, y, also=()):
     """The nearest open path tile to (x, y) in an area: nobody on it, and not right below a door."""
     beh = a['behaviour']
-    taken = {(n['x'], n['y']) for n in a['people']} | {(t['x'], t['y']) for t in a['trainers']} | \
+    taken = set(also) | {(n['x'], n['y']) for n in a['people']} | {(t['x'], t['y']) for t in a['trainers']} | \
             {(sg['x'], sg['y']) for sg in a['signs']} | {(it['x'], it['y']) for it in a['items']} | \
             {(d['x'], d['y'] + k) for d in a['doors'] for k in (0, 1)}
     for r in range(0, 12):

@@ -26,7 +26,7 @@ const src = ['js/dexdata.js', 'js/moveextra.js', 'js/dexinfo.js', 'js/tileart.js
 vm.runInContext(src + `
 ;this.G = {LOCATIONS, getMap, getInterior, neighbours, TILE_ART, TILE_CLS, WALKABLE, LEDGE_DIR, EDGE_GROUPS, edgeOverlay, ROOF_SWAP,
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
-  STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, GYM_JUNIORS, PROF_CALLS,
+  STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, gymTheme, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
   setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
@@ -235,10 +235,12 @@ const TALL_PIECES = new Set(['bookshelf', 'plant', 'shelf', 'healer', 'pc']);
 // Gyms (css: .room-gym, .gym-<theme>): the theme's floor art under everything, maze walls and statues on
 // it, plain painted walls, a rug and the exit mat.
 const GYM_WALL = {fire:['#e08858','#b05830'], water:['#a8d8f8','#6098d0'], ground:['#c8a060','#987038'], ghost:['#786098','#503870'],
-  electric:['#f8e890','#b09020'], grass:['#a8d880','#488830'], ice:['#e8f8ff','#88c0e0'], dragon:['#8870a8','#4c3868']};
+  electric:['#f8e890','#b09020'], grass:['#a8d880','#488830'], ice:['#e8f8ff','#88c0e0'], dragon:['#8870a8','#4c3868'],
+  flying:['#d0e8f8','#7898c0'], normal:['#e8d8b8','#a88858'], rock:['#b0a090','#706050']};
 const GYM_RUG = {fire:'#f8c048', water:'#f8f8f8', ground:'#98b050', ghost:'#9870c8', electric:'#3868d0', grass:'#f0e0a0', ice:'#4890c8', dragon:'#e0a030',
-  league:'#9080c0'};
-const GYM_FLOOR = {electric:['#f0d860','#c8a830'], grass:['#78b858','#58983c'], ice:['#d8f0f8','#a8d8f0'], dragon:['#685088','#4c3868']};
+  flying:'#f8f8f8', normal:'#d84848', rock:'#c04040', league:'#9080c0'};
+const GYM_FLOOR = {electric:['#f0d860','#c8a830'], grass:['#78b858','#58983c'], ice:['#d8f0f8','#a8d8f0'], dragon:['#685088','#4c3868'],
+  flying:['#a8d0f0','#7898c0'], normal:['#d8b880','#a88858'], rock:['#a89888','#786858']};
 // The four newer gyms have no floor or wall art, only the stylesheet's patterns (.gym-electric etc.).
 function gymFloorPattern(theme){
   const [f] = GYM_FLOOR[theme], c = new Canvas(16, 16, hex(f));
@@ -246,6 +248,9 @@ function gymFloorPattern(theme){
   if(theme==='grass'){ for(const [x,y] of [[0,0],[8,0],[0,8],[8,8]]) ellipse(c, x+0.5, y+0.5, 1.2, 1.2, hex('#98d070'), 1);
     for(const [x,y] of [[4,5.5],[15,5.5],[4,16.5],[15,16.5]]) ellipse(c, x, y, 0.9, 0.9, hex('#4c8c34'), 1); }
   if(theme==='ice') for(let y=0; y<16; y++) for(let x=0; x<16; x++) if(((x+y)%12+12)%12===5 || ((x+y)%12+12)%12===6) c.set(x, y, hex('#ffffff'));
+  if(theme==='flying') for(const [x,y] of [[3,4],[11,12]]){ c.rect(x, y, 4, 1, hex('#f8f8f8')); c.rect(x+1, y-1, 2, 1, hex('#f8f8f8')); }
+  if(theme==='normal') for(let y=0; y<16; y+=4) c.rect(0, y, 16, 1, hex('#b89868'));
+  if(theme==='rock') for(const [x,y] of [[2,3],[10,6],[5,11],[13,13]]) c.rect(x, y, 2, 2, hex('#786858'));
   if(theme==='dragon'){ c.rect(0, 0, 16, 1, hex('#4c3868')); c.rect(0, 8, 16, 1, hex('#4c3868')); c.rect(0, 0, 1, 16, hex('#4c3868')); c.rect(8, 0, 1, 16, hex('#4c3868')); }
   return {w:16, h:16, px:Array.from({length:16}, (_,y)=>Array.from({length:16}, (_,x)=>c.get(x, y)))};
 }
@@ -265,6 +270,8 @@ function gymWallPattern(bg, top, bottom, shade, light, round){
 }
 const GYMWALL_CSS = {electric:['#c8a830','#f8e048','#c89818','#806010','#fff8b0',false], grass:['#58983c','#88c860','#285a1c','#1c4012',null,true],
   ice:['#a8d8f0','#f0fbff','#98d0f0','#5898c8','#fff',false], dragon:['#4c3868','#a04838','#602820','#401810','#e07860',false],
+  flying:['#7898c0','#e8f4ff','#a8c8e8','#587898','#fff',true], normal:['#a88858','#e8c890','#c8a068','#785830','#f8e8c0',false],
+  rock:['#786858','#b8a898','#988878','#504038','#d8c8b8',false],
   league:['#8878b0','#e0d0f8','#9080c0','#605088','#fff',false]};
 function drawGym(room, opts={}){
   const league = room.interior==='league';
@@ -336,12 +343,12 @@ function trainerOut(n, loc){
   if(n.id) return {kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:/#gym\d/.test(n.id) ? 'junior' : 'route', title:n.title, team:n.team,
     intro:[`${n.title}: "${n.intro}"`], after:[`${n.title}: "${n.after}"`], vanish:false, grunt:n.kind==='grunt'};
   const leader = loc.type==='gym', name = loc.leaderName;
-  const quote = n.champion ? "So you made it. I always knew it'd be you. One last battle, for real this time!"
+  const quote = n.champion ? loc.championQuote || "So you made it. I always knew it'd be you. One last battle, for real this time!"
     : leader ? `So, a new challenger has come to the ${loc.name.split(' ')[0]} Gym. Show me what your Pokémon can do!`
     : (loc.desc.match(/"([^"]+)"/)||[])[1] || "Let's battle!";
-  const theme = leader ? (G.GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase() : '';
+  const theme = leader ? G.gymTheme(loc.leaderName) : '';
   return {kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:n.champion ? 'champion' : leader ? 'leader' : 'rival',
-    title:(leader ? 'Gym Leader ' : 'Rival ') + name,
+    title:(leader ? 'Gym Leader ' : n.champion && loc.championKind ? 'Champion ' : 'Rival ') + name,
     team:loc.leaderTeam, fill:leader && G.GYM_JUNIORS[theme] ? G.GYM_JUNIORS[theme].team : G.areaPool(loc),
     intro:[`${name}: "${quote}"`],
     after:leader || n.champion ? [`${name}: "You've already beaten me. The road ahead is waiting for you!"`] : (loc.rivalAfter || []).map(l=>`${name.toUpperCase()}: ${l}`),
@@ -440,10 +447,10 @@ for(const li of AREAS){
   const items = itemsHere.map(([x,y])=>({x, y, id:(map.itemTypes && map.itemTypes[`${x},${y}`]) || 'pokeball'}));
   const legend = map.npcs.find(n=>n.legend);
   const keys = set=>[...(set || [])].map(k=>k.split(',').map(Number));
-  areas.push({index:li, name:loc.name, type:loc.type, kind:loc.kind || '', w:map.w, h:map.h, desc:loc.desc, at:loc.at,
+  areas.push({index:li, region:loc.region || 1, name:loc.name, type:loc.type, kind:loc.kind || '', w:map.w, h:map.h, desc:loc.desc, at:loc.at,
     tiles:map.tiles.map(r=>r.join('')), behaviour:map.tiles.map(r=>r.map(behaviour)),
     links:nb.map((n,k)=>({to:n.exit.to, dir:n.exit.dir, ox:n.ox, oy:n.oy, w:n.map.w, h:n.map.h, name:G.LOCATIONS[n.exit.to].name, gate:!!n.exit.gate,
-      badges:G.LOCATIONS[n.exit.to].badges || 0, strip:strips[k]})),
+      badges:G.LOCATIONS[n.exit.to].badges || 0, need:n.exit.need || '', strip:strips[k]})),
     gate_kind:loc.type==='gym' ? 'gym' : loc.type==='trainer' ? 'rival' : '', leader_name:loc.leaderName || '',
     signs:map.signs.map(s=>({x:s.x, y:s.y, text:s.text || '', route:!!s.route, lines:s.lines || null})),
     doors, items,
@@ -455,7 +462,7 @@ for(const li of AREAS){
     spawn:map.spawn, pool:loc.pool || [], area_pool:G.areaPool(loc), water:G.waterPool(loc), fish:G.fishPool(loc), tier:loc.tier ?? li,
     theme:loc.theme || 'plain', weather:map.weather || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
-    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI,
+    scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI, shrine:!!loc.shrine,
     leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});
   if(legend) trainerSpecies.add(legend.legend);
 }

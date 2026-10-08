@@ -292,7 +292,7 @@ const area_info* overworld::area() const
     return wd::maps[area_index()].area;
 }
 
-bool overworld::area_flag(uint8_t flag) const
+bool overworld::area_flag(uint16_t flag) const
 {
     const area_info* a = area();
     return a && (a->flags & flag);
@@ -420,6 +420,7 @@ void overworld::load_map(int index, bool keep_bg)
     _map_index = index;
     _map = &wd::maps[index];
     g.map = int16_t(index);
+    g.region = uint8_t(bn::max(int(g.region), map_region(index) - 1));
     if(! _map->is_room())
     {
         g.visited.set(index);
@@ -524,7 +525,7 @@ void overworld::load_actors()
         _actors.push_back(a);
     }
     // The guardian of the Sunken Shrine, until it's caught.
-    if(_map->area && _map->area->legend_x >= 0 && ! g.has(story::LEGEND_CAUGHT) && ! _actors.full())
+    if(_map->area && _map->area->legend_x >= 0 && ! legend_caught(_map->area->legend) && ! _actors.full())
     {
         actor a;
         a.legend = true;
@@ -1216,14 +1217,30 @@ void overworld::step(direction want)
             hold_until_released();
             return;
         }
-        // Victory Road: all eight badges.
-        if(l.badges && g.badges() < l.badges)
+        // Victory Road: all eight badges (of that region).
+        if(l.badges && g.region_badges(map_region(target_place.map)) < l.badges)
         {
             set_player_frame(0);
             bn::string<80> text("Only trainers with all ");
             text.append(bn::to_string<4>(l.badges));
             text.append(" badges may pass beyond this point.");
             say(text);
+            hold_until_released();
+            return;
+        }
+        // Calderra's CRATER RIM: a branch opens from this side once you've walked it from PORT CALDER, and the
+        // ASHEN TOWER once all three beasts are free.
+        if(l.need == link_need::VISITED && target_place.map >= 0 && ! g.visited.test(target_place.map))
+        {
+            set_player_frame(0);
+            say("Loose rock and steep cliffs. There's no way down from this side.");
+            hold_until_released();
+            return;
+        }
+        if(l.need == link_need::SHRINES && ! shrines_cleared(map_region(_map_index)))
+        {
+            set_player_frame(0);
+            say("A wall of heat and storm bars the way to the tower. The three beasts must be freed first.");
             hold_until_released();
             return;
         }
@@ -1606,7 +1623,8 @@ void overworld::wild_battle(bool water)
             }
         }
     }
-    e.level = bn::max(2, bn::min(int(_map->level_cap), g.average_level() - 2 + r.get_int(3)));
+    int lv_cap = map_level_cap(_map_index);
+    e.level = bn::max(map_region(_map_index) == 2 ? lv_cap - 6 : 2, bn::min(lv_cap, g.average_level() - 2 + r.get_int(3)));
     _start_battle = true;
 }
 

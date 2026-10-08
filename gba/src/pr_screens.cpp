@@ -1971,11 +1971,11 @@ namespace
                     upper(cap, sp.name);
                     u.print(120 - u.width(cap) / 2, 28, cap, text_color::INK, texts);
                     bool any = false;
-                    for(int i = 0; i < world_data::areas_count; ++i)
+                    for(int i : world_data::area_maps)
                     {
                         const map_def& m = world_data::maps[i];
                         const area_info& a = *m.area;
-                        if(a.at_x >= 100)
+                        if(a.at_x >= 100 || a.region != map_region(state().map))
                         {
                             continue;
                         }
@@ -1995,11 +1995,11 @@ namespace
                     {
                         return ! any && x + w > box_x0 && x < box_x1 && y + h > box_y0 && y < box_y1;
                     };
-                    for(int i = 0; i < world_data::areas_count; ++i)
+                    for(int i : world_data::area_maps)
                     {
                         const map_def& m = world_data::maps[i];
                         const area_info& a = *m.area;
-                        if(a.at_x >= 100)
+                        if(a.at_x >= 100 || a.region != map_region(state().map))
                         {
                             continue;
                         }
@@ -2472,10 +2472,10 @@ void card_screen()
                 you->set_bg_priority(1);
                 // The eight gyms' badges.
                 int k = 0;
-                for(int i = 0; i < world_data::areas_count; ++i)
+                for(int i : world_data::area_maps)
                 {
                     const map_def& a = world_data::maps[i];
-                    if(a.gate != gate_kind::GYM)
+                    if(a.gate != gate_kind::GYM || a.area->region != map_region(g.map))
                     {
                         continue;
                     }
@@ -2489,7 +2489,7 @@ void card_screen()
             else
             {
                 int rivals = 0;
-                for(int i = 0; i < world_data::areas_count; ++i)
+                for(int i : world_data::area_maps)
                 {
                     const map_def& a = world_data::maps[i];
                     if(a.gate == gate_kind::RIVAL && a.leader_id >= 0 && g.beaten.test(a.leader_id))
@@ -2569,26 +2569,31 @@ int region_map_screen(bool travel)
     bn::vector<bn::sprite_ptr, 60> links;
     bn::vector<bn::sprite_ptr, 24> texts;
     bn::vector<bn::sprite_ptr, 24> used_marks;
-    // The grid: x 0..7, y -2..3.
-    constexpr int ox = 30, oy = 10, cw = 24, ch = 20;     // (rows -2 to 3: TRADEWIND VILLAGE is below WISPGATE)
+    // The grid: x 0..7, y -2..3 (Calderra's: x 0..11, closer together).
     int here = g.map;
     if(world_data::maps[here].is_room())
     {
         here = world_data::maps[here].exit_map;
     }
+    const int region = world_data::maps[here].area->region;
+    const int ox = region == 1 ? 30 : 12, oy = 10, cw = region == 1 ? 24 : 18, ch = 20;
+    auto elsewhere = [&](const area_info& a)
+    {
+        return a.at_x >= 100 || a.region != region;     // under the sea, or another region
+    };
     int cursor = here;
     auto cell_xy = [&](const area_info& a, int& x, int& y)
     {
         x = ox + a.at_x * cw;
         y = oy + (a.at_y + 2) * ch;
     };
-    for(int i = 0; i < world_data::areas_count; ++i)
+    for(int i : world_data::area_maps)
     {
         const map_def& m = world_data::maps[i];
         const area_info& a = *m.area;
-        if(a.at_x >= 100)
+        if(elsewhere(a))
         {
-            continue;       // under the sea
+            continue;
         }
         int x, y;
         cell_xy(a, x, y);
@@ -2611,7 +2616,7 @@ int region_map_screen(bool travel)
                 continue;
             }
             const area_info& b = *world_data::maps[l.target].area;
-            if(b.at_x >= 100)
+            if(elsewhere(b))
             {
                 continue;
             }
@@ -2697,10 +2702,10 @@ int region_map_screen(bool travel)
         {
             // The nearest area in that direction.
             int best = -1, best_d = 1 << 30;
-            for(int i = 0; i < world_data::areas_count; ++i)
+            for(int i : world_data::area_maps)
             {
                 const area_info& a = *world_data::maps[i].area;
-                if(a.at_x >= 100 || i == cursor)
+                if(elsewhere(a) || i == cursor)
                 {
                     continue;
                 }

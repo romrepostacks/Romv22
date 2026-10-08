@@ -22,8 +22,7 @@ namespace
     // The level cap where you are (advLevel): rooms share their area's.
     int level_cap()
     {
-        const map_def& m = world_data::maps[state().map];
-        return m.level_cap;
+        return map_level_cap(state().map);
     }
 
     void trainer_team(battle_setup& s, const trainer& t)
@@ -51,6 +50,17 @@ namespace
         else
         {
             lv = bn::max(3, bn::min(cap_level, avg - 1));
+        }
+        if(map_region(g.map) == 2)
+        {
+            // Calderra: levels follow your Calderra badges (calderra_level), never your party's. Juniors and route
+            // trainers sit just under the cap, a leader at the next badge's level, the rival and the bosses
+            // between, the Elite Four at 196-199 and the Champion at the cap, 200.
+            int b = g.region_badges(2);
+            lv = junior ? cap_level - 4 : elite ? 196 + t.elite : t.role == trainer_role::CHAMPION ? 200
+                : t.role == trainer_role::LEADER ? calderra_level(b + 1) : route ? cap_level - 2 : calderra_level(b) + 4;
+            s.smart = true;
+            s.boss_heal = ! route || elite;
         }
         species_id names[6];
         int n = 0;

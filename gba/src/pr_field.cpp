@@ -58,7 +58,7 @@ namespace
     // The trainer id of an area's rival / leader, and of a named gym (canSurf: Tidalkeep, canDive: Rimefall).
     bool area_cleared(const char* name)
     {
-        for(int i = 0; i < wd::areas_count; ++i)
+        for(int i : wd::area_maps)
         {
             const map_def& m = wd::maps[i];
             if(bn::string_view(m.place_name) == bn::string_view(name))
@@ -115,7 +115,7 @@ namespace
     // The CHALLENGE TOWER's rooms.
     int tower_room(room_kind kind, int floor = -1, gym_theme theme = gym_theme::NONE)
     {
-        for(int i = wd::areas_count; i < wd::maps_count; ++i)
+        for(int i = 0; i < wd::maps_count; ++i)
         {
             const room_info* r = wd::maps[i].room;
             if(r && r->kind == kind && (floor < 0 || r->floor == floor) && (kind != room_kind::CHAMBER || r->theme == theme))
@@ -145,7 +145,7 @@ namespace
     void reset_tower_trainers()
     {
         game_state& g = state();
-        for(int i = wd::areas_count; i < wd::maps_count; ++i)
+        for(int i = 0; i < wd::maps_count; ++i)
         {
             const map_def& m = wd::maps[i];
             for(int k = 0; k < m.trainers_count; ++k)
@@ -439,6 +439,12 @@ void overworld::talk_to(int index)
     case person_role::TUTOR:
         move_tutor();
         break;
+    case person_role::FERRY:
+        ferry();
+        break;
+    case person_role::PROF:
+        calderra_prof();
+        break;
     default:
         for(int i = 0; i < p.lines_count; ++i)
         {
@@ -478,7 +484,7 @@ void overworld::legend_talk(int index)
         tower_legend_battle(legend, tower_level());
         return;
     }
-    if(! g.has(story::MASTER_GIFT) && ! g.has(story::LEGEND_CAUGHT))
+    if(map_region(_map_index) == 1 && ! g.has(story::MASTER_GIFT) && ! g.has(story::LEGEND_CAUGHT))
     {
         // (A save from before 1.6, already past WREN at the door: the MASTER BALL waits at the guardian's feet.)
         g.story |= story::MASTER_GIFT;
@@ -491,7 +497,9 @@ void overworld::legend_talk(int index)
     say(text);
     say("Gyaaaoooh!");
     g.story |= story::LEGEND_FIGHT;
-    fixed_battle(legend, 50, true);
+    // Calderra's: a little above the level cap there (HO-OH at the very top).
+    int level = map_region(_map_index) == 1 ? 50 : legend == species_id::HO_OH ? 200 : bn::min(200, map_level_cap(_map_index) + 5);
+    fixed_battle(legend, level, true);
 }
 
 // ----- Water: SURF and the OLD ROD (waterAction) -----
@@ -615,7 +623,8 @@ void overworld::go_fish(int rod)
         }
     }
     // wildLevel() - 2, at least 3 (the better rods: wildLevel(), then + 2).
-    int wild = bn::max(2, bn::min(int(_map->level_cap), g.average_level() - 2 + r.get_int(3)));
+    int cap = map_level_cap(g.map);
+    int wild = bn::max(map_region(g.map) == 2 ? cap - 6 : 2, bn::min(cap, g.average_level() - 2 + r.get_int(3)));
     constexpr int bonus[] = { -2, 0, 2 };
     fixed_battle(s, bn::clamp(wild + bonus[rod], 3, 100));
 }
@@ -1496,7 +1505,7 @@ void overworld::starter_event()
     story_say("A wild ZIGZAGOON is after me! In my BAG! There's a POKé BALL in there!");
     chaser.set_visible(false);
     suspend();
-    int pick = starter_bag();
+    int pick = starter_bag(game_data::starter_trios[g.starter_trio], 3);
     resume();
     species_id chosen = game_data::starter_trios[g.starter_trio][pick];
     mon partner = mon::make(chosen, 5);
@@ -1520,19 +1529,20 @@ void overworld::starter_event()
 }
 
 // Emerald's bag screen: three POKé BALLS; Left/Right to choose, A to look.
-int overworld::starter_bag()
+int overworld::starter_bag(const species_id* list, int count)
 {
     ui& u = gui();
-    game_state& g = state();
-    int index = 1;
+    int index = count / 2 - (count > 3);
     int result = 0;
     {
         bn::regular_bg_ptr bg = bn::regular_bg_items::bag_bg.create_bg(8, 48);
         bg.set_priority(3);
-        bn::vector<bn::sprite_ptr, 3> balls;
-        for(int i = 0; i < 3; ++i)
+        // Three balls 40 px apart, or Calderra's six closer together.
+        const int step = count > 3 ? 32 : 40, x0 = 120 - step * (count - 1) / 2;
+        bn::vector<bn::sprite_ptr, 6> balls;
+        for(int i = 0; i < count; ++i)
         {
-            balls.push_back(bn::sprite_items::ball.create_sprite(sx(80 + i * 40), sy(64)));
+            balls.push_back(bn::sprite_items::ball.create_sprite(sx(x0 + i * step), sy(64)));
             balls.back().set_bg_priority(2);
         }
         bn::optional<bn::sprite_ptr> shown;
@@ -1542,22 +1552,22 @@ int overworld::starter_bag()
         ui::fade_in(8);
         while(true)
         {
-            cursor.set_position(sx(80 + index * 40), sy(48));
+            cursor.set_position(sx(x0 + index * step), sy(48));
             frame();
             if(bn::keypad::left_pressed())
             {
-                index = (index + 2) % 3;
+                index = (index + count - 1) % count;
                 audio::play(audio::sfx::SELECT);
             }
             else if(bn::keypad::right_pressed())
             {
-                index = (index + 1) % 3;
+                index = (index + 1) % count;
                 audio::play(audio::sfx::SELECT);
             }
             else if(bn::keypad::a_pressed())
             {
                 audio::play(audio::sfx::SELECT);
-                const species& s = game_data::species_list[int(game_data::starter_trios[g.starter_trio][index])];
+                const species& s = game_data::species_list[int(list[index])];
                 shown = s.front.create_sprite(sx(120), sy(112 - 32));
                 shown->set_bg_priority(1);
                 bn::string<80> text("Do you choose this POKéMON? The ");
@@ -1579,6 +1589,55 @@ int overworld::starter_bag()
         ui::fade_out(8);
     }
     return result;
+}
+
+// PORT CALDER's professor (2.0.0): a Gen 8 or 9 starter for the journey through Calderra, grown up to the
+// region's level; then a word about the beasts.
+void overworld::calderra_prof()
+{
+    game_state& g = state();
+    if(g.flags.test(flag::CALDERRA_STARTER))
+    {
+        say("PROF. EMBER: \"Three beasts, three branches, one crater. Choose any road you like!\"");
+        say("PROF. EMBER: \"Your levels here follow your CALDERRA badges, not the road. Every road grows with you.\"");
+        return;
+    }
+    say("PROF. EMBER: \"So you're the CHAMPION from VELLORIN! Welcome to CALDERRA.\"");
+    say("PROF. EMBER: \"I study the legend of the ASHEN TOWER, and the three beasts who rose from its ashes.\"");
+    say("PROF. EMBER: \"A new region deserves a new partner. Pick one from my BAG!\"");
+    static constexpr species_id starters[] = { species_id::GROOKEY, species_id::SCORBUNNY, species_id::SOBBLE,
+                                               species_id::SPRIGATITO, species_id::FUECOCO, species_id::QUAXLY };
+    suspend();
+    int pick = starter_bag(starters, 6);
+    resume();
+    mon partner = mon::make(starters[pick], calderra_level(g.region_badges(2)));
+    if(roll_shiny())
+    {
+        partner.traits |= mon_trait::SHINY;
+    }
+    bn::string<64> text(g.name);
+    text.append(" chose ");
+    text.append(partner.name());
+    text.append("!");
+    say(text);
+    while(partner.data().evolves_to >= 0 && partner.level >= partner.data().evolve_level)
+    {
+        partner.evolve_into(partner.data().evolves_to, gui());
+    }
+    int slot;
+    if(! g.add_mon(partner, slot))
+    {
+        say("...But there's no room for it, even in the BOXES! Make some space and come back.");
+        return;
+    }
+    g.mark_owned(partner.species_index);
+    g.flags.set(flag::CALDERRA_STARTER);
+    if(slot >= 0)
+    {
+        say("It was sent to the BOX.");
+    }
+    save_game();
+    say("PROF. EMBER: \"Now, the beasts. TEAM ECLIPSE is after them. Please, get to the shrines first!\"");
 }
 
 // After the first battle, the professor thanks you and heads off.
@@ -2052,13 +2111,26 @@ void overworld::after_story()
     move_prompts();
     trainer_walk_back();
     // The League beaten for the first time: the Hall of Fame and the credits.
-    for(int i = 0; i < wd::areas_count; ++i)
+    for(int i : wd::area_maps)
     {
         const map_def& m = wd::maps[i];
-        if(m.area && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) && ! g.has(story::CHAMPION))
+        if(m.area->region == 1 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) && ! g.has(story::CHAMPION))
         {
             credits();
             return;
+        }
+    }
+    // Calderra's League beaten for the first time (2.0.0).
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == 2 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
+           ! g.flags.test(flag::CALDERRA_CHAMPION))
+        {
+            g.flags.set(flag::CALDERRA_CHAMPION);
+            save_game();
+            story_say("SOLENNE: \"Calderra has a new CHAMPION. The beasts knew it before any of us did.\"");
+            story_say("SOLENNE: \"The crater is yours to roam. And the GYM LEADERS are already asking for a rematch!\"");
         }
     }
     if(g.has(story::DIVE_GIFT))
@@ -2075,7 +2147,7 @@ void overworld::after_story()
     {
         g.story &= ~story::LEGEND_FIGHT;
         bool got = false;
-        species_id legend = species_id::LUGIA;
+        species_id legend = _map->area && _map->area->legend_x >= 0 ? _map->area->legend : species_id::LUGIA;
         for(int i = 0; i < g.party_count; ++i)
         {
             got |= g.party[i].species_index == uint16_t(legend);
@@ -2084,30 +2156,57 @@ void overworld::after_story()
         {
             got |= ! m.empty() && m.species_index == uint16_t(legend);
         }
-        bool first = ! g.has(story::STORM_ENDED);
-        if(got)
+        if(legend_flag(legend) >= 0)
         {
-            g.story |= story::LEGEND_CAUGHT;
-        }
-        g.story |= story::STORM_ENDED;
-        save_game();
-        if(got)
-        {
-            load_actors();
-            update_tint();
-            refresh(true);
-            say("LUGIA, guardian of the sea and sky, joined your team!");
+            // Calderra's beasts and HO-OH.
+            if(got)
+            {
+                g.flags.set(legend_flag(legend));
+            }
+            save_game();
+            bn::string<64> text;
+            upper(text, game_data::species_list[int(legend)].name);
+            if(got)
+            {
+                load_actors();
+                refresh(true);
+                text.append(" joined your team!");
+                say(text);
+            }
+            else
+            {
+                text.append(" fled into the crater's wilds...");
+                say(text);
+                say("Maybe it will return to its shrine.");
+            }
         }
         else
         {
-            say("LUGIA sank back into the depths of the shrine...");
-            say("Maybe it will rise again if you return.");
-        }
-        if(first)
-        {
-            story_say("Far above, the storm clouds over VELLORIN begin to break apart.");
-            story_say("WREN: \"You did it... The storms are clearing!\"");
-            story_say("WREN: \"VESPER's gone, and TEAM TEMPEST with her. See you at the top!\"");
+            bool first = ! g.has(story::STORM_ENDED);
+            if(got)
+            {
+                g.story |= story::LEGEND_CAUGHT;
+            }
+            g.story |= story::STORM_ENDED;
+            save_game();
+            if(got)
+            {
+                load_actors();
+                update_tint();
+                refresh(true);
+                say("LUGIA, guardian of the sea and sky, joined your team!");
+            }
+            else
+            {
+                say("LUGIA sank back into the depths of the shrine...");
+                say("Maybe it will rise again if you return.");
+            }
+            if(first)
+            {
+                story_say("Far above, the storm clouds over VELLORIN begin to break apart.");
+                story_say("WREN: \"You did it... The storms are clearing!\"");
+                story_say("WREN: \"VESPER's gone, and TEAM TEMPEST with her. See you at the top!\"");
+            }
         }
     }
     if(g.has(story::SURF_GIFT))
@@ -2220,6 +2319,43 @@ void overworld::tower_guide()
     }
 }
 
+
+// The ferry (2.0.0): PORTMERE HARBOUR to PORT CALDER for CHAMPIONS (ADVENTURE MODE), and back. It lands you
+// at the other port's SAILOR.
+void overworld::ferry()
+{
+    game_state& g = state();
+    ui& u = gui();
+    bool home = map_region(_map_index) == 1;
+    if(home && ! g.run.adventure)
+    {
+        say("SAILOR: \"The ferry to CALDERRA only takes CHAMPIONS. Beat the POKéMON LEAGUE and come back!\"");
+        return;
+    }
+    u.show_text(home ? "SAILOR: \"All aboard for CALDERRA, land of the great crater! Set sail?\""
+                     : "SAILOR: \"Heading home? We sail for PORTMERE HARBOUR in VELLORIN. Set sail?\"");
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == (home ? 2 : 1))
+        {
+            for(int k = 0; k < m.people_count; ++k)
+            {
+                if(m.people[k].role == person_role::FERRY)
+                {
+                    fast_travel(i);
+                    return;
+                }
+            }
+        }
+    }
+}
 
 void overworld::warp_to_room(int map_index)
 {

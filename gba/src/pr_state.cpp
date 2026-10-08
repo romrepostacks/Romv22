@@ -29,7 +29,7 @@ namespace
     static_assert(species_count <= dex_size, "the POKéDEX holds dex_size species");
     static_assert(world_data::trainers_count <= trainer_slots, "beaten holds trainer_slots trainers");
     static_assert(world_data::items_count <= item_ball_slots, "picked holds item_ball_slots item balls");
-    static_assert(world_data::areas_count <= area_slots, "visited holds area_slots areas");
+    static_assert(world_data::maps_count <= area_slots, "visited holds a bit per map index");
 
     template<typename Block>
     uint32_t checksum_of(const Block& block)
@@ -583,11 +583,16 @@ int game_state::average_level() const
 
 int game_state::badges() const
 {
+    return region_badges(1);
+}
+
+int game_state::region_badges(int region) const
+{
     int n = 0;
-    for(int i = 0; i < world_data::areas_count; ++i)
+    for(int i : world_data::area_maps)
     {
         const map_def& m = world_data::maps[i];
-        if(m.gate == gate_kind::GYM && m.leader_id >= 0)
+        if(m.gate == gate_kind::GYM && m.leader_id >= 0 && m.area->region == region)
         {
             n += beaten.test(m.leader_id);
         }
@@ -642,26 +647,94 @@ bool roll_shiny()
     return rng().get_int(16384) < chances;
 }
 
+int map_region(int map)
+{
+    if(map < 0 || map >= world_data::maps_count)
+    {
+        return 1;
+    }
+    const map_def& m = world_data::maps[map];
+    return m.is_room() ? world_data::maps[m.exit_map].area->region : m.area->region;
+}
+
+int calderra_level(int badges)
+{
+    return bn::min(200, 100 + 12 * badges);
+}
+
+int map_level_cap(int map)
+{
+    if(map_region(map) == 2)
+    {
+        return calderra_level(state().region_badges(2));
+    }
+    return world_data::maps[map].level_cap;
+}
+
+int legend_flag(species_id legend)
+{
+    switch(legend)
+    {
+    case species_id::RAIKOU:
+        return 0;
+    case species_id::SUICUNE:
+        return 1;
+    case species_id::ENTEI:
+        return 2;
+    case species_id::HO_OH:
+        return 3;
+    default:
+        return -1;
+    }
+}
+
+bool legend_caught(species_id legend)
+{
+    const game_state& g = state();
+    int f = legend_flag(legend);
+    return f >= 0 ? g.flags.test(f) : g.has(story::LEGEND_CAUGHT);
+}
+
+bool shrines_cleared(int region)
+{
+    const game_state& g = state();
+    for(int i : world_data::area_maps)
+    {
+        const map_def& m = world_data::maps[i];
+        if(m.area->region == region && (m.area->flags & area_flag::SHRINE) && ! (m.leader_id >= 0 && g.beaten.test(m.leader_id)))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 int level_cap_now()
 {
     const game_state& g = state();
     if(! g.run.nuzlocke())
     {
-        return 100;
+        return g.region >= 1 ? 200 : 100;
+    }
+    if(map_region(g.map) == 2)
+    {
+        // Calderra: the next leader's level (calderra_level of one more badge), then 200 for the League.
+        int b = g.region_badges(2);
+        return b >= 8 ? 200 : calderra_level(b + 1);
     }
     // The first gym (in the region's order) whose leader you haven't beaten; after the eighth, the League.
-    for(int i = 0; i < world_data::areas_count; ++i)
+    for(int i : world_data::area_maps)
     {
         const map_def& m = world_data::maps[i];
-        if(m.area && m.area->kind == area_kind::GYM && m.leader_id >= 0 && ! g.beaten.test(m.leader_id))
+        if(m.area->region == 1 && m.area->kind == area_kind::GYM && m.leader_id >= 0 && ! g.beaten.test(m.leader_id))
         {
             return m.level_cap;
         }
     }
-    for(int i = 0; i < world_data::areas_count; ++i)
+    for(int i : world_data::area_maps)
     {
         const map_def& m = world_data::maps[i];
-        if(m.area && (m.area->flags & area_flag::CHAMPION) && ! (m.leader_id >= 0 && g.beaten.test(m.leader_id)))
+        if(m.area->region == 1 && (m.area->flags & area_flag::CHAMPION) && ! (m.leader_id >= 0 && g.beaten.test(m.leader_id)))
         {
             return m.level_cap;
         }

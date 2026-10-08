@@ -236,7 +236,8 @@ struct game_state
         return items[int(id)];
     }
     [[nodiscard]] int average_level() const;    // partyAvgLevel, rounded
-    [[nodiscard]] int badges() const;           // gym leaders beaten (badgeCount)
+    [[nodiscard]] int badges() const;           // Vellorin's gym leaders beaten (badgeCount)
+    [[nodiscard]] int region_badges(int region) const;  // a region's gym leaders beaten (1 Vellorin, 2 Calderra)
     [[nodiscard]] bool has(uint32_t bits) const
     {
         return (story & bits) == bits;
@@ -280,8 +281,31 @@ bool peek_save(game_state& out);
 bool device_cleared();
 void set_device_cleared();
 
-// NUZLOCKE's level cap: the next gym leader's (the League's after the eighth badge); 100 otherwise.
+// NUZLOCKE's level cap: the next gym leader's (the League's after the eighth badge); otherwise 100, or 200 once
+// you've reached Calderra.
 int level_cap_now();
+
+// The region a map is in (1 Vellorin, 2 Calderra...): a room's is its area's.
+int map_region(int map);
+
+// The level cap where a map is (advLevel). Vellorin's is the place's own; Calderra's branches go in any order,
+// so its levels follow your Calderra badges instead: 100, then 12 more per badge.
+int map_level_cap(int map);
+
+// Story flags beyond `story` (bits in game_state::flags); 0-3 are Calderra's legendaries (legend_flag).
+namespace flag
+{
+    constexpr int CALDERRA_CHAMPION = 4;
+    constexpr int CALDERRA_STARTER = 5;
+}
+
+// Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH; -1 for any other.
+int legend_flag(species_id legend);
+bool legend_caught(species_id legend);
+
+// Every beast shrine (a BOSS area with a guardian, other than the story legendary's) in a region cleared.
+bool shrines_cleared(int region);
+int calderra_level(int badges);
 
 // A wild (or summoned) Pokémon's shiny roll: 1 in 4096, x2 in ADVENTURE MODE, x1.25 in a NUZLOCKE run.
 bool roll_shiny();

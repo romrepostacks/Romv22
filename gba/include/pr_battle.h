@@ -22,6 +22,7 @@ struct battle_setup
     // battles never). Dupes are refused one by one (dupes clause), and only one catch per battle.
     bool nuzlocke_catch = true;
     bool smart = false;             // CHALLENGE TOWER from rank 3: foes pick their best move and target
+    bool boss_heal = false;         // Calderra's leaders, rival, Elite Four and Champion: one FULL RESTORE a battle
 };
 
 battle_report run_battle(battle_setup& setup);

@@ -58,7 +58,9 @@ enum class person_role : uint8_t
     TOWER,          // the CHALLENGE TOWER's guide (ADVENTURE MODE only)
     TRADER,         // TRADEWIND VILLAGE's trader
     DAYCARE,        // CINDERGATE TOWN's DAY CARE (GBA 1.8)
-    TUTOR           // the MOVE TUTOR in every POKéMON CENTER (GBA 1.8)
+    TUTOR,          // the MOVE TUTOR in every POKéMON CENTER (GBA 1.8)
+    FERRY,          // the SAILOR between PORTMERE HARBOUR and PORT CALDER (2.0.0)
+    PROF            // PORT CALDER's professor: the Calderra starter (2.0.0)
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
@@ -90,7 +92,7 @@ struct door
     int16_t x;
     int16_t y;
     door_kind kind;
-    int8_t room;                    // index into world_data::maps
+    int16_t room;                   // index into world_data::maps
 };
 
 struct person
@@ -136,9 +138,9 @@ struct trainer
     const char* const* after;       // said when you talk to them after (a rival says it, then leaves)
     int8_t after_count;
     bool vanish;                    // a rival leaves once beaten
-    uint8_t id;                     // bit in game_state::beaten
+    uint16_t id;                    // bit in game_state::beaten
     int8_t elite;                   // the Elite Four's place in line, or -1
-    int8_t area;                    // the area it belongs to (its own, or the one its room is in)
+    int16_t area;                   // the area it belongs to (its own, or the one its room is in)
     bool scene;                     // only there while a scene puts them there (SCENES.portmere)
 };
 
@@ -155,19 +157,19 @@ struct item_ball
     int16_t x;
     int16_t y;
     item_id item;
-    uint8_t id;                     // bit in game_state::picked
+    uint16_t id;                    // bit in game_state::picked
     uint16_t ground;                // metatile drawn once it's picked up
 };
 
 // A hidden item (GBA only): nothing shows but a glint now and then; A facing the spot finds it.
 struct hidden_item
 {
-    int8_t area;
+    int16_t area;
     int16_t x;
     int16_t y;
     item_id item;
     uint8_t count;
-    uint8_t id;                     // bit in game_state::picked
+    uint16_t id;                    // bit in game_state::picked
 };
 
 // An item ball in a neighbour's strip: where it is (in the neighbour) and its picked-up metatile here.
@@ -189,11 +191,19 @@ struct thing
 
 // A connected area, placed at (ox, oy) in this map's tile coordinates (Emerald-style seamless connections).
 // target is the index into world_data::maps, or -1 for an area that isn't in this build yet.
+// What else a link needs before it opens (Calderra's CRATER RIM).
+enum class link_need : uint8_t
+{
+    NONE,
+    VISITED,                        // you've been there (walked that branch from PORT CALDER)
+    SHRINES                         // every beast shrine in the region is cleared
+};
+
 // The part of the neighbour this area's tileset can draw is its strip (sx, sy, sw, sh in the neighbour's
 // tiles); past it is forest.
 struct link
 {
-    int8_t target;
+    int16_t target;
     int16_t ox;
     int16_t oy;
     int16_t w;
@@ -201,6 +211,7 @@ struct link
     const char* name;
     bool gate;                      // shut until this place's leader or rival is beaten
     int8_t badges;                  // badges needed to go there (Victory Road)
+    link_need need;
     int16_t sx;
     int16_t sy;
     int16_t sw;
@@ -242,14 +253,15 @@ enum class area_weather : uint8_t
 
 namespace area_flag
 {
-    constexpr uint8_t CENTER = 1;
-    constexpr uint8_t LEAGUE = 2;
-    constexpr uint8_t CHAMPION = 4;
-    constexpr uint8_t BOSS = 8;
-    constexpr uint8_t OWN_POOL = 16;      // its own wild Pokémon (the POKéDEX's AREA), not a neighbour's
-    constexpr uint8_t TOWER_TOWN = 32;    // SPIRECREST TOWN: shut until you're CHAMPION
-    constexpr uint8_t SAFARI = 64;        // the SAFARI ZONE: $5000 to enter, any species at all in the grass
-    constexpr uint8_t TRADE_TOWN = 128;   // TRADEWIND VILLAGE (the TRADER)
+    constexpr uint16_t CENTER = 1;
+    constexpr uint16_t LEAGUE = 2;
+    constexpr uint16_t CHAMPION = 4;
+    constexpr uint16_t BOSS = 8;
+    constexpr uint16_t OWN_POOL = 16;     // its own wild Pokémon (the POKéDEX's AREA), not a neighbour's
+    constexpr uint16_t TOWER_TOWN = 32;   // SPIRECREST TOWN: shut until you're CHAMPION
+    constexpr uint16_t SAFARI = 64;       // the SAFARI ZONE: $5000 to enter, any species at all in the grass
+    constexpr uint16_t TRADE_TOWN = 128;  // TRADEWIND VILLAGE (the TRADER)
+    constexpr uint16_t SHRINE = 256;      // a beast's shrine (Calderra's three)
 }
 
 // What an area is (LOCATIONS): its kind, look and weather, where it sits on the region map, the layer
@@ -259,12 +271,13 @@ struct area_info
     area_kind kind;
     area_theme theme;
     area_weather weather;
-    uint8_t flags;
+    uint16_t flags;
     int8_t tier;
+    uint8_t region;                 // 1 Vellorin, 2 Calderra...
     int16_t at_x;                   // the region map's grid (DIVE's areas sit apart, at x 100 and up)
     int16_t at_y;
-    int8_t dive;                    // the area beneath (map index), or -1
-    int8_t surface;                 // the area above, or -1
+    int16_t dive;                   // the area beneath (map index), or -1
+    int16_t surface;                // the area above, or -1
     const char* scene;
     const uint8_t* dive_spots;      // x, y pairs
     int16_t dive_count;
@@ -301,7 +314,10 @@ enum class gym_theme : uint8_t
     GRASS,
     ICE,
     DRAGON,
-    LEAGUE          // (a tower room in the League's look)
+    LEAGUE,         // (a tower room in the League's look)
+    FLYING,         // Calderra's three new gyms (2.0.0)
+    NORMAL,
+    ROCK
 };
 
 // A League gate: tiles x0..x1 of row y, open once that Elite Four trainer is beaten.
@@ -351,8 +367,8 @@ struct map_def
     int8_t pool_count;
     int16_t spawn_x;
     int16_t spawn_y;
-    int8_t level_cap;
-    int8_t exit_map;                // rooms: the area outside, and the door you came in by
+    int16_t level_cap;
+    int16_t exit_map;                // rooms: the area outside, and the door you came in by
     int16_t exit_x;
     int16_t exit_y;
     int16_t leader_id;              // the trainer id of this place's rival or gym leader, or -1

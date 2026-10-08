@@ -1370,8 +1370,8 @@ function buildTown(loc){
   const placed = [];
   // Each town's outskirts lean toward its Gym's type: rocky (fire/ground), woods (ghost), a strip of
   // sea shore along the south (water); home and the rest get trees and flowers.
-  const flavor = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
-  const PALETTE = {fire:'rrrTb', ground:'rrTTb*', ghost:'TTTTb', water:'**bT', electric:'rTb*', grass:'TTbb**', ice:'rrTT', dragon:'rrrTb'}[flavor] || 'TTTT**b';
+  const flavor = gymTheme(loc.leaderName);
+  const PALETTE = {fire:'rrrTb', ground:'rrTTb*', ghost:'TTTTb', water:'**bT', electric:'rTb*', grass:'TTbb**', ice:'rrTT', dragon:'rrrTb', flying:'TTb**', normal:'TT**bb', rock:'rrrTb'}[flavor] || 'TTTT**b';
   const tries = flavor==='ghost' ? 120 : 70;
   if(flavor==='water') for(let y=H-5; y<H-2; y++) for(let x=2; x<W-2; x++){
     if(x>=LANE-1 && x<=LANE+3) continue;   // leave the south lane
@@ -1582,7 +1582,7 @@ function buildRoute(loc){
   const gated = loc.links.find(l=>l.gate);
   if(loc.type==='trainer' && gated){
     const trail = paths[gated.dir], spot = trail[Math.floor(trail.length*0.45)];
-    npcs.push({kind:'rival', x:spot.x, y:spot.y, facing:OPPOSITE[gated.dir], trainer:true, vanish:true});
+    npcs.push({kind:loc.rivalKind || 'rival', x:spot.x, y:spot.y, facing:OPPOSITE[gated.dir], trainer:true, vanish:true});
   }
   if(loc.boss){
     const trail = paths[loc.links[0].dir], spot = trail[Math.floor(trail.length*0.7)];
@@ -1722,7 +1722,10 @@ const GYM_JUNIORS = {
   electric:{cls:'GUITARIST', kind:'boy',    team:['Voltorb','Magnemite','Electrike','Pikachu','Shinx','Mareep']},
   grass: {cls:'AROMA LADY', kind:'lass',    team:['Oddish','Roselia','Shroomish','Sunkern','Cherubi','Budew']},
   ice:   {cls:'SKIER',      kind:'girl',    team:['Snorunt','Swinub','Spheal','Seel','Smoochum','Snover']},
-  dragon:{cls:'DRAGON TAMER', kind:'gentleman', team:['Swablu','Bagon','Dratini','Gible','Taillow','Trapinch']}};
+  dragon:{cls:'DRAGON TAMER', kind:'gentleman', team:['Swablu','Bagon','Dratini','Gible','Taillow','Trapinch']},
+  flying:{cls:'BIRD KEEPER', kind:'boy',     team:['Rookidee','Wattrel','Squawkabilly','Flamigo','Cramorant','Corvisquire']},
+  normal:{cls:'RANCHER',     kind:'hiker',   team:['Lechonk','Wooloo','Skwovet','Tandemaus','Dunsparce','Squawkabilly']},
+  rock:  {cls:'RUIN MANIAC', kind:'hiker',   team:['Nacli','Rolycoly','Klawf','Glimmet','Carkol','Naclstack']}};
 // The Elite Four (Phase 5): one per room, in order.
 const ELITES = [
   {kind:'eliteDark', title:'ELITE FOUR MORROW', team:['Umbreon','Houndoom','Absol','Honchkrow','Weavile','Tyranitar'],
@@ -1744,14 +1747,21 @@ function leagueReset(){
   for(const room of Object.values(loc.__rooms || {})) if(room.interior==='league') leagueGates(room, loc);
 }
 const GYM_STYLE = {Rell:{kind:'leaderFire', type:'Fire'}, Sable:{kind:'leaderWater', type:'Water'}, Orin:{kind:'leaderGround', type:'Ground and Poison'}, Iska:{kind:'leaderGhost', type:'Ghost and Psychic'},
-  Juno:{kind:'leaderElectric', type:'Electric'}, Bryn:{kind:'leaderGrass', type:'Grass'}, Hale:{kind:'leaderIce', type:'Ice'}, Corvin:{kind:'leaderDragon', type:'Dragon and Flying'}};
+  Juno:{kind:'leaderElectric', type:'Electric'}, Bryn:{kind:'leaderGrass', type:'Grass'}, Hale:{kind:'leaderIce', type:'Ice'}, Corvin:{kind:'leaderDragon', type:'Dragon and Flying'},
+  // Calderra (2.0.0): each leader has their own look; `theme` is the gym's.
+  Arc:{kind:'leaderArc', type:'Electric', theme:'electric'}, Kestra:{kind:'leaderKestra', type:'Flying', theme:'flying'},
+  Tobin:{kind:'leaderTobin', type:'Normal', theme:'normal'}, Isolde:{kind:'leaderIsolde', type:'Ice', theme:'ice'},
+  Marina:{kind:'leaderMarina', type:'Water', theme:'water'}, Garnet:{kind:'leaderGarnet', type:'Rock', theme:'rock'},
+  Pyra:{kind:'leaderPyra', type:'Fire', theme:'fire'}, Dune:{kind:'leaderDune', type:'Ground', theme:'ground'}};
+// A gym's theme (its floor, walls and juniors): fire, water, ... from its leader.
+function gymTheme(name){ const g = GYM_STYLE[name]; return g ? g.theme || g.kind.replace('leader', '').toLowerCase() : ''; }
 function getInterior(loc, bi){
   if(getMap(loc).buildings[bi].kind==='tower') return towerInterior(loc, bi);
   loc.__rooms ||= {};
   if(loc.__rooms[bi]) return loc.__rooms[bi];
   const b = getMap(loc).buildings[bi];
   // Gym walls: pools in the Water gym, rock or boulders elsewhere (styled by theme).
-  const theme = b.kind==='gym' ? (GYM_STYLE[loc.leaderName] || {kind:'leaderFire'}).kind.replace('leader', '').toLowerCase() : null;
+  const theme = b.kind==='gym' ? (gymTheme(loc.leaderName) || 'fire') : null;
   const tiles = ROOMS[b.kind].map(r=>r.split('').map(ch=>ch==='x' && theme==='water' ? '~' : ch));
   const h = tiles.length, w = tiles[0].length, matX = tiles[h-1].indexOf('M');
   const npcs = [];
@@ -1761,8 +1771,8 @@ function getInterior(loc, bi){
   if(b.kind==='house' && b.home) npcs.push({kind:'mom', x:3, y:5, facing:'down', role:'mom'});
   else if(b.kind==='house') npcs.push({kind:b.resident || 'oldwoman', x:3, y:5, facing:'down', wander:true, lines:b.lines});
   if(b.kind==='league'){
-    ELITES.forEach((e,k)=>npcs.push({...e, x:5, y:[19,15,11,7][k], facing:'right', trainer:true, id:`${loc.name}#elite${k}`, elite:k}));
-    npcs.push({kind:'rival', x:7, y:2, facing:'down', trainer:true, gymLeader:true, champion:true});
+    (loc.elites || ELITES).forEach((e,k)=>npcs.push({...e, x:5, y:[19,15,11,7][k], facing:'right', trainer:true, id:`${loc.name}#elite${k}`, elite:k}));
+    npcs.push({kind:loc.championKind || 'rival', x:7, y:2, facing:'down', trainer:true, gymLeader:true, champion:true});
   }
   if(b.kind==='gym'){
     const g = GYM_STYLE[loc.leaderName] || {kind:'leaderFire', type:'tough'};
@@ -1862,7 +1872,18 @@ const CHARS = {
   eliteFight: {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d89868',H:'#402818',B:'#e0e0e0',D:'#303030',Y:'#e05030'},
   eliteSteel: {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c8a0',H:'#a8b0c0',B:'#607080',D:'#384050',Y:'#c8d0e0'},
   elitePsy:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#e880b0',B:'#f0a8c8',D:'#f0a8c8',Y:'#fff0f8'},
-  leaderDragon:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#402060',B:'#7038c0',D:'#282030',Y:'#e0a030'}};
+  leaderDragon:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#402060',B:'#7038c0',D:'#282030',Y:'#e0a030'},
+  // Calderra's leaders (2.0.0).
+  leaderArc:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#202028',B:'#f8d030',D:'#303038',Y:'#f8f8f8'},
+  leaderKestra:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d0b0',H:'#c06030',B:'#68a8e8',D:'#f8f8f8',Y:'#e8e8f8'},
+  leaderTobin: {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#a87848',B:'#d84848',D:'#4060a0',Y:'#f0d890'},
+  leaderIsolde:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#f0f0f8',B:'#88c8f0',D:'#f8f8f8',Y:'#4890c8'},
+  leaderMarina:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e0a878',H:'#286890',B:'#38b8c8',D:'#f8f8f8',Y:'#f8f8f8'},
+  leaderGarnet:{head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#802020',B:'#987868',D:'#584038',Y:'#c04040'},
+  leaderPyra:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8c8a0',H:'#f86828',B:'#302828',D:'#c03018',Y:'#f8b030'},
+  rivalKai:    {head:'cap',   K:'#282830',R:'#d84030',W:'#f8f8f8',S:'#d8a070',H:'#282028',B:'#e05830',D:'#303038',Y:'#f0c040'},
+  championSolenne:{head:'long', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#f0c040',B:'#f8f0e0',D:'#c08830',Y:'#e05830'},
+  leaderDune:  {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c08050',H:'#806040',B:'#d8b878',D:'#806040',Y:'#f0e0b0'}};
 const charCache = {};
 // The player: an original trainer on Gen 3's 16×21 overworld frame, following Brendan's row-by-row
 // widths from the pokeemerald sheet: the head is widest at the eyes (14 px, hair tufts outside the face
@@ -4438,7 +4459,7 @@ function startTrainerBattle(npc){
   const cap = Math.min(6, 2 + badgeCount()), sig = rt ? [] : loc.leaderTeam.length > cap ? [...loc.leaderTeam.slice(0, cap-1), loc.leaderTeam[loc.leaderTeam.length-1]] : loc.leaderTeam.slice();
   const names = rt ? (npc.elite!=null ? npc.team.slice() : npc.team.slice(0, Math.max(1, junior ? Math.min(adv.party.length, 1 + badgeCount()) : adv.party.length))) : sig;
   if(!rt){
-    const theme = (GYM_STYLE[loc.leaderName] || {kind:''}).kind.replace('leader', '').toLowerCase();
+    const theme = gymTheme(loc.leaderName);
     const extra = loc.type==='gym' && GYM_JUNIORS[theme] ? GYM_JUNIORS[theme].team : areaPool(loc);
     const size = Math.min(cap, Math.max(names.length, adv.party.length));
     for(const n of extra) if(names.length<size && !names.includes(n)) names.push(n);
@@ -6130,6 +6151,100 @@ for(const loc of [TRADE_TOWN, SAFARI]){ const m = getMap(loc); m.npcs = m.npcs.f
 {
   const m = getMap(TOWER_TOWN), t = m.buildings.find(b=>b.kind==='tower');
   if(t) m.npcs.push({kind:'gentleman', x:t.door.x+2, y:t.door.y+1, facing:'left', role:'tower', lines:['The CHALLENGE TOWER opens to CHAMPIONS.']});
+}
+
+// ---------- Calderra (2.0.0): the second region, reached by ferry from PORTMERE in ADVENTURE MODE ----------
+// A tree, not a line: PORT CALDER, then three branches (Stormreach, Mistral Lakes, Cinderdeep) open in any
+// order, meeting at the CRATER RIM; then the ASHEN TOWER, Victory Road and the Calderra League. Levels follow
+// your Calderra badges, not the place (the GBA works them out). `region` keeps its areas, rooms, trainers and
+// items in their own block after Vellorin's, so saves never shift. `at` is Calderra's own map grid.
+const ELITES_CALDERRA = [
+  {kind:'eliteDark', title:'ELITE FOUR VESPERA', team:['Mabosstiff','Grimmsnarl','Kingambit','Bombirdier','Spiritomb','Hydreigon'],
+   intro:"The crater swallows the light. Let's see if you shine anyway.", after:"Bright enough. Go on."},
+  {kind:'eliteFight', title:'ELITE FOUR TORAN', team:['Annihilape','Grapploct','Falinks','Quaquaval','Lucario','Sirfetch’d'],
+   intro:"I climbed out of that crater with my bare hands. Show me your grip!", after:"Ha! You hold on like a true climber."},
+  {kind:'eliteSteel', title:'ELITE FOUR MAGDA', team:['Copperajah','Corviknight','Tinkaton','Orthworm','Revavroom','Gholdengo'],
+   intro:"Calderra's iron was forged in its fires. So was I.", after:"Tempered well. The next door is open."},
+  {kind:'elitePsy', title:'ELITE FOUR SELENE', team:['Espathra','Farigiraf','Hatterene','Armarouge','Veluza','Indeedee'],
+   intro:"The beasts showed me your path long ago. Let's walk it together.", after:"Just as they said. The CHAMPION awaits."}];
+const CALDERRA = [
+  // 0: the start
+  {type:'town', name:"Port Calder", at:[0,1], desc:"Gulls wheel over a harbour of black volcanic stone. Three roads leave town: north, west and east.", center:true},
+  // 1-7: Stormreach (Raikou): Electric, Flying and Normal gyms
+  {type:'route', name:"Galeward Plains", at:[1,-1], desc:"Open grass bends under a constant wind. Thunderheads gather to the north.", pool:['Yamper','Wattrel','Pawmi','Rookidee','Lechonk','Skwovet']},
+  {type:'gym', name:"Voltaine City", at:[2,-1], desc:"Lightning rods crown every roof. Leader Arc's gym hums with Electric Pokémon.", center:true, leaderName:"Arc", leaderTeam:['Boltund','Bellibolt','Toxtricity','Pawmot']},
+  {type:'route', name:"Thunderhead Steppe", at:[3,-1], desc:"Scorched grass where lightning strikes again and again.", pool:['Tadbulb','Pincurchin','Toxel','Morpeko','Wattrel','Yamper']},
+  {type:'trainer', kind:'boss', name:"Raikou Shrine", at:[4,-1], boss:true, shrine:true, legend:'Raikou', grunts:2, theme:'rocky',
+   desc:"A shrine of split stone where thunder never stops. TEAM ECLIPSE's machines crackle around it. \"The thunder beast is ours!\"",
+   leaderName:"Admin Corona", leaderTeam:['Kilowattrel','Mabosstiff','Toxtricity','Grafaiai'], pool:['Pincurchin','Tadbulb','Morpeko']},
+  {type:'gym', name:"Galeforth Town", at:[5,-1], desc:"Wind chimes ring from a town built on stilts. Leader Kestra's gym is open to the sky.", center:true, leaderName:"Kestra", leaderTeam:['Corviknight','Kilowattrel','Flamigo','Bombirdier']},
+  {type:'route', name:"Stormbreak Ridge", at:[6,-1], desc:"A narrow ridge in the storm's path. The crater's rim is close now.", pool:['Corvisquire','Squawkabilly','Flamigo','Cramorant','Rookidee','Wattrel'], theme:'rocky'},
+  {type:'gym', name:"Plainsong Town", at:[7,-1], desc:"Farms and windmills at the foot of the crater. Leader Tobin's gym is a big red barn.", center:true, leaderName:"Tobin", leaderTeam:['Greedent','Maushold','Oinkologne','Dudunsparce']},
+  // 8-14: Mistral Lakes (Suicune): Ice and Water gyms
+  {type:'route', name:"Mistral Shore", at:[1,1], desc:"Cold mist rolls off a chain of lakes to the west.", pool:['Wooloo','Chewtle','Arrokuda','Wiglett','Gossifleur','Snom'], water:['Arrokuda','Chewtle','Finizen','Wiglett'], theme:'lake'},
+  {type:'gym', name:"Frostmere Town", at:[2,1], desc:"Ice fishing huts dot a frozen lake. Leader Isolde's gym is carved from the ice.", center:true, leaderName:"Isolde", leaderTeam:['Frosmoth','Eiscue','Cetitan','Baxcalibur']},
+  {type:'route', name:"Northwind Pass", at:[3,1], desc:"The north wind howls through a gap in the hills. Snow never melts here.", pool:['Snom','Cetoddle','Frigibax','Eiscue','Sneasel','Snover'], theme:'forest'},
+  {type:'trainer', kind:'boss', name:"Suicune Shrine", at:[4,1], boss:true, shrine:true, legend:'Suicune', grunts:2, theme:'lake',
+   desc:"A shrine on an island of clear water, wrapped in the north wind. TEAM ECLIPSE has dammed the spring. \"The rain beast is ours!\"",
+   leaderName:"Admin Umbra", leaderTeam:['Basculegion','Grimmsnarl','Barraskewda','Mabosstiff'], pool:['Wiglett','Finizen','Arrokuda'], water:['Finizen','Wiglett','Arrokuda','Dondozo']},
+  {type:'gym', name:"Tidewell City", at:[5,1], desc:"Canals run through every street. Leader Marina's gym is a waterfall arena.", center:true, leaderName:"Marina", leaderTeam:['Drednaw','Barraskewda','Palafin','Dondozo']},
+  {type:'route', name:"Fogfen Marsh", at:[6,1], desc:"Reeds and fog as far as you can see. Something croaks in the murk.", pool:['Toedscool','Shroodle','Wooper','Bramblin','Tatsugiri','Wiglett'], water:['Tatsugiri','Veluza','Arrokuda','Chewtle'], theme:'lake'},
+  {type:'route', name:"Misty Climb", at:[7,1], desc:"A slick trail climbing out of the fog toward the crater's rim.", pool:['Bramblin','Greavard','Sinistea','Hatenna','Impidimp','Snom'], theme:'forest'},
+  // 15-21: Cinderdeep (Entei): Rock, Fire and Ground gyms
+  {type:'route', name:"Ashfall Woods", at:[1,3], desc:"Grey trees under a fine fall of ash. The ground is warm underfoot.", pool:['Sizzlipede','Rolycoly','Nickit','Charcadet','Capsakid','Skwovet'], theme:'forest'},
+  {type:'gym', name:"Kilnwick Town", at:[2,3], desc:"Kilns smoke day and night. Leader Garnet's gym is a quarry of red stone.", center:true, leaderName:"Garnet", leaderTeam:['Coalossal','Garganacl','Stonjourner','Glimmora']},
+  {type:'route', name:"Basalt Road", at:[3,3], desc:"A road of black stone columns. Rocks tumble down from the slopes.", pool:['Nacli','Klawf','Glimmet','Rolycoly','Carkol','Mudbray'], theme:'rocky'},
+  {type:'trainer', kind:'boss', name:"Entei Shrine", at:[4,3], boss:true, shrine:true, legend:'Entei', grunts:2, theme:'rocky',
+   desc:"A shrine ringed by lava that never cools. TEAM ECLIPSE stands at the fire's edge. \"The fire beast is ours!\"",
+   leaderName:"Admin Penumbra", leaderTeam:['Houndstone','Kingambit','Centiskorch','Mabosstiff'], pool:['Charcadet','Sizzlipede','Salandit']},
+  {type:'gym', name:"Magmaw City", at:[5,3], desc:"A city built on cooled lava. Leader Pyra's gym sits over a glowing vent.", center:true, leaderName:"Pyra", leaderTeam:['Centiskorch','Armarouge','Scovillain','Ceruledge']},
+  {type:'route', name:"Cinder Steps", at:[6,3], desc:"Steep steps cut into the volcano. Sand blows down from the dunes above.", pool:['Silicobra','Orthworm','Toedscool','Cufant','Salandit','Charcadet'], theme:'rocky'},
+  {type:'gym', name:"Dunewhorl Town", at:[7,3], desc:"A town of sandstone and wind-carved dunes. Leader Dune's gym is half buried in sand.", center:true, leaderName:"Dune", leaderTeam:['Sandaconda','Runerigus','Clodsire','Toedscruel']},
+  // 22: where the branches meet
+  {type:'trainer', kind:'rival', name:"Crater Rim", at:[8,1], desc:"The edge of the great crater. KAI is already here, staring at the tower below. \"All three beasts... and you freed them first?\"",
+   leaderName:"Kai", rivalKind:'rivalKai', leaderTeam:['Corviknight','Dragapult','Lokix','Kingambit','Garganacl'], theme:'rocky'},
+  // 23-25: the crater
+  {type:'trainer', kind:'boss', name:"Ashen Tower", at:[9,1], boss:true, legend:'Ho-Oh', grunts:3, theme:'cave',
+   desc:"The burned tower at the crater's heart. TEAM ECLIPSE's boss waits at the top. \"With the three beasts' power, the tower will rise again, for ECLIPSE!\"",
+   leaderName:"Boss Nyx", leaderTeam:['Grimmsnarl','Kingambit','Mabosstiff','Houndstone','Bombirdier','Hydreigon'], pool:['Houndstone','Greavard','Sinistea','Gimmighoul']},
+  {type:'route', name:"Calderra Victory Road", at:[10,1], badges:8, aces:true, theme:'cave', desc:"A cave through the crater wall. Only trainers with all eight Calderra badges may pass.", pool:['Glimmora','Garganacl','Orthworm','Tinkatuff','Arctibax','Drakloak']},
+  {type:'town', name:"Calderra League", at:[11,1], center:true, league:true, champion:true, elites:ELITES_CALDERRA, championKind:'championSolenne',
+   championQuote:"The beasts chose you, and Ho-Oh answered you. Now show me why. I am SOLENNE, CHAMPION of CALDERRA!",
+   desc:"The Pokémon League of Calderra, built on the crater's far rim. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Solenne", leaderTeam:['Dragapult','Kingambit','Gholdengo','Baxcalibur','Annihilape','Hydrapple']},
+  // 26-31: side areas
+  {type:'route', name:"Windmill Fields", at:[2,-2], desc:"Old windmills turn over fields of gold. Fluffy Pokémon graze between them.", pool:['Wooloo','Dubwool','Gossifleur','Eldegoss','Smoliv','Fidough'], own:true},
+  {type:'route', name:"Static Fields", at:[5,-2], desc:"Your hair stands on end here. Sparks jump between the stones.", pool:['Pawmo','Bellibolt','Boltund','Toxtricity','Morpeko','Kilowattrel']},
+  {type:'route', name:"Glacier Cave", at:[2,0], desc:"Blue ice glows deep inside the hill.", pool:['Cetoddle','Frigibax','Arctibax','Eiscue','Snom','Frosmoth'], theme:'cave'},
+  {type:'route', name:"Hidden Falls", at:[5,0], desc:"A waterfall pours into a pool nobody seems to know about.", pool:['Wiglett','Tatsugiri','Veluza','Finizen','Dondozo','Cramorant'], water:['Dondozo','Veluza','Palafin','Tatsugiri'], theme:'lake'},
+  {type:'route', name:"Geode Hollow", at:[2,2], desc:"Crystals glitter in every crack of this cave.", pool:['Glimmet','Nacli','Naclstack','Carkol','Tinkatink','Gimmighoul'], theme:'cave'},
+  {type:'route', name:"Hot Springs", at:[5,2], desc:"Steaming pools among the rocks. Pokémon soak in the warm water.", pool:['Charcadet','Salandit','Capsakid','Clodsire','Tandemaus','Sizzlipede'], water:['Clodsire','Wooper','Chewtle','Drednaw'], theme:'lake'}];
+{
+  const base = LOCATIONS.length;
+  for(const loc of CALDERRA){ loc.region = 2; loc.tier = 25; LOCATIONS.push(loc); }
+  const C = i=>base + i;
+  // Links by hand (the map grid is drawn for the region map, not the walk): Stormreach north, Mistral west,
+  // Cinderdeep east, all three meeting the rim; each gym and shrine keeps the way onward shut until beaten.
+  const join = (a, b, dir)=>{
+    (CALDERRA[a].links ||= []).push({dir, to:C(b), gate:['gym', 'trainer'].includes(CALDERRA[a].type)});
+    (CALDERRA[b].links ||= []).push({dir:OPPOSITE[dir], to:C(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir] of steps){ join(from, to, dir); from = to; } };
+  walk(0, [[1,'up'],[2,'up'],[3,'up'],[4,'up'],[5,'up'],[6,'up'],[7,'up'],[22,'up']]);
+  walk(0, [[8,'left'],[9,'left'],[10,'up'],[11,'up'],[12,'up'],[13,'up'],[14,'right'],[22,'right']]);
+  walk(0, [[15,'right'],[16,'right'],[17,'up'],[18,'up'],[19,'up'],[20,'up'],[21,'left'],[22,'left']]);
+  walk(22, [[23,'up'],[24,'up'],[25,'up']]);
+  for(const l of CALDERRA[24].links) if(l.to===C(25)) l.gate = false;   // Victory Road asks for badges instead
+  for(const [from, side, dir] of [[2,26,'right'],[5,27,'left'],[9,28,'down'],[12,29,'left'],[16,30,'down'],[19,31,'right']]) join(from, side, dir);
+  // From the rim, a branch opens once you've walked it from PORT CALDER; the tower, once all three beasts are free.
+  for(const l of CALDERRA[22].links) l.need = l.to===C(23) ? 'shrines' : 'visited';
+  Object.assign(CALDERRA[22], {rivalAfter:["...You're the real deal. I've chased those beasts since I was a kid.", "TEAM ECLIPSE went into the ASHEN TOWER. Their boss NYX is up there.", "Go. I'll keep the grunts off your back."]});
+  Object.assign(CALDERRA[0], {storyNpc:{kind:'hiker', lines:["See that statue? WREN and the GYM LEADERS of VELLORIN, sailed over to open our port.", "Folks say the three beasts of the crater are waking up. And TEAM ECLIPSE wants them."]}});
+  Object.assign(CALDERRA[4], {rivalAfter:["Hmph. Keep the thunder beast, then. ECLIPSE has two more to catch."]});
+  Object.assign(CALDERRA[11], {rivalAfter:["The rain beast slips away... It doesn't matter. NYX will have them all."]});
+  Object.assign(CALDERRA[18], {rivalAfter:["Burned again. Tell yourself you've won, kid. The tower is where it ends."]});
+  Object.assign(CALDERRA[23], {rivalAfter:["No... the tower answers to YOU? Then ECLIPSE is finished.", "Enjoy your crater, CHAMPION of nowhere."]});
+  for(const loc of CALDERRA) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------
