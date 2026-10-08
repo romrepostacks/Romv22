@@ -1,7 +1,16 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 1.8: TMs, evolution stones, the Day Care and eggs, rematches, Repel and better rods!",
+  "motd": "Version 1.8.1: EGGS show in your party, and REPELS no longer go to waste!",
   "changelog": [
+    {
+      "version": "GBA 1.8.1",
+      "date": "2026-10-08",
+      "title": "Eggs in the party",
+      "changes": [
+        "The EGGS you carry show in the party screen's free slots, with a bar that fills as each one nears hatching and the steps it has left. With a full party, the message says when the next one hatches",
+        "Using a REPEL while one is still working no longer uses it up"
+      ]
+    },
     {
       "version": "GBA 1.8",
       "date": "2026-10-08",

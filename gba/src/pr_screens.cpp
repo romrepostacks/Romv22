@@ -210,6 +210,18 @@ namespace
                 slot_rect r = slot_of(k);
                 if(k >= g.party_count)
                 {
+                    // The EGGS you carry fill the free slots (GBA 1.9): the bar fills as one nears hatching.
+                    int e = k - g.party_count;
+                    if(k && e < g.extra.egg_count)
+                    {
+                        int left = g.extra.eggs[e].steps;
+                        int x = r.tx * 8, y = r.ty * 8;
+                        u.win().box(window_style::EMPTY, r.tx, r.ty, r.tw, r.th);
+                        u.print(x + 6, y + 2, "EGG", text_color::WHITE, _texts, true);
+                        draw_hp_bar(_bars[k], x + 6, y + 14, 3, egg_hatch_steps - left, egg_hatch_steps);
+                        u.print(x + 34, y + 12, bn::to_string<8>(left), text_color::WHITE, _texts, true);
+                        continue;
+                    }
                     // Empty slots (and the ones the party can't use yet: partyCap) stay dark.
                     if(k)
                     {
@@ -306,14 +318,27 @@ int party_screen(party_mode mode, const char* prompt)
         int selected = 0;
         int swapping = -1;
         bool redraw = true;
-        const char* base_prompt = prompt ? prompt : "Choose a POKéMON.";
+        bn::string<48> base_prompt(prompt ? prompt : "Choose a POKéMON.");
+        // EGGS that don't fit in the free slots: the soonest one's steps go in the message instead.
+        const extras_state& x = g.extra;
+        if(! prompt && g.party_count + x.egg_count > max_party)
+        {
+            int soonest = egg_hatch_steps;
+            for(int i = 0; i < x.egg_count; ++i)
+            {
+                soonest = bn::min(soonest, int(x.eggs[i].steps));
+            }
+            base_prompt = "Next EGG hatches in ";
+            base_prompt.append(bn::to_string<8>(soonest));
+            base_prompt.append(" steps.");
+        }
         bool faded = true;
         while(true)
         {
             if(redraw)
             {
                 view->draw(selected, swapping);
-                view->message(swapping >= 0 ? "Move to where?" : base_prompt);
+                view->message(swapping >= 0 ? bn::string_view("Move to where?") : bn::string_view(base_prompt));
                 redraw = false;
                 if(faded)
                 {
@@ -858,12 +883,17 @@ int bag_screen(bag_mode mode)
                 }
                 if(id == item_id::REPEL || id == item_id::SUPERREPEL || id == item_id::MAXREPEL)
                 {
-                    int steps = id == item_id::REPEL ? 100 : id == item_id::SUPERREPEL ? 200 : 250;
+                    if(g.extra.repel_steps)
+                    {
+                        said = "The last REPEL is still working.";   // Emerald: it lingers, nothing used up
+                        redraw = true;
+                        continue;
+                    }
                     g.items[int(id)] = uint8_t(g.items[int(id)] - 1);
-                    g.extra.repel_steps = uint16_t(bn::max(int(g.extra.repel_steps), steps));
+                    g.extra.repel_steps = uint16_t(id == item_id::REPEL ? 100 : id == item_id::SUPERREPEL ? 200 : 250);
                     audio::play(audio::sfx::BALL);
                     said = it.name;
-                    said.append(" was used. Wild POKéMON will stay away for a while.");
+                    said.append(" was used. Wild POKéMON will stay away.");
                     redraw = true;
                     continue;
                 }
