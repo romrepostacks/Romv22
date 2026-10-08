@@ -424,6 +424,7 @@ void overworld::load_map(int index, bool keep_bg)
     if(! _map->is_room())
     {
         g.visited.set(index);
+        roamers_move();
     }
     _px = g.x * 16;
     _py = g.y * 16;
@@ -525,7 +526,9 @@ void overworld::load_actors()
         _actors.push_back(a);
     }
     // The guardian of the Sunken Shrine, until it's caught.
-    if(_map->area && _map->area->legend_x >= 0 && ! legend_caught(_map->area->legend) && ! _actors.full())
+    int beast = _map->area ? legend_flag(_map->area->legend) : -1;
+    if(_map->area && _map->area->legend_x >= 0 && ! legend_caught(_map->area->legend) && ! (beast >= 0 && beast < 3 && g.roam[beast]) &&
+       ! _actors.full())
     {
         actor a;
         a.legend = true;
@@ -1440,6 +1443,7 @@ void overworld::cross_area(const place& here)
     _map = &wd::maps[here.map];
     g.map = int16_t(here.map);
     g.visited.set(here.map);
+    roamers_move();
     _px = px;
     _py = py;
     _cam_x = _px - view_x;
@@ -1625,6 +1629,19 @@ void overworld::wild_battle(bool water)
     }
     int lv_cap = map_level_cap(_map_index);
     e.level = bn::max(map_region(_map_index) == 2 ? lv_cap - 6 : 2, bn::min(lv_cap, g.average_level() - 2 + r.get_int(3)));
+    // A roaming beast on this route: one grass encounter in three is it instead.
+    for(int f = 0; f < 3 && ! water; ++f)
+    {
+        if(g.roam[f] == _map_index + 1 && ! g.flags.test(f) && r.get_int(3) == 0)
+        {
+            e.count = 1;
+            e.species[0] = roamer_species(f);
+            e.level = bn::min(200, lv_cap + 5);
+            e.legendary = true;
+            e.roamer = f;
+            break;
+        }
+    }
     _start_battle = true;
 }
 

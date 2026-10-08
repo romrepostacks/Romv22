@@ -383,6 +383,19 @@ battle_report battle_scene(const encounter& e)
     }
     clear_pending_moves();
     battle_report report = run_battle(*s);
+    if(e.roamer >= 0)
+    {
+        // A roaming beast: caught, or off to another route.
+        if(report.outcome == battle_outcome::CAUGHT)
+        {
+            g.flags.set(e.roamer);
+            g.roam[e.roamer] = 0;
+        }
+        else
+        {
+            roamers_move();
+        }
+    }
     if(e.rematch && report.outcome == battle_outcome::WON)
     {
         g.extra.rematched.set(world_data::maps[e.map].trainers[e.trainer_index].id);

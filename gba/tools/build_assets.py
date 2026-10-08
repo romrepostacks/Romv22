@@ -662,6 +662,16 @@ def build_world(exp, data, out_inc):
         '{%d, %d, %d, item_id::%s, %d, %d}' % (h['area'], h['x'], h['y'], h['item'].upper(), h['count'], h['id']) for h in hidden))
     L.append('constexpr int hidden_items_count = %d;' % len(hidden))
     L.append('constexpr int maps_count = %d;' % len(map_order))
+    # 2.0.0: where Calderra's beasts roam once they've run from their shrines (by legend_flag: RAIKOU, SUICUNE, ENTEI).
+    beasts = {'Raikou': 0, 'Suicune': 1, 'Entei': 2}
+    names = {ar['name']: by_index[ar['index']] for ar in areas}
+    roam = [[], [], []]
+    for ar in areas:
+        if ar['legend'] and ar['legend']['name'] in beasts:
+            roam[beasts[ar['legend']['name']]] = [names[n] for n in ar['roam']]
+    width = max(1, max(len(r) for r in roam))
+    L.append('constexpr int16_t roam_areas[3][%d] = {%s};' % (width, ', '.join('{%s}' % (', '.join(map(str, r)) or '0') for r in roam)))
+    L.append('constexpr int roam_counts[3] = {%s};' % ', '.join(str(len(r)) for r in roam))
     L.append('constexpr int trainers_count = %d;' % len(ids))
     L.append('constexpr int items_count = %d;\n' % item_count)
     L.append('}\n\n#endif')

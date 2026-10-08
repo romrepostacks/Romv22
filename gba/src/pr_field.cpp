@@ -491,6 +491,25 @@ void overworld::legend_talk(int index)
         say("Something glints at the guardian's feet...");
         obtain(item_id::MASTERBALL, 1);
     }
+    int beast = legend_flag(legend);
+    if(beast >= 0 && beast < 3)
+    {
+        // Calderra's beasts don't stay to fight: they run, and roam their branch's routes until caught.
+        bn::string<96> run_text;
+        upper(run_text, game_data::species_list[int(legend)].name);
+        run_text.append(" looked at you for a long moment...");
+        say(run_text);
+        run_text.clear();
+        upper(run_text, game_data::species_list[int(legend)].name);
+        run_text.append(" bolted away into the wilds!");
+        say(run_text);
+        start_roaming(beast);
+        save_game();
+        load_actors();
+        refresh(true);
+        say("It must be roaming the routes nearby. It won't stay in one place for long...");
+        return;
+    }
     bn::string<64> text("The great ");
     text.append(game_data::species_list[int(legend)].name);
     text.append(" is stirring...");

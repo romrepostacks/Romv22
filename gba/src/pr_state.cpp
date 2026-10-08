@@ -30,6 +30,7 @@ namespace
     static_assert(world_data::trainers_count <= trainer_slots, "beaten holds trainer_slots trainers");
     static_assert(world_data::items_count <= item_ball_slots, "picked holds item_ball_slots item balls");
     static_assert(world_data::maps_count <= area_slots, "visited holds a bit per map index");
+    static_assert(sizeof(game_state) == 30260, "save version 11's layout never moves: new fields come out of spare");
 
     template<typename Block>
     uint32_t checksum_of(const Block& block)
@@ -669,6 +670,30 @@ int map_level_cap(int map)
         return calderra_level(state().region_badges(2));
     }
     return world_data::maps[map].level_cap;
+}
+
+species_id roamer_species(int f)
+{
+    constexpr species_id beasts[] = { species_id::RAIKOU, species_id::SUICUNE, species_id::ENTEI };
+    return beasts[f];
+}
+
+void start_roaming(int f)
+{
+    state().roam[f] = 1;        // somewhere; roamers_move picks the route
+    roamers_move();
+}
+
+void roamers_move()
+{
+    game_state& g = state();
+    for(int f = 0; f < 3; ++f)
+    {
+        if(g.roam[f] && ! g.flags.test(f) && world_data::roam_counts[f])
+        {
+            g.roam[f] = int16_t(1 + world_data::roam_areas[f][rng().get_int(world_data::roam_counts[f])]);
+        }
+    }
 }
 
 int legend_flag(species_id legend)

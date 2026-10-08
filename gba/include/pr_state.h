@@ -220,7 +220,8 @@ struct game_state
     uint8_t region = 0;                 // 0 Vellorin, 1 Calderra, ...
     uint8_t spare_bytes[3] = {};
     bitset<flag_slots> flags;           // story flags for Calderra and later regions
-    uint8_t spare[save_spare] = {};     // zero; later versions add fields here without moving anything
+    int16_t roam[4] = {};               // Calderra's roaming beasts (legend_flag): the map each is on + 1, 0 if not
+    uint8_t spare[save_spare - 8] = {}; // zero; later versions add fields here without moving anything
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1
@@ -302,6 +303,12 @@ namespace flag
 // Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH; -1 for any other.
 int legend_flag(species_id legend);
 bool legend_caught(species_id legend);
+
+// Calderra's roaming beasts (2.0.0): each runs from its shrine and roams its branch's routes, moving every
+// time you change area, until you catch it.
+species_id roamer_species(int f);
+void start_roaming(int f);
+void roamers_move();
 
 // Every beast shrine (a BOSS area with a guardian, other than the story legendary's) in a region cleared.
 bool shrines_cleared(int region);
