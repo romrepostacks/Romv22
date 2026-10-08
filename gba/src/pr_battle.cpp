@@ -734,11 +734,12 @@ namespace
             }
         }
         views[n] = "CANCEL";
-        const char* tip = nuz_block ? (_nuz_caught ? "NUZLOCKE: one catch per encounter." :
-                                                     "NUZLOCKE: this area's encounter is used up.") :
-                          wild ? (g.item_count(item_id::POKEBALL) ? "Weaken it first for a better catch rate!" :
-                                  "Out of POKé BALLS! Restock at a POKéMON CENTER.") :
-                          "There's nothing in the BAG you can use here.";
+        // (Two lines in the 112 px box: a third would make you press A before the list.)
+        const char* tip = nuz_block ? (_nuz_caught ? "NUZLOCKE: one catch a battle." :
+                                                     "NUZLOCKE: no catch left here.") :
+                          wild ? (g.item_count(item_id::POKEBALL) ? "Weaken it first to catch it!" :
+                                  "No POKé BALLS left!") :
+                          "No items to use here.";
         u.show_text(tip, 112);
         while(true)
         {

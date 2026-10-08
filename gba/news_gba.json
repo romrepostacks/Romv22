@@ -1,7 +1,15 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 1.9.0: give your POKéMON held items, from LEFTOVERS to the CHOICE SCARF!",
+  "motd": "Version 1.9.1: give your POKéMON held items, from LEFTOVERS to the CHOICE SCARF!",
   "changelog": [
+    {
+      "version": "GBA 1.9.1",
+      "date": "2026-10-08",
+      "title": "Battle BAG tips",
+      "changes": [
+        "The tip beside the BAG in battle fits its box again: it no longer cuts off \"Out of POKé BALLS\" or makes you press A before the list"
+      ]
+    },
     {
       "version": "GBA 1.9.0",
       "date": "2026-10-08",

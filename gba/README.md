@@ -3,7 +3,7 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.9.0**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+Version **1.9.1**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
 web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
 NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
 The GBA is now the only supported version of the game.
@@ -81,7 +81,7 @@ The GBA is now the only supported version of the game.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
 - **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.8.1
-  saves load in 1.9.0; saves from 0.3 and earlier aren't compatible.
+  saves load in 1.9.x; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) was planned for the web app, which has been retired.
 
