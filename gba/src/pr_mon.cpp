@@ -107,9 +107,9 @@ mon mon::make(species_id id, int level, held_item item)
 {
     mon m;
     m.species_index = uint16_t(id);
-    m.level = uint8_t(level);
+    m.level = uint16_t(level);
     m.item = item;
-    m.move_count = uint8_t(moves_at(m.data(), level, m.slots));
+    m.move_count = uint8_t(moves_at(m.data(), level, m.moves));
     m.recalc_stats();
     m.hp = m.max_hp;
     return m;
@@ -271,11 +271,7 @@ void mon::learn_moves_at(int at_level, ui& ui)
         {
             if(move(k) == 0)
             {
-                for(int j = k; j < move_count - 1; ++j)
-                {
-                    slots[j] = slots[j + 1];
-                }
-                --move_count;
+                remove_move(k);
                 --k;
             }
         }

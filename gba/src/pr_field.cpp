@@ -1343,8 +1343,8 @@ void overworld::player_pc()
         bool withdraw = k == 0;
         while(true)
         {
-            bn::array<uint8_t, items_count>& from = withdraw ? g.pc_items : g.items;
-            bn::array<uint8_t, items_count>& to = withdraw ? g.items : g.pc_items;
+            auto& from = withdraw ? g.pc_items : g.items;
+            auto& to = withdraw ? g.items : g.pc_items;
             int ids[items_count];
             bn::string<32> labels[items_count + 1];
             bn::string_view views[items_count + 1];
@@ -2857,7 +2857,7 @@ void overworld::save_menu()
         u.print(118 - u.width(value), 26 + i * 16, value, text_color::INK, info);
     };
     // POKéDEX: the different species you have, party and boxes.
-    bitset<1024> have;
+    bitset<dex_size> have;
     for(int i = 0; i < g.party_count; ++i)
     {
         have.set(g.party[i].species_index);
@@ -2949,11 +2949,7 @@ namespace
         {
             if(m.move(k) == 0)
             {
-                for(int j = k; j < m.move_count - 1; ++j)
-                {
-                    m.slots[j] = m.slots[j + 1];
-                }
-                --m.move_count;
+                m.remove_move(k);
                 --k;
             }
         }
@@ -3368,7 +3364,7 @@ bool overworld::offer_rematch(int index)
     if(g.extra.rematch_day != today)
     {
         g.extra.rematch_day = uint16_t(today);
-        g.extra.rematched = bitset<256>();
+        g.extra.rematched = bitset<trainer_slots>();
     }
     if(g.extra.rematched.test(a.tr->id))
     {

@@ -19,6 +19,16 @@ constexpr int box_slots = box_size * box_count;
 constexpr int name_length = 12;         // the web game's names (maxlength 12)
 constexpr int box_name_length = 8;
 
+// Save version 11 (2.0.0) sizes the save for all nine planned regions, so its layout never has to move again:
+// new things go in the spare bytes, and zero always means "not set yet".
+constexpr int bag_kinds = 256;          // item kinds the bag can hold (items_count is today's)
+constexpr int dex_size = 2048;          // POKéDEX entries (1025 species today, room for more)
+constexpr int trainer_slots = 2048;     // trainer::id
+constexpr int item_ball_slots = 2048;   // item_ball::id
+constexpr int area_slots = 1024;        // areas (visited, NUZLOCKE encounters)
+constexpr int flag_slots = 1024;        // story flags beyond `story` (Calderra and later regions)
+constexpr int save_spare = 1024;
+
 // Story progress (adv.starterPending / starterThanks / story.*), as bits.
 namespace story
 {
@@ -128,7 +138,7 @@ struct run_state
     bool over = false;                  // NUZLOCKE: the party whited out, the run has ended
     uint16_t deaths = 0;
     uint16_t catches = 0;
-    bitset<64> encounter_used;          // NUZLOCKE: areas whose one encounter is spent
+    bitset<area_slots> encounter_used;  // NUZLOCKE: areas whose one encounter is spent
     uint8_t tower_clears = 0;           // CHALLENGE TOWER: rank = clears + 1
     uint8_t tower_best = 0;             // best streak of clears in a row
     uint8_t tower_streak = 0;
@@ -165,7 +175,7 @@ struct extras_state
 {
     uint16_t repel_steps = 0;           // wild POKéMON stay away while this counts down
     uint16_t rematch_day = 0;           // the day (of play time) `rematched` is for
-    bitset<256> rematched;              // route trainers beaten again today
+    bitset<trainer_slots> rematched;    // route trainers beaten again today
     mon daycare[2];                     // level 0: empty
     uint32_t daycare_steps[2] = {};     // steps walked since it was left (its EXP)
     uint16_t egg_steps = 0;             // toward the DAY CARE's next check for an EGG
@@ -192,20 +202,25 @@ struct game_state
     uint32_t play_frames = 0;
     options opt;
     char name[name_length + 1] = {};
-    bn::array<uint8_t, items_count> items = {};
-    bn::array<uint8_t, items_count> pc_items = {};
+    bn::array<uint8_t, bag_kinds> items = {};
+    bn::array<uint8_t, bag_kinds> pc_items = {};
     bn::array<mon, max_party> party;
     bn::array<mon, box_slots> box;      // box b holds b * 30 ... b * 30 + 29; empty slots have level 0
     char box_names[box_count][box_name_length + 1] = {};
     uint8_t box_wall[box_count] = {};   // 0: the box's default
-    bitset<256> beaten;                 // trainers (trainer::id); a rival or leader beaten = the place cleared
-    bitset<256> picked;                 // item balls (item_ball::id)
-    bitset<1024> seen;                  // POKéDEX, by species index
-    bitset<1024> owned;
-    bitset<64> visited;                 // areas you've been to (the region map, the TRAINER CARD)
-    run_state run;                      // (added in save version 5; older saves get the defaults)
-    tower_state tower;                  // (added in save version 6)
-    extras_state extra;                 // (added in save version 9)
+    bitset<trainer_slots> beaten;       // trainers (trainer::id); a rival or leader beaten = the place cleared
+    bitset<item_ball_slots> picked;     // item balls (item_ball::id)
+    bitset<dex_size> seen;              // POKéDEX, by species index
+    bitset<dex_size> owned;
+    bitset<area_slots> visited;         // areas you've been to (the region map, the TRAINER CARD)
+    run_state run;
+    tower_state tower;
+    extras_state extra;
+    // Save version 11 (2.0.0).
+    uint8_t region = 0;                 // 0 Vellorin, 1 Calderra, ...
+    uint8_t spare_bytes[3] = {};
+    bitset<flag_slots> flags;           // story flags for Calderra and later regions
+    uint8_t spare[save_spare] = {};     // zero; later versions add fields here without moving anything
 
     [[nodiscard]] int able_count() const;
     [[nodiscard]] int first_able() const;       // first party member that can fight, or -1

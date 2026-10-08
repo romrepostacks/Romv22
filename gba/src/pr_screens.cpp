@@ -777,11 +777,7 @@ namespace
         {
             if(m.move(k) == 0)
             {
-                for(int j = k; j < m.move_count - 1; ++j)
-                {
-                    m.slots[j] = m.slots[j + 1];
-                }
-                --m.move_count;
+                m.remove_move(k);
                 --k;
             }
         }
@@ -2960,11 +2956,7 @@ namespace
                 // Clear the slot (the others close up), but never the last move.
                 if(slot < m.move_count && m.move_count > 1)
                 {
-                    for(int i = slot; i < m.move_count - 1; ++i)
-                    {
-                        m.slots[i] = m.slots[i + 1];
-                    }
-                    --m.move_count;
+                    m.remove_move(slot);
                 }
                 continue;
             }
@@ -3128,7 +3120,7 @@ void edit_one(int index)
             if(row == 0)
             {
                 int old_level = m.level;
-                m.level = uint8_t(bn::clamp(int(m.level) + step, 1, 100));
+                m.level = uint16_t(bn::clamp(int(m.level) + step, 1, 100));
                 if(m.level != old_level)
                 {
                     m.xp = 0;

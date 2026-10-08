@@ -36,17 +36,21 @@ namespace mon_trait
 [[nodiscard]] int stat_min(int base, bool is_hp, int level);
 [[nodiscard]] int stat_max(int base, bool is_hp, int level);
 
+// Save version 11 (2.0.0) sized this for nine regions: levels and species past 255, moves past 1023, and
+// spare bytes for later. The save converter (pr_state.cpp) copies older saves' 46-byte Pokémon into it.
 struct mon
 {
     uint16_t species_index = 0;
-    uint8_t level = 0;                  // 0: an empty box slot
+    uint16_t level = 0;                 // 0: an empty box slot
     uint8_t move_count = 0;
     status st = status::NONE;
     uint8_t sleep_turns = 0;
     held_item item = held_item::NONE;
     uint8_t flags = 0;
-    uint16_t slots[4] = {};             // a move each: its index (low 10 bits) and the PP used (high 6 bits)
+    uint8_t traits = 0;                 // mon_trait bits
     uint16_t hp = 0;
+    uint16_t moves[4] = {};             // move indices
+    uint8_t pp_used[4] = {};
     uint16_t max_hp = 0;
     uint16_t atk = 0;
     uint16_t def = 0;
@@ -55,7 +59,7 @@ struct mon
     uint16_t spe = 0;
     uint16_t xp = 0;
     char nick[nick_length + 1] = {};
-    uint8_t traits = 0;                 // mon_trait bits (this byte was always-0 padding in older saves)
+    uint8_t spare[7] = {};              // zero; for later versions
 
     [[nodiscard]] static mon make(species_id id, int level, held_item item = held_item::NONE);
 
@@ -84,29 +88,40 @@ struct mon
     // The move in a slot, and its PP (the move's base PP; a POKéMON CENTER restores it).
     [[nodiscard]] int move(int slot) const
     {
-        return slots[slot] & 0x3ff;
+        return moves[slot];
     }
     void set_move(int slot, int move_index)
     {
-        slots[slot] = uint16_t(move_index & 0x3ff);
+        moves[slot] = uint16_t(move_index);
+        pp_used[slot] = 0;
+    }
+    // Forgets the move in a slot; the ones after it move up.
+    void remove_move(int slot)
+    {
+        for(int j = slot; j < move_count - 1; ++j)
+        {
+            moves[j] = moves[j + 1];
+            pp_used[j] = pp_used[j + 1];
+        }
+        --move_count;
     }
     [[nodiscard]] int max_pp(int slot) const;
     [[nodiscard]] int pp(int slot) const
     {
-        return bn::max(0, max_pp(slot) - (slots[slot] >> 10));
+        return bn::max(0, max_pp(slot) - pp_used[slot]);
     }
     void use_pp(int slot)
     {
         if(pp(slot) > 0)
         {
-            slots[slot] = uint16_t(slots[slot] + (1 << 10));
+            ++pp_used[slot];
         }
     }
     void restore_pp()
     {
-        for(uint16_t& s : slots)
+        for(uint8_t& p : pp_used)
         {
-            s &= 0x3ff;
+            p = 0;
         }
     }
     // Every move is out of PP: it can only Struggle.
