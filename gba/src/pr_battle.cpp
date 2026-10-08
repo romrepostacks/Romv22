@@ -957,6 +957,7 @@ namespace
         auto speed = [](const action& a)
         {
             int spe = a.user->m->spe * stage_x100(a.user->stages[battle_stat::SPE]) / 100;
+            spe = a.user->m->item == held_item::CHOICE_SCARF ? spe * 3 / 2 : spe;
             return a.user->m->st == status::PARALYSIS ? spe / 2 : spe;
         };
         for(int i = 1; i < actions.size(); ++i)
@@ -1085,6 +1086,7 @@ namespace
                 {
                     int h = m.max_hp / 4;
                     m.flags |= mon_flag::BERRY_USED;
+                    m.item = held_item::NONE;       // GBA 1.9: eaten (yours are held now too)
                     set_hp(f, bn::min(int(m.max_hp), m.hp + h));
                     bn::string<64> text(label(f));
                     text.append(" restored HP with its SITRUS BERRY!");
@@ -1716,6 +1718,7 @@ namespace
             {
                 dmg = t.hp - 1;
                 t.flags |= mon_flag::SASH_USED;
+                t.item = held_item::NONE;           // GBA 1.9: used up
                 sash[i] = true;
             }
             c.damages[i] = dmg;

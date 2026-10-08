@@ -27,6 +27,7 @@
 #include "bn_sprite_items_hand.h"
 #include "bn_sprite_items_hpbar.h"
 #include "bn_sprite_items_link.h"
+#include "bn_sprite_items_mon_icon_egg.h"
 #include "bn_sprite_items_person_player.h"
 
 #include "pr_audio.h"
@@ -59,6 +60,61 @@ namespace
                        bn::ivector<bn::sprite_ptr>& out, int max_lines = 2, int line_height = 15, bool small = false)
     {
         u.print_wrapped_fit(x, y, width, text, max_lines, line_height, color, out, small);
+    }
+
+    // GBA 1.9: the held items are bag items LEFTOVERS .. SITRUSBERRY, in held_item's order.
+    held_item held_of(item_id id)
+    {
+        int k = int(id) - int(item_id::LEFTOVERS);
+        return k >= 0 && k <= int(item_id::SITRUSBERRY) - int(item_id::LEFTOVERS) ? held_item(k + 1) : held_item::NONE;
+    }
+
+    item_id item_of(held_item h)
+    {
+        return item_id(int(item_id::LEFTOVERS) + int(h) - 1);
+    }
+
+    // Gives a held item from the bag (one it already holds goes back in the bag).
+    bn::string<80> give_held(item_id id, mon& m)
+    {
+        game_state& g = state();
+        bn::string<80> text;
+        if(m.item == held_of(id))
+        {
+            text = m.name();
+            text.append(" is already holding that.");
+            return text;
+        }
+        if(m.item != held_item::NONE)
+        {
+            g.add_item(item_of(m.item), 1);
+        }
+        g.items[int(id)] = uint8_t(g.items[int(id)] - 1);
+        m.item = held_of(id);
+        text = m.name();
+        text.append(" is now holding the ");
+        text.append(game_data::items[int(id)].name);
+        text.append(".");
+        return text;
+    }
+
+    bn::string<80> take_held(mon& m)
+    {
+        bn::string<80> text;
+        if(m.item == held_item::NONE)
+        {
+            text = m.name();
+            text.append(" isn't holding anything.");
+            return text;
+        }
+        state().add_item(item_of(m.item), 1);
+        text = "Received the ";
+        text.append(game_data::items[int(item_of(m.item))].name);
+        text.append(" from ");
+        text.append(m.name());
+        text.append(".");
+        m.item = held_item::NONE;
+        return text;
     }
 }
 
@@ -217,9 +273,15 @@ namespace
                         int left = g.extra.eggs[e].steps;
                         int x = r.tx * 8, y = r.ty * 8;
                         u.win().box(window_style::EMPTY, r.tx, r.ty, r.tw, r.th);
-                        u.print(x + 6, y + 2, "EGG", text_color::WHITE, _texts, true);
-                        draw_hp_bar(_bars[k], x + 6, y + 14, 3, egg_hatch_steps - left, egg_hatch_steps);
-                        u.print(x + 34, y + 12, bn::to_string<8>(left), text_color::WHITE, _texts, true);
+                        bn::sprite_ptr icon = bn::sprite_items::mon_icon_egg.create_sprite(sx(x + 10), sy(y + 8));
+                        icon.set_bg_priority(0);
+                        icon.set_z_order(1);
+                        _icons.push_back(icon);
+                        _icon_y[_icons.size() - 1] = y + 8;
+                        _icon_slot[_icons.size() - 1] = k;
+                        u.print(x + 22, y + 2, "EGG", text_color::WHITE, _texts, true);
+                        u.print(x + 22, y + 12, bn::to_string<8>(left), text_color::WHITE, _texts, true);
+                        draw_hp_bar(_bars[k], x + 44, y + 14, 3, egg_hatch_steps - left, egg_hatch_steps);
                         continue;
                     }
                     // Empty slots (and the ones the party can't use yet: partyCap) stay dark.
@@ -271,6 +333,18 @@ namespace
             _message.clear();
             u.win().box(window_style::WINDOW, 0, 17, 24, 3);
             u.print(8, 140, text, text_color::INK, _message);
+        }
+
+        // Drops the sprites (names, icons, bars), which would show through a menu or the text box over them.
+        void blank()
+        {
+            _icons.clear();
+            _texts.clear();
+            _message.clear();
+            for(int k = 0; k < max_party; ++k)
+            {
+                _bars[k].clear();
+            }
         }
 
         // The chosen one's icon hops (faster when healthier: 6/8/14/22 frames).
@@ -414,11 +488,11 @@ int party_screen(party_mode mode, const char* prompt)
                 text.append(g.party[selected].name());
                 text.append("?");
                 view->message(text);
-                bn::string_view options[] = { "SUMMARY", "SWITCH", "CANCEL" };
+                bn::string_view options[] = { "SUMMARY", "SWITCH", "ITEM", "CANCEL" };
                 bn::string_view battle_options[] = { "SUMMARY", "CANCEL" };
                 menu_spec s;
                 s.options = mode == party_mode::FIELD ? options : battle_options;
-                s.count = mode == party_mode::FIELD ? 3 : 2;
+                s.count = mode == party_mode::FIELD ? 4 : 2;
                 s.tw = 10;
                 s.th = s.count * 2 + 2;
                 s.tx = 20;
@@ -434,6 +508,71 @@ int party_screen(party_mode mode, const char* prompt)
                 else if(pick == 1 && mode == party_mode::FIELD && n > 1)
                 {
                     swapping = selected;
+                }
+                else if(pick == 2 && mode == party_mode::FIELD)
+                {
+                    // GBA 1.9: ITEM: GIVE (from the held items in the bag) / TAKE.
+                    mon& m = g.party[selected];
+                    view->blank();
+                    bn::string_view item_options[] = { "GIVE", "TAKE", "CANCEL" };
+                    menu_spec is;
+                    is.options = item_options;
+                    is.count = 3;
+                    is.tw = 8;
+                    is.th = 8;
+                    is.tx = 22;
+                    is.ty = 9;
+                    int action = u.menu(is);
+                    bn::string<80> said;
+                    if(action == 0)
+                    {
+                        item_id ids[5];
+                        bn::string<32> labels[6];
+                        bn::string_view views[6];
+                        int k = 0;
+                        for(int h = 1; h <= 5; ++h)
+                        {
+                            item_id id = item_of(held_item(h));
+                            if(g.item_count(id))
+                            {
+                                ids[k] = id;
+                                labels[k] = game_data::items[int(id)].name;
+                                labels[k].append(" x");
+                                labels[k].append(bn::to_string<4>(g.item_count(id)));
+                                views[k] = labels[k];
+                                ++k;
+                            }
+                        }
+                        if(! k)
+                        {
+                            said = "You don't have any items to hold.";
+                        }
+                        else
+                        {
+                            views[k] = "CANCEL";
+                            menu_spec gs;
+                            gs.options = views;
+                            gs.count = k + 1;
+                            gs.tw = 17;
+                            gs.th = gs.count * 2 + 2;
+                            gs.tx = 13;
+                            gs.ty = 17 - gs.th;
+                            int which = u.menu(gs);
+                            if(which >= 0 && which < k)
+                            {
+                                said = give_held(ids[which], m);
+                            }
+                        }
+                    }
+                    else if(action == 1)
+                    {
+                        said = take_held(m);
+                    }
+                    if(! said.empty())
+                    {
+                        u.say(said);
+                        u.clear_text();
+                    }
                 }
                 redraw = true;
             }
@@ -534,8 +673,7 @@ void summary_screen(const mon* mons, int count, int index)
                         u.print(100, 43 + i * 30, type_name(mv.type), text_color::BLUE, texts, true);
                         if(mv.power)
                         {
-                            row = "PWR ";
-                            row.append(bn::to_string<4>(mv.power));
+                            row = bn::to_string<4>(mv.power);
                         }
                         else
                         {
@@ -546,7 +684,10 @@ void summary_screen(const mon* mons, int count, int index)
                         pp.append(bn::to_string<4>(m.pp(i)));
                         pp.append("/");
                         pp.append(bn::to_string<4>(m.max_pp(i)));
-                        u.print(150, 43 + i * 30, pp, m.pp(i) ? text_color::INK : text_color::RED, texts, true);
+                        // (Right of the type, left of the power: "ELECTRIC" ran into it at a fixed x.)
+                        int pp_right = 232 - u.width(row, true) - 8;
+                        u.print(pp_right - u.width(pp, true), 43 + i * 30, pp, m.pp(i) ? text_color::INK : text_color::RED,
+                                texts, true);
                     }
                 }
                 redraw = false;
@@ -897,9 +1038,10 @@ int bag_screen(bag_mode mode)
                     redraw = true;
                     continue;
                 }
-                if(! medicine && ! candy && tm < 0 && ! evolver)
+                bool held = held_of(id) != held_item::NONE;
+                if(! medicine && ! candy && tm < 0 && ! evolver && ! held)
                 {
-                    continue;   // only medicine, the RARE CANDY, evolution items and TMs work on a Pokémon
+                    continue;   // only medicine, the RARE CANDY, evolution items, TMs and held items go on a Pokémon
                 }
                 // Who on (bagOpen's list: "NAME hp/max", CANCEL).
                 bn::string<32> labels[max_party + 1];
@@ -917,7 +1059,11 @@ int bag_screen(bag_mode mode)
                 texts.clear();      // the item list's text would show through the party list
                 cursor.reset();
                 int who = u.list(views, g.party_count + 1);
-                if(who >= 0 && who < g.party_count && tm >= 0)
+                if(who >= 0 && who < g.party_count && held)
+                {
+                    said = give_held(id, g.party[who]);
+                }
+                else if(who >= 0 && who < g.party_count && tm >= 0)
                 {
                     said = teach_tm(tm, g.party[who]);
                 }

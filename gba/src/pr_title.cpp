@@ -31,7 +31,7 @@ namespace pr
 namespace
 {
     constexpr int start_poke_balls = 10;     // introFinish(): items {pokeball: 10}
-    constexpr const char* build_version = "1.8.1";
+    constexpr const char* build_version = "1.9.0";
 
     BN_DATA_EWRAM game_state saved_preview;
 

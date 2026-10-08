@@ -922,6 +922,20 @@ void overworld::mart()
             evo_stock[evo_count++] = id;
         }
     }
+    // GBA 1.9: held items (from the 2nd badge; LIFE ORB and CHOICE SCARF from the 4th).
+    item_id held_stock[5];
+    int held_count = 0;
+    if(badges >= 2)
+    {
+        held_stock[held_count++] = item_id::SITRUSBERRY;
+        held_stock[held_count++] = item_id::LEFTOVERS;
+        held_stock[held_count++] = item_id::FOCUSSASH;
+    }
+    if(badges >= 4)
+    {
+        held_stock[held_count++] = item_id::LIFEORB;
+        held_stock[held_count++] = item_id::CHOICESCARF;
+    }
     // BUY from a list: how many (x1, x5, x10), then OK? A TM comes alone.
     auto buy = [&](const item_id* list, int count, bool tms)
     {
@@ -1035,8 +1049,8 @@ void overworld::mart()
             }
         }
         u.show_text("Welcome! How may I serve you?");
-        bn::string_view top[5];
-        int top_ids[5];
+        bn::string_view top[6];
+        int top_ids[6];
         int top_count = 0;
         top_ids[top_count] = 0;
         top[top_count++] = "BUY";
@@ -1046,6 +1060,11 @@ void overworld::mart()
         {
             top_ids[top_count] = 3;
             top[top_count++] = "EVOLUTION";
+        }
+        if(held_count)
+        {
+            top_ids[top_count] = 5;
+            top[top_count++] = "HELD ITEMS";
         }
         top_ids[top_count] = 1;
         top[top_count++] = "SELL";
@@ -1065,6 +1084,10 @@ void overworld::mart()
         else if(pick == 3)
         {
             buy(evo_stock, evo_count, false);
+        }
+        else if(pick == 5)
+        {
+            buy(held_stock, held_count, false);
         }
         else if(pick == 1)
         {

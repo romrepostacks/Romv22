@@ -3,7 +3,7 @@
 A real GBA ROM of Party Royale, built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **1.8.1**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+Version **1.9.0**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
 web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
 NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
 The GBA is now the only supported version of the game.
@@ -74,11 +74,14 @@ The GBA is now the only supported version of the game.
   (by badges) and the MOVE TUTOR in every POKéMON CENTER, REPELS and the ESCAPE ROPE, the GOOD and SUPER
   RODS, once-a-day rematches with route trainers, and the DAY CARE in CINDERGATE TOWN, which raises two
   POKéMON and finds EGGS (no genders: any two that share an egg group, or DITTO, can breed).
-  The EGGS you carry show in the party screen with their hatch progress (1.8.1).
+  The EGGS you carry show in the party screen with their hatch progress (1.8.1), with an EGG icon (1.9.0).
+- **Held items (1.9.0):** give your POKéMON LEFTOVERS, a LIFE ORB, CHOICE SCARF, FOCUS SASH or SITRUS BERRY
+  from the party screen (ITEM > GIVE / TAKE) or the BAG. The MART's HELD ITEMS counter sells them from the
+  2nd badge (LIFE ORB and CHOICE SCARF from the 4th). The FOCUS SASH and SITRUS BERRY are used up.
 - **FREE BATTLE** and **WHAT'S NEW** on the title screen, as in the web game.
 - **Music and sound:** the web game's tunes and sound effects on the GBA's sound chip.
-- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.7
-  saves load in 1.8; saves from 0.3 and earlier aren't compatible.
+- **Saving** to cartridge SRAM from START > SAVE, plus autosaves where the web game autosaves. 1.0 to 1.8.1
+  saves load in 1.9.0; saves from 0.3 and earlier aren't compatible.
 
 Phase 8 (per-device layouts and controllers) was planned for the web app, which has been retired.
 
@@ -113,6 +116,9 @@ sh tools/setup-toolchain.sh      # once
 export WONDERFUL_TOOLCHAIN=/opt/wonderful PATH=/opt/wonderful/bin:$PATH
 make -j8
 ```
+
+To check that no map crashes, `python3 tools/walktest/walktest.py` (needs `libmgba-dev`) drops a level 100
+party at every map's spawn point, walks it around at random in mGBA and reports any Butano assert.
 
 (devkitARM also works with Butano: install devkitPro's `gba-dev` and drop the `WONDERFUL_TOOLCHAIN`
 export.)

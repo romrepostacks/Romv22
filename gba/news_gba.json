@@ -1,7 +1,20 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 1.8.1: EGGS show in your party, and REPELS no longer go to waste!",
+  "motd": "Version 1.9.0: give your POKéMON held items, from LEFTOVERS to the CHOICE SCARF!",
   "changelog": [
+    {
+      "version": "GBA 1.9.0",
+      "date": "2026-10-08",
+      "title": "Held items",
+      "changes": [
+        "Your POKéMON can hold items now. Use ITEM > GIVE or TAKE on the party screen, or pick a held item in the BAG",
+        "The MART's new HELD ITEMS counter sells the SITRUS BERRY, LEFTOVERS and FOCUS SASH from 2 badges, and the LIFE ORB and CHOICE SCARF from 4",
+        "The CHOICE SCARF now really raises SPEED by half, for trainers' POKéMON too. A FOCUS SASH or SITRUS BERRY is used up once it works",
+        "EGGS in your party have an EGG picture",
+        "The BATTLE MOVES page no longer runs a move's type into its PP",
+        "Version numbers now have three parts: new regions, new features, then fixes"
+      ]
+    },
     {
       "version": "GBA 1.8.1",
       "date": "2026-10-08",

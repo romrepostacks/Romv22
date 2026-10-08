@@ -30,7 +30,8 @@ ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awak
             'maxpotion', 'repel', 'superrepel', 'maxrepel', 'escaperope', 'goodrod', 'superrod',     # GBA 1.8
             'firestone', 'waterstone', 'thunderstone', 'leafstone', 'moonstone', 'sunstone', 'shinystone', 'duskstone',
             'dawnstone', 'icestone', 'ovalstone', 'razorclaw', 'razorfang', 'linkingcord']
-            # ... then the TMs (add_extras)
+            # ... then the TMs (add_extras), then GBA 1.9's held items (after the TMs, so older saves' bags stay a prefix)
+HELD_ITEM_IDS = ['leftovers', 'lifeorb', 'choicescarf', 'focussash', 'sitrusberry']    # HELD's order
 # GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
 GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
              'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
@@ -57,6 +58,12 @@ GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ba
              'ovalstone': {'name': 'OVAL STONE', 'pocket': 0, 'desc': 'A round stone. It makes a certain POKéMON evolve.', 'price': 3000},
              'razorclaw': {'name': 'RAZOR CLAW', 'pocket': 0, 'desc': 'A sharply hooked claw. It makes a certain POKéMON evolve.', 'price': 3000},
              'razorfang': {'name': 'RAZOR FANG', 'pocket': 0, 'desc': 'A sharp fang. It makes a certain POKéMON evolve.', 'price': 3000},
+             # GBA 1.9: held items, given from the party screen or the BAG.
+             'leftovers': {'name': 'LEFTOVERS', 'pocket': 0, 'desc': 'Held: restores a little HP at the end of every turn.', 'price': 4000},
+             'lifeorb': {'name': 'LIFE ORB', 'pocket': 0, 'desc': 'Held: the holder\'s moves do 30% more damage.', 'price': 6000},
+             'choicescarf': {'name': 'CHOICE SCARF', 'pocket': 0, 'desc': 'Held: raises the holder\'s SPEED by half.', 'price': 6000},
+             'focussash': {'name': 'FOCUS SASH', 'pocket': 0, 'desc': 'Held: at full HP, survives one KO with 1 HP. Used up.', 'price': 4000},
+             'sitrusberry': {'name': 'SITRUS BERRY', 'pocket': 3, 'desc': 'Held: restores HP once when it falls to half. Used up.', 'price': 1000},
              'linkingcord': {'name': 'LINKING CORD', 'pocket': 0, 'desc': 'A mysterious cord. POKéMON that evolve by trading evolve when it is used on them.', 'price': 3000}}
 EVO_ITEMS = {'fire-stone': 'firestone', 'water-stone': 'waterstone', 'thunder-stone': 'thunderstone', 'leaf-stone': 'leafstone',
              'moon-stone': 'moonstone', 'sun-stone': 'sunstone', 'shiny-stone': 'shinystone', 'dusk-stone': 'duskstone',
@@ -847,12 +854,28 @@ def build_mons(data, gfx):
                 small = small.convert('RGB').convert('RGBA')
                 small.putalpha(a)
                 icons.append((s['num'], small))
+    icons.append(('egg', egg_icon()))      # GBA 1.9: the party screen's EGGS
     # The icons share ICON_PALETTES palettes (Emerald uses 3): a box of 30 different species must fit the
     # 16 sprite palettes with the text's. Shiny icons keep the normal colours, as in Emerald.
     for num, pal, idx in icon_palettes(icons):
-        save_indexed_bmp(os.path.join(gfx, 'mon_icon_%d.bmp' % num), pal, idx, {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+        save_indexed_bmp(os.path.join(gfx, 'mon_icon_%s.bmp' % num), pal, idx, {'type': 'sprite', 'bpp_mode': 'bpp_4'})
 
 ICON_PALETTES = 6
+
+def egg_icon():
+    """A 32x32 EGG icon, drawn (no sprite for it in sprites/): a cream egg with green spots, outlined."""
+    big = Image.new('RGBA', (128, 128), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    d.ellipse((30, 22, 98, 118), fill=(40, 40, 48, 255))                       # outline
+    d.ellipse((36, 28, 92, 112), fill=(248, 240, 208, 255))                   # shell
+    for box in ((44, 48, 60, 64), (70, 40, 84, 54), (66, 74, 84, 92), (42, 86, 56, 100)):
+        d.ellipse(box, fill=(96, 176, 80, 255))                               # spots
+    d.ellipse((46, 34, 56, 46), fill=(255, 255, 255, 255))                    # shine
+    small = big.resize((32, 32), Image.LANCZOS)
+    a = small.split()[3].point(lambda v: 255 if v >= 110 else 0)
+    small = small.convert('RGB').convert('RGBA')
+    small.putalpha(a)
+    return small
 
 def icon_palettes(icons):
     """Groups the icons by colour into ICON_PALETTES shared 15-colour palettes (k-means style: a palette
@@ -1629,6 +1652,7 @@ def add_extras(data):
         GBA_ITEMS[key] = {'name': 'TM%02d %s' % (t['tm'], m['n'].upper()), 'pocket': 2, 'price': price,
                           'desc': what + ' Teach it again and again.'}
         data['tms'].append({'move': mi, 'item': key, 'badges': badges, 'slug': t['move']})
+    ITEM_IDS.extend(HELD_ITEM_IDS)
     if len(ITEM_IDS) > 255:
         raise SystemExit('%d kinds of items (max 255)' % len(ITEM_IDS))
     data['tm_compat'] = []
