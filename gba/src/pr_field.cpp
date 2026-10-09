@@ -162,7 +162,7 @@ namespace
     {
         game_state& g = state();
         int clears = bn::max(0, g.run.tower_clears - 1);
-        return bn::min(g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
+        return bn::min(g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
     }
 }
 
@@ -439,6 +439,9 @@ void overworld::talk_to(int index)
     case person_role::TUTOR:
         move_tutor();
         break;
+    case person_role::CAPTAIN:
+        captain();
+        break;
     case person_role::FERRY:
         ferry();
         break;
@@ -517,7 +520,8 @@ void overworld::legend_talk(int index)
     say("Gyaaaoooh!");
     g.story |= story::LEGEND_FIGHT;
     // Calderra's: a little above the level cap there (HO-OH at the very top).
-    int level = map_region(_map_index) == 1 ? 50 : legend == species_id::HO_OH ? 200 : bn::min(200, map_level_cap(_map_index) + 5);
+    int level = map_region(_map_index) == 1 ? 50 : legend == species_id::HO_OH ? 200 :
+                bn::min(region_cap(map_region(_map_index)), map_level_cap(_map_index) + 5);
     fixed_battle(legend, level, true);
 }
 
@@ -643,9 +647,9 @@ void overworld::go_fish(int rod)
     }
     // wildLevel() - 2, at least 3 (the better rods: wildLevel(), then + 2).
     int cap = map_level_cap(g.map);
-    int wild = bn::max(map_region(g.map) == 2 ? cap - 6 : 2, bn::min(cap, g.average_level() - 2 + r.get_int(3)));
+    int wild = bn::max(map_region(g.map) >= 2 ? cap - 6 : 2, bn::min(cap, g.average_level() - 2 + r.get_int(3)));
     constexpr int bonus[] = { -2, 0, 2 };
-    fixed_battle(s, bn::clamp(wild + bonus[rod], 3, 100));
+    fixed_battle(s, bn::clamp(wild + bonus[rod], 3, bn::max(100, cap)));
 }
 
 // ----- DIVE -----
@@ -2156,6 +2160,23 @@ void overworld::after_story()
             story_say("SOLENNE: \"The crater is yours to roam. And the GYM LEADERS are already asking for a rematch!\"");
         }
     }
+    // The Sundered Isles' League beaten for the first time (3.0.0).
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == 3 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
+           ! g.flags.test(flag::SUNDERED_CHAMPION))
+        {
+            g.flags.set(flag::SUNDERED_CHAMPION);
+            save_game();
+            suspend();
+            audio::play_music("credits");
+            hall_of_fame_screen("SUNDERED ISLES");
+            resume();
+            story_say("MAREA: \"The tide turns, and so does the crown. The SUNDERED ISLES have a new CHAMPION.\"");
+            story_say("MAREA: \"Groudon sleeps, Kyogre sleeps, and the islands stay islands. Sail where you like, CHAMPION!\"");
+        }
+    }
     if(g.has(story::DIVE_GIFT))
     {
         g.story &= ~story::DIVE_GIFT;
@@ -2371,6 +2392,43 @@ void overworld::ferry()
             for(int k = 0; k < m.people_count; ++k)
             {
                 if(m.people[k].role == person_role::FERRY)
+                {
+                    fast_travel(i);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+// The ship captain (3.0.0): PORT CALDER to PORT KEEL in the SUNDERED ISLES for CALDERRA's CHAMPION, and back.
+// It lands you at the other port's CAPTAIN.
+void overworld::captain()
+{
+    game_state& g = state();
+    ui& u = gui();
+    bool home = map_region(_map_index) == 2;
+    if(home && ! g.flags.test(flag::CALDERRA_CHAMPION))
+    {
+        say("CAPTAIN: \"The SUNDERED ISLES are no place for greenhorns. Beat the CALDERRA LEAGUE, then we'll talk.\"");
+        return;
+    }
+    u.show_text(home ? "CAPTAIN: \"Yarr, CHAMPION! Fancy a voyage to the SUNDERED ISLES, where the land broke apart? Set sail?\""
+                     : "CAPTAIN: \"Back to PORT CALDER, then? Set sail?\"");
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == (home ? 3 : 2))
+        {
+            for(int k = 0; k < m.people_count; ++k)
+            {
+                if(m.people[k].role == person_role::CAPTAIN)
                 {
                     fast_travel(i);
                     return;
@@ -3226,10 +3284,10 @@ void overworld::move_tutor()
     game_state& g = state();
     ui& u = gui();
     say("MOVE TUTOR: \"I can help a POKéMON remember a move it learned before, or one it should have learned by now.\"");
-    bool calderra = map_region(_map_index) == 2;
+    bool calderra = map_region(_map_index) >= 2;
     if(calderra)
     {
-        say("MOVE TUTOR: \"Here in CALDERRA I also teach new moves, a different four each day. For a fee, of course!\"");
+        say("MOVE TUTOR: \"Out here I also teach new moves, a different four each day. For a fee, of course!\"");
     }
     while(true)
     {
@@ -3620,7 +3678,8 @@ bool overworld::offer_rematch(int index)
     ui& u = gui();
     actor& a = _actors[index];
     // 2.0.0: once you're CALDERRA's CHAMPION, its GYM LEADERS take rematches too, at level 200.
-    bool leader = a.tr->role == trainer_role::LEADER && map_region(_map_index) == 2 && g.flags.test(flag::CALDERRA_CHAMPION);
+    bool leader = a.tr->role == trainer_role::LEADER && map_region(_map_index) >= 2 &&
+                  g.flags.test(map_region(_map_index) == 3 ? flag::SUNDERED_CHAMPION : flag::CALDERRA_CHAMPION);
     if((a.tr->role != trainer_role::ROUTE && ! leader) || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
        g.first_able() < 0 || g.tower.active)
     {

@@ -22,7 +22,10 @@ struct battle_setup
     // battles never). Dupes are refused one by one (dupes clause), and only one catch per battle.
     bool nuzlocke_catch = true;
     bool smart = false;             // CHALLENGE TOWER from rank 3: foes pick their best move and target
-    bool boss_heal = false;         // Calderra's leaders, rival, Elite Four and Champion: one FULL RESTORE a battle
+    int8_t boss_heals = 0;          // FULL RESTOREs a battle: Calderra's leaders, rival, Elite Four and Champion
+                                    // one, the Sundered Isles' two (3.0.0)
+    bool sharp = false;             // the Sundered Isles' trainers (3.0.0): smart, and they read held items too
+    battle_weather weather = battle_weather::NONE;  // the weather at the start (3.0.0: the islands' storms)
 };
 
 battle_report run_battle(battle_setup& setup);

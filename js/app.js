@@ -797,7 +797,31 @@ const PROC_RAW_GEN89 = [
 ["Terapagos","Normal",null,90,65,85,65,85,60],
 ["Pecharunt","Poison","Ghost",88,88,160,88,88,88]
 ];
-const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry));
+// 3.0.0: Sundered forms, island forms found only in the SUNDERED ISLES, born when GROUDON and KYOGRE broke the
+// land apart. Each keeps its original's learnset, ability and size with new types and stats; the sprites are
+// the original's, recoloured by gba/tools/art/sundered_forms.py. They come after everything older so species
+// indices in saves stay put. [name, original, dex number, types, hp/atk/def/spa/spd/spe, evolves to, level]
+const SUNDERED_FORMS = [
+  ["Sandshrew-Sunder", "Sandshrew", 2001, ["Ground","Water"], [50,70,85,30,40,35], "Sandslash-Sunder", 22],
+  ["Sandslash-Sunder", "Sandslash", 2002, ["Ground","Water"], [80,95,110,55,65,55]],
+  ["Numel-Sunder", "Numel", 2003, ["Fire","Water"], [60,50,45,70,50,30], "Camerupt-Sunder", 33],
+  ["Camerupt-Sunder", "Camerupt", 2004, ["Fire","Water"], [75,80,80,115,80,30]],
+  ["Wailmer-Sunder", "Wailmer", 2005, ["Water","Ground"], [130,80,45,55,35,55], "Wailord-Sunder", 40],
+  ["Wailord-Sunder", "Wailord", 2006, ["Water","Ground"], [170,100,55,70,45,60]],
+  ["Corphish-Sunder", "Corphish", 2007, ["Water","Steel"], [43,75,80,40,40,35], "Crawdaunt-Sunder", 30],
+  ["Crawdaunt-Sunder", "Crawdaunt", 2008, ["Water","Steel"], [63,110,110,70,65,50]],
+  ["Carvanha-Sunder", "Carvanha", 2009, ["Water","Ghost"], [45,80,25,75,25,65], "Sharpedo-Sunder", 30],
+  ["Sharpedo-Sunder", "Sharpedo", 2010, ["Water","Ghost"], [70,105,45,110,45,95]],
+  ["Sableye-Sunder", "Sableye", 2011, ["Ghost","Steel"], [50,70,85,60,70,45]],
+  ["Torkoal-Sunder", "Torkoal", 2012, ["Fire","Water"], [70,75,130,100,80,15]]];
+const PROC_RAW_SUNDERED = SUNDERED_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
+for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of SUNDERED_FORMS){
+  const s = n.toLowerCase(), o = orig.toLowerCase();
+  if(typeof DEXDATA!=='undefined' && DEXDATA[o])
+    DEXDATA[s] = {...DEXDATA[o], types, base:{hp,atk,def,spa,spd,spe}, evo:to ? {to:to.toLowerCase(), level} : undefined};
+  if(typeof MOVE_EXTRA!=='undefined' && MOVE_EXTRA.learn[o]) MOVE_EXTRA.learn[s] = MOVE_EXTRA.learn[o];
+}
+const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry)).concat(PROC_RAW_SUNDERED.map(procEntry));
 
 const LEVEL = 50;
 // Real data from js/dexdata.js (generated from PokeAPI by tools/build-dexdata.js) replaces the
@@ -1080,6 +1104,11 @@ const DEX_NUM = {
  // 2.0.0 (gba/tools/build_gen89.js): the four Gen 7 gaps and Gen 8-9
  "cutiefly":742,"mudbray":749,"morelull":755,"salandit":757,"grookey":810,"thwackey":811,"rillaboom":812,"scorbunny":813,"raboot":814,"cinderace":815,"sobble":816,"drizzile":817,"inteleon":818,"skwovet":819,"greedent":820,"rookidee":821,"corvisquire":822,"corviknight":823,"blipbug":824,"dottler":825,"orbeetle":826,"nickit":827,"thievul":828,"gossifleur":829,"eldegoss":830,"wooloo":831,"dubwool":832,"chewtle":833,"drednaw":834,"yamper":835,"boltund":836,"rolycoly":837,"carkol":838,"coalossal":839,"applin":840,"flapple":841,"appletun":842,"silicobra":843,"sandaconda":844,"cramorant":845,"arrokuda":846,"barraskewda":847,"toxel":848,"toxtricity":849,"sizzlipede":850,"centiskorch":851,"clobbopus":852,"grapploct":853,"sinistea":854,"polteageist":855,"hatenna":856,"hattrem":857,"hatterene":858,"impidimp":859,"morgrem":860,"grimmsnarl":861,"obstagoon":862,"perrserker":863,"cursola":864,"sirfetch-d":865,"mr-rime":866,"runerigus":867,"milcery":868,"alcremie":869,"falinks":870,"pincurchin":871,"snom":872,"frosmoth":873,"stonjourner":874,"eiscue":875,"indeedee":876,"morpeko":877,"cufant":878,"copperajah":879,"dracozolt":880,"arctozolt":881,"dracovish":882,"arctovish":883,"duraludon":884,"dreepy":885,"drakloak":886,"dragapult":887,"zacian":888,"zamazenta":889,"eternatus":890,"kubfu":891,"urshifu":892,"zarude":893,"regieleki":894,"regidrago":895,"glastrier":896,"spectrier":897,"calyrex":898,"wyrdeer":899,"kleavor":900,"ursaluna":901,"basculegion":902,"sneasler":903,"overqwil":904,"enamorus":905,"sprigatito":906,"floragato":907,"meowscarada":908,"fuecoco":909,"crocalor":910,"skeledirge":911,"quaxly":912,"quaxwell":913,"quaquaval":914,"lechonk":915,"oinkologne":916,"tarountula":917,"spidops":918,"nymble":919,"lokix":920,"pawmi":921,"pawmo":922,"pawmot":923,"tandemaus":924,"maushold":925,"fidough":926,"dachsbun":927,"smoliv":928,"dolliv":929,"arboliva":930,"squawkabilly":931,"nacli":932,"naclstack":933,"garganacl":934,"charcadet":935,"armarouge":936,"ceruledge":937,"tadbulb":938,"bellibolt":939,"wattrel":940,"kilowattrel":941,"maschiff":942,"mabosstiff":943,"shroodle":944,"grafaiai":945,"bramblin":946,"brambleghast":947,"toedscool":948,"toedscruel":949,"klawf":950,"capsakid":951,"scovillain":952,"rellor":953,"rabsca":954,"flittle":955,"espathra":956,"tinkatink":957,"tinkatuff":958,"tinkaton":959,"wiglett":960,"wugtrio":961,"bombirdier":962,"finizen":963,"palafin":964,"varoom":965,"revavroom":966,"cyclizar":967,"orthworm":968,"glimmet":969,"glimmora":970,"greavard":971,"houndstone":972,"flamigo":973,"cetoddle":974,"cetitan":975,"veluza":976,"dondozo":977,"tatsugiri":978,"annihilape":979,"clodsire":980,"farigiraf":981,"dudunsparce":982,"kingambit":983,"great-tusk":984,"scream-tail":985,"brute-bonnet":986,"flutter-mane":987,"slither-wing":988,"sandy-shocks":989,"iron-treads":990,"iron-bundle":991,"iron-hands":992,"iron-jugulis":993,"iron-moth":994,"iron-thorns":995,"frigibax":996,"arctibax":997,"baxcalibur":998,"gimmighoul":999,"gholdengo":1000,"wo-chien":1001,"chien-pao":1002,"ting-lu":1003,"chi-yu":1004,"roaring-moon":1005,"iron-valiant":1006,"koraidon":1007,"miraidon":1008,"walking-wake":1009,"iron-leaves":1010,"dipplin":1011,"poltchageist":1012,"sinistcha":1013,"okidogi":1014,"munkidori":1015,"fezandipiti":1016,"ogerpon":1017,"archaludon":1018,"hydrapple":1019,"gouging-fire":1020,"raging-bolt":1021,"iron-boulder":1022,"iron-crown":1023,"terapagos":1024,"pecharunt":1025
 };
+// 3.0.0: the Sundered forms' numbers, and their originals' POKéDEX sizes and categories.
+for(const [n, orig, num] of SUNDERED_FORMS){
+  DEX_NUM[slug(n)] = num;
+  if(typeof DEXINFO!=='undefined' && DEXINFO[DEX_NUM[slug(orig)]]) DEXINFO[num] = DEXINFO[DEX_NUM[slug(orig)]];
+}
 function spritePath(d, facing, shiny){
   const num = DEX_NUM[slug(d.name)] || 0;
   return `sprites/pokemon/${facing==='back'?'back/':''}${shiny?'shiny/':''}${num}.png`;
@@ -1586,7 +1615,7 @@ function buildRoute(loc){
   }
   if(loc.boss){
     const trail = paths[loc.links[0].dir], spot = trail[Math.floor(trail.length*0.7)];
-    npcs.push({kind:'admin', x:spot.x, y:spot.y, facing:OPPOSITE[loc.links[0].dir], trainer:true, vanish:true});
+    npcs.push({kind:loc.bossKind || 'admin', x:spot.x, y:spot.y, facing:OPPOSITE[loc.links[0].dir], trainer:true, vanish:true});
     npcs.push({kind:'mon:'+loc.legend, x:cx, y:cy, facing:'down', legend:loc.legend});
   }
   // Locals with tips, spread along the route.
@@ -1600,6 +1629,8 @@ function buildRoute(loc){
   // Trainers: a few per route, 3–5 tiles off the path, facing it, so walking the path gets you spotted.
   const TR_CLASSES = loc.aces ? ['ACE TRAINER'] : {plain:['YOUNGSTER','LASS','BUG CATCHER'], forest:['BUG CATCHER','LASS','YOUNGSTER'], lake:['FISHERMAN','LASS','YOUNGSTER'], rocky:['HIKER','YOUNGSTER','LASS'], sea:['SWIMMER','FISHERMAN','SWIMMER'], cave:['HIKER','HIKER','YOUNGSTER'], deep:['SWIMMER','SWIMMER','FISHERMAN']}[loc.theme||'plain'];
   const TR_KIND = {YOUNGSTER:'youngster', LASS:'lass', 'BUG CATCHER':'bugcatcher', HIKER:'hiker', FISHERMAN:'fisher', 'TEMPEST GRUNT':'grunt', SWIMMER:'lass', 'ACE TRAINER':'boy'};
+  // 3.0.0: a region's own villains (TEAM QUAKE, TEAM NEPTUNE) in place of TEMPEST's grunts.
+  const GT = loc.gruntTeam || {cls:'TEMPEST GRUNT', kind:'grunt', pool:TEMPEST_POOL, intro:GRUNT_INTRO, after:GRUNT_AFTER};
   // Lasses are girls; the other classes here are boys, as in Emerald.
   const TR_NAMES = {girl:['CALLIE','TIANA','DANA','OLIVIA','KAREN','ROSA','NINA','IVY','JUNE'], boy:['JOEY','BEN','RICK','ALLEN','MIKE','TOBY','LUKE','GREG','OWEN','SAM']};
   const TR_INTRO = ["Our eyes met! That means we battle!", "Hey! You look tough. Let's see!", "I just caught these guys. Try them out!", "You're not getting past without a battle!", "My Pokémon and I trained all day for this!"];
@@ -1615,13 +1646,13 @@ function buildRoute(loc){
     let clear = true;   // an open line of sight from them back to the path
     for(let s=1; s<dist; s++) if(!WALKABLE.has(tiles[y-dy*s][x-dx*s])) clear = false;
     if(!clear) continue;
-    const grunt = made < (loc.grunts||0), pick = TR_CLASSES[Math.floor(rnd()*TR_CLASSES.length)], cls = grunt ? 'TEMPEST GRUNT' : pick;
-    const tp = grunt ? TEMPEST_POOL : cls==='SWIMMER' || cls==='FISHERMAN' ? waterPool(loc) : pool;
+    const grunt = made < (loc.grunts||0), pick = TR_CLASSES[Math.floor(rnd()*TR_CLASSES.length)], cls = grunt ? GT.cls : pick;
+    const tp = grunt ? GT.pool : cls==='SWIMMER' || cls==='FISHERMAN' ? waterPool(loc) : pool;
     const size = 2 + Math.floor(rnd()*4), team = Array.from({length:size}, ()=>tp[Math.floor(rnd()*tp.length)]);
     const named = `${cls} ${(names=>names[Math.floor(rnd()*names.length)])(TR_NAMES[cls==='LASS' || cls==='SWIMMER' ? 'girl' : 'boy'])}`;
     const ii = Math.floor(rnd()*TR_INTRO.length), ai = Math.floor(rnd()*TR_AFTER.length);
-    npcs.push({kind:TR_KIND[cls], x, y, facing:OPPOSITE[d], trainer:true, id:`${loc.name}#${made}`, title:grunt ? 'TEMPEST GRUNT' : named,
-      team, intro:grunt ? GRUNT_INTRO[ii % GRUNT_INTRO.length] : TR_INTRO[ii], after:grunt ? GRUNT_AFTER[ai % GRUNT_AFTER.length] : TR_AFTER[ai], home:{x,y}});
+    npcs.push({kind:grunt ? GT.kind : TR_KIND[cls], x, y, facing:OPPOSITE[d], trainer:true, id:`${loc.name}#${made}`, title:grunt ? GT.cls : named,
+      team, intro:grunt ? GT.intro[ii % GT.intro.length] : TR_INTRO[ii], after:grunt ? GT.after[ai % GT.after.length] : TR_AFTER[ai], home:{x,y}});
     made++;
   }
   // Item balls lying in the grass (A picks them up, once).
@@ -1633,6 +1664,8 @@ function buildRoute(loc){
   for(const pk of pockets) if(tiles[pk.y] && '."'.includes(tiles[pk.y][pk.x]) && reach.has(pk.y*W+pk.x)) drop(pk.x, pk.y);   // only clearings you can walk to
   for(let k=Object.keys(itemTypes).length; k<Math.max(1, Math.round(A/1300)); k++){ const sp = freeSpot(); if(!sp) break; drop(sp.x, sp.y); }
   if(loc.tablet){ const sp = freeSpot(); if(sp){ tiles[sp.y][sp.x] = '^'; signs.push({x:sp.x, y:sp.y, lines:loc.tablet}); } }
+  // 3.0.0: buried treasure (DOUBLOON SHOAL): these items, wherever there's room.
+  for(const t of loc.treasure || []){ const sp = freeSpot(); if(!sp) break; tiles[sp.y][sp.x] = 'I'; itemTypes[`${sp.x},${sp.y}`] = t; }
   let diveSpots = null;
   // Sea routes: open water with a landing at each entrance and small islands where people and items are.
   if(loc.theme==='sea'){
@@ -6245,6 +6278,137 @@ const CALDERRA = [
   Object.assign(CALDERRA[18], {rivalAfter:["Burned again. Tell yourself you've won, kid. The tower is where it ends."]});
   Object.assign(CALDERRA[23], {rivalAfter:["No... the tower answers to YOU? Then ECLIPSE is finished.", "Enjoy your crater, CHAMPION of nowhere."]});
   for(const loc of CALDERRA) getMap(loc);
+}
+
+// ---------- The Sundered Isles (3.0.0): the third region, reached by ship from PORT CALDER ----------
+// Once one land, broken apart when GROUDON and KYOGRE fought over it. PORT KEEL on the central island; three sea
+// routes out to the ring of eight gym islands, which sea routes join all the way round, in any order. TEAM QUAKE
+// wakes GROUDON under MAGMA ISLE to fuse the islands into one flat land; TEAM NEPTUNE wakes KYOGRE in THE ABYSS
+// to drown them. With both calmed and eight badges, MT. KEEL's Victory Road leads to the League. Levels follow
+// your Sundered badges (200, then 12 more per badge, up to 300). `at` is the region map's grid.
+Object.assign(CHARS, {
+  captain:      {head:'cap',   K:'#282830',R:'#202838',W:'#f8f8f8',S:'#e8b080',H:'#f8f8f8',B:'#203868',D:'#202838',Y:'#e0c040'},
+  gruntQuake:   {head:'cap',   K:'#282830',R:'#a03818',W:'#f0a040',S:'#e8b080',H:'#302018',B:'#a03818',D:'#503020',Y:'#f0a040'},
+  gruntNeptune: {head:'cap',   K:'#282830',R:'#184878',W:'#48d0c8',S:'#f0c098',H:'#1e1e24',B:'#184878',D:'#102838',Y:'#48d0c8'},
+  bossQuake:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c88050',H:'#801808',B:'#602010',D:'#382018',Y:'#f08030'},
+  bossNeptune:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#28a8c0',B:'#102850',D:'#102850',Y:'#48d0c8'},
+  leaderFern:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#305820',B:'#78b848',D:'#486828',Y:'#f0e070'},
+  leaderBram:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#604020',B:'#98b020',D:'#485020',Y:'#f8e048'},
+  leaderForge:  {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c08050',H:'#504848',B:'#8890a0',D:'#404858',Y:'#e08030'},
+  leaderPerla:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#f8b8d0',B:'#f8f0f8',D:'#f0a8c8',Y:'#f0d0e0'},
+  leaderDavey:  {head:'cap',   K:'#282830',R:'#302838',W:'#f8f8f8',S:'#d8c8c0',H:'#483858',B:'#584078',D:'#302838',Y:'#c8a848'},
+  leaderSilt:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c8b098',H:'#702878',B:'#9050a0',D:'#402048',Y:'#a0e048'},
+  leaderKalani: {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#a86838',H:'#181818',B:'#f8f8f8',D:'#202020',Y:'#e04030'},
+  leaderMirra:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#f0c8f0',B:'#c060c0',D:'#702878',Y:'#f8e8a0'},
+  rivalMarlo:   {head:'cap',   K:'#282830',R:'#28a0a0',W:'#f8f8f8',S:'#b07848',H:'#202020',B:'#f0f0e0',D:'#3878a8',Y:'#f0c040'},
+  eliteWater:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e0a878',H:'#204878',B:'#3888c8',D:'#204878',Y:'#f8f8f8'},
+  eliteGround:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c08050',H:'#806040',B:'#c09858',D:'#604830',Y:'#f0e0b0'},
+  eliteDragon:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#202048',B:'#5038a8',D:'#282038',Y:'#e8c040'},
+  championMarea:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#f8f0e0',B:'#285898',D:'#f8f0e0',Y:'#e0c040'}});
+Object.assign(GYM_STYLE, {
+  Fern:{kind:'leaderFern', type:'Grass', theme:'grass'}, Bram:{kind:'leaderBram', type:'Bug', theme:'bug'},
+  Forge:{kind:'leaderForge', type:'Steel', theme:'steel'}, Perla:{kind:'leaderPerla', type:'Fairy', theme:'fairy'},
+  Davey:{kind:'leaderDavey', type:'Ghost', theme:'ghost'}, Silt:{kind:'leaderSilt', type:'Poison', theme:'poison'},
+  Kalani:{kind:'leaderKalani', type:'Fighting', theme:'fighting'}, Mirra:{kind:'leaderMirra', type:'Psychic', theme:'psychic'}});
+Object.assign(GYM_JUNIORS, {
+  bug:     {cls:'BUG MANIAC',  kind:'bugcatcher', team:['Grubbin','Charjabug','Dewpider','Cutiefly','Dwebble','Combee']},
+  steel:   {cls:'WORKER',      kind:'hiker',   team:['Klink','Bronzor','Ferroseed','Magnemite','Corphish-Sunder','Pawniard']},
+  fairy:   {cls:'PARASOL LADY', kind:'lass',   team:['Spritzee','Swirlix','Comfey','Snubbull','Fidough','Hatenna']},
+  poison:  {cls:'DIVER',       kind:'fisher',  team:['Mareanie','Skrelp','Tentacool','Grimer','Croagunk','Stunky']},
+  fighting:{cls:'BLACK BELT',  kind:'hiker',   team:['Makuhita','Crabrawler','Stufful','Mienfoo','Meditite','Hawlucha']},
+  psychic: {cls:'PSYCHIC',     kind:'girl',    team:['Natu','Spoink','Baltoy','Bruxish','Drowzee','Inkay']}});
+const QUAKE_TEAM = {cls:'QUAKE GRUNT', kind:'gruntQuake', pool:['Numel-Sunder','Sandshrew-Sunder','Diglett','Geodude','Trapinch','Slugma'],
+  intro:["TEAM QUAKE will raise the seabed! One land, one ground!", "The islands are a mistake. GROUDON will fix it!", "Nobody gets past TEAM QUAKE's line!"],
+  after:["The ground shakes, but you don't...", "Boss BASALT won't be happy about this.", "Fine. The land will rise without me."]};
+const NEPTUNE_TEAM = {cls:'NEPTUNE GRUNT', kind:'gruntNeptune', pool:['Carvanha-Sunder','Corphish-Sunder','Tentacool','Wailmer-Sunder','Wingull','Remoraid'],
+  intro:["The sea will take it all back. Out of the way!", "TEAM NEPTUNE sails for a drowned world!", "You'll make a fine sunken statue!"],
+  after:["Glub... washed out.", "The tide always turns. For us, next time.", "Boss THALASSA will drown you herself!"]};
+const ELITES_SUNDERED = [
+  {kind:'eliteWater', title:'ELITE FOUR NERISSA', team:['Milotic','Kingdra','Lapras','Golisopod','Wailord-Sunder','Walking Wake'],
+   intro:"The sea split these islands once. Let's see if it can split you!", after:"You stood against the tide. Go on."},
+  {kind:'eliteGround', title:'ELITE FOUR TERRAN', team:['Mudsdale','Excadrill','Hippowdon','Sandslash-Sunder','Flygon','Great Tusk'],
+   intro:"Every island stands on the same rock. Show me your footing!", after:"Solid ground. The next door is yours."},
+  {kind:'eliteDragon', title:'ELITE FOUR KAIDO', team:['Salamence','Kommo-o','Dragalge','Goodra','Noivern','Roaring Moon'],
+   intro:"Dragons ruled the sky before the land broke. They still do!", after:"Hah! The dragons bow to you."},
+  {kind:'eliteDark', title:'ELITE FOUR NOCTIS', team:['Sharpedo-Sunder','Krookodile','Tyranitar','Zoroark','Kingambit','Obstagoon'],
+   intro:"Below the waves it's always night. Can you see?", after:"...Bright as a lighthouse. The CHAMPION waits."}];
+const SUNDERED = [
+  // 0: the hub
+  {type:'town', name:"Port Keel", at:[2,0], center:true, desc:"A busy harbour on the central island. MT. KEEL rises behind the town, and sea routes run out in every direction."},
+  // 1-3: the spokes out to the ring
+  {type:'route', name:"Sea Route 1", at:[1,0], theme:'sea', desc:"Open water west of PORT KEEL, toward a rock where fighters train.", pool:['Wingull','Pelipper','Corphish-Sunder'], water:['Tentacool','Wailmer-Sunder','Finneon','Mantyke','Remoraid','Corphish-Sunder']},
+  {type:'route', name:"Sea Route 2", at:[2,1], theme:'sea', desc:"Fog drifts over the water south of PORT KEEL. Old wreckage bobs in the swell.", pool:['Wingull','Pelipper','Carvanha-Sunder'], water:['Carvanha-Sunder','Frillish','Tentacool','Wishiwashi','Finneon','Mantyke']},
+  {type:'route', name:"Sea Route 3", at:[3,0], theme:'sea', desc:"Busy shipping lanes east to the IRONHAUL shipyard.", pool:['Wingull','Pelipper','Corphish-Sunder'], water:['Corphish-Sunder','Wailmer-Sunder','Remoraid','Clauncher','Tentacool','Lumineon']},
+  // 4-11: the gym islands, clockwise from the west
+  {type:'gym', name:"Brawler's Rock", at:[0,0], center:true, desc:"Sea cliffs where fighters train against the waves. Leader Kalani's gym is a dojo on the rocks.", leaderName:"Kalani", leaderTeam:['Hariyama','Crabominable','Bewear','Hawlucha']},
+  {type:'gym', name:"Wreck Cove", at:[2,2], center:true, desc:"A village built from the hulls of wrecked ships. Leader Davey's gym is the biggest wreck of all.", leaderName:"Davey", leaderTeam:['Dhelmise','Palossand','Sharpedo-Sunder','Jellicent']},
+  {type:'gym', name:"Ironhaul Isle", at:[4,0], center:true, desc:"Cranes and slipways ring the island's shipyard. Leader Forge's gym is a dry dock.", leaderName:"Forge", leaderTeam:['Skarmory','Klinklang','Bronzong','Crawdaunt-Sunder']},
+  {type:'gym', name:"Mirage Isle", at:[0,-2], center:true, desc:"A desert island where the heat paints towns that aren't there. Leader Mirra's gym is real... probably.", leaderName:"Mirra", leaderTeam:['Xatu','Claydol','Bruxish','Espeon']},
+  {type:'gym', name:"Verdant Isle", at:[2,-2], center:true, desc:"Jungle so thick the sun barely reaches the ground. Leader Fern's gym grows out of a giant tree.", leaderName:"Fern", leaderTeam:['Tropius','Exeggutor','Lurantis','Rillaboom']},
+  {type:'gym', name:"Hivewood Key", at:[4,-2], center:true, desc:"Hollow trees hum with Bug Pokémon. Leader Bram's gym is inside the biggest hive.", leaderName:"Bram", leaderTeam:['Vikavolt','Scizor','Ribombee','Heracross']},
+  {type:'gym', name:"Pearl Isle", at:[4,2], center:true, desc:"White beaches and pearl divers. Leader Perla's gym sparkles like the inside of a shell.", leaderName:"Perla", leaderTeam:['Primarina','Sylveon','Comfey','Slurpuff']},
+  {type:'gym', name:"Mire Isle", at:[0,2], center:true, desc:"A swamp island under a yellow haze. Leader Silt's gym sits on stilts above the bog.", leaderName:"Silt", leaderTeam:['Toxapex','Swalot','Toxicroak','Skuntank']},
+  // 12-19: the ring of sea routes between the islands
+  {type:'route', name:"Sea Route 4", at:[0,-1], theme:'sea', desc:"Choppy water between the cliffs and the desert island.", pool:['Wingull','Pelipper','Sandshrew-Sunder'], water:['Wailmer-Sunder','Tentacool','Mantyke','Finneon','Barboach','Clauncher']},
+  {type:'trainer', kind:'rival', name:"Sea Route 5", at:[1,-2], theme:'sea', desc:"A sandbar halfway to the jungle. A trainer on a surfboard waves you down. \"You're the CHAMPION from the north? Prove it!\"",
+   leaderName:"Marlo", rivalKind:'rivalMarlo', leaderTeam:['Toucannon','Golisopod','Lycanroc','Sandslash-Sunder','Kommo-o'], pool:['Wingull','Pelipper','Pikipek'], water:['Tentacool','Wailmer-Sunder','Luvdisc','Finneon','Mantyke','Corsola']},
+  {type:'route', name:"Sea Route 6", at:[3,-2], theme:'sea', desc:"Warm water where the jungle meets the hives. Bug Pokémon skim the waves.", pool:['Wingull','Surskit','Cutiefly'], water:['Surskit','Dewpider','Tentacool','Luvdisc','Corsola','Mantyke']},
+  {type:'route', name:"Sea Route 7", at:[4,-1], theme:'sea', desc:"The north wind blows a storm off the open sea. Something huge moves out there.", pool:['Wingull','Pelipper','Wailmer-Sunder'], water:['Wailmer-Sunder','Sharpedo','Tentacruel','Remoraid','Lumineon','Wishiwashi']},
+  {type:'route', name:"Sea Route 8", at:[4,1], theme:'sea', desc:"Calm, clear water over pearl beds.", pool:['Wingull','Pelipper','Corsola'], water:['Clamperl','Luvdisc','Corsola','Staryu','Finneon','Lapras']},
+  {type:'route', name:"Sea Route 9", at:[3,2], theme:'sea', desc:"Masts stick out of the water here. Sailors say the wrecks are haunted.", pool:['Wingull','Pelipper','Sableye-Sunder'], water:['Carvanha-Sunder','Frillish','Pyukumuku','Clamperl','Tentacool','Wishiwashi']},
+  {type:'route', name:"Sea Route 10", at:[1,2], theme:'sea', desc:"The sea turns murky near the swamp. Bubbles rise from below.", pool:['Wingull','Croagunk','Numel-Sunder'], water:['Mareanie','Skrelp','Tentacool','Qwilfish','Barboach','Carvanha-Sunder']},
+  {type:'route', name:"Sea Route 11", at:[0,1], theme:'sea', desc:"Rocky shallows below the cliffs. Waves crash on every side.", pool:['Wingull','Pelipper','Makuhita'], water:['Crabrawler','Clauncher','Tentacool','Wailmer-Sunder','Mantyke','Corphish-Sunder']},
+  // 20-22: the villains' bases and the treasure
+  {type:'trainer', kind:'boss', name:"Magma Isle", at:[0,3], boss:true, shrine:true, legend:'Groudon', grunts:3, theme:'rocky', gruntTeam:QUAKE_TEAM, bossKind:'bossQuake',
+   desc:"A volcano rises out of the sea, its slopes cracked and glowing. TEAM QUAKE's drills bite into the rock. \"GROUDON will raise the land, and the islands will be one!\"",
+   leaderName:"Boss Basalt", leaderTeam:['Camerupt-Sunder','Torkoal-Sunder','Excadrill','Garchomp','Rhyperior','Coalossal'], pool:['Numel-Sunder','Torkoal-Sunder','Slugma','Magby','Sandshrew-Sunder']},
+  {type:'trainer', kind:'boss', name:"The Abyss", at:[5,-2], boss:true, shrine:true, legend:'Kyogre', grunts:3, theme:'sea', gruntTeam:NEPTUNE_TEAM, bossKind:'bossNeptune',
+   desc:"A whirlpool wide as a town, under a sky that never stops raining. TEAM NEPTUNE's ships circle it. \"KYOGRE will drown this world, and they'll remember us like Atlantis!\"",
+   leaderName:"Boss Thalassa", leaderTeam:['Sharpedo-Sunder','Kingdra','Gyarados','Wailord-Sunder','Toxapex','Barraskewda'], pool:['Wingull','Pelipper'], water:['Carvanha-Sunder','Sharpedo-Sunder','Wailmer-Sunder','Tentacruel','Dhelmise','Relicanth']},
+  {type:'route', name:"Doubloon Shoal", at:[5,2], theme:'sea', own:true, treasure:['masterball','rarecandy','rarecandy','ultraball'],
+   tablet:["Scratched into the stone: \"X MARKS THE SPOT.\"", "\"Here lies the treasure of the old captains. Whoever finds it, keep it.\""],
+   desc:"A sandbar shaped like an X, far from any shipping lane. Pirates say treasure is buried here.", pool:['Sableye-Sunder','Wingull','Pyukumuku'], water:['Luvdisc','Corsola','Clamperl','Lapras','Relicanth','Wishiwashi']},
+  // 23-24: MT. KEEL
+  {type:'route', name:"Keel Victory Road", at:[2,-1], badges:8, aces:true, theme:'cave', desc:"Tunnels up through MT. KEEL. Only trainers with all eight Sundered badges, who calmed GROUDON and KYOGRE, may pass.", pool:['Camerupt-Sunder','Sandslash-Sunder','Sableye-Sunder','Hippowdon','Golurk','Druddigon']},
+  {type:'town', name:"Sundered League", at:[3,-1], center:true, league:true, champion:true, elites:ELITES_SUNDERED, championKind:'championMarea',
+   championQuote:"You calmed the land and the sea, and now you climb the mountain between them. I am MAREA, CHAMPION of the SUNDERED ISLES!",
+   desc:"The Pokémon League of the Sundered Isles, on the top of MT. KEEL. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Marea", leaderTeam:['Swampert','Gyarados','Metagross','Camerupt-Sunder','Crawdaunt-Sunder','Garchomp']}];
+// Weather on the islands: rain and storms toward THE ABYSS, ash near MAGMA ISLE, fog over the swamp and the wrecks.
+Object.assign(WEATHER, {"Sea Route 2":'fog', "Sea Route 7":'rain', "Sea Route 9":'fog', "Sea Route 10":'fog', "Mire Isle":'fog',
+  "Wreck Cove":'fog', "The Abyss":'rain', "Hivewood Key":'rain', "Magma Isle":'ash', "Sea Route 4":'ash', "Keel Victory Road":'cave'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of SUNDERED){ loc.region = 3; loc.tier = 30; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  // Every island is open from the start (levels follow your badges), so nothing is gated but MARLO's sandbar,
+  // MT. KEEL (eight badges, and both legendaries calmed) and the bases' legendaries.
+  const join = (a, b, dir, gate=false)=>{
+    (SUNDERED[a].links ||= []).push({dir, to:S(b), gate});
+    (SUNDERED[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  // PORT KEEL: west, south and east to the ring; north up MT. KEEL.
+  join(0, 1, 'left'); join(1, 4, 'left');
+  join(0, 2, 'down'); join(2, 5, 'down');
+  join(0, 3, 'right'); join(3, 6, 'right');
+  join(0, 23, 'up'); join(23, 24, 'right');
+  // The ring, clockwise from BRAWLER'S ROCK.
+  join(4, 12, 'up'); join(12, 7, 'up');
+  join(7, 13, 'right'); join(13, 8, 'right', true);
+  join(8, 14, 'right'); join(14, 9, 'right');
+  join(9, 15, 'down'); join(15, 6, 'down');
+  join(6, 16, 'down'); join(16, 10, 'down');
+  join(10, 17, 'left'); join(17, 5, 'left');
+  join(5, 18, 'left'); join(18, 11, 'left');
+  join(11, 19, 'up'); join(19, 4, 'up');
+  // Off the ring: the villains' bases and the treasure.
+  join(11, 20, 'down'); join(9, 21, 'right'); join(10, 22, 'right');
+  for(const l of SUNDERED[0].links) if(l.to===S(23)) l.need = 'shrines';
+  Object.assign(SUNDERED[13], {rivalAfter:["Whoa. You really are a CHAMPION. I'm MARLO, born and raised on these islands.", "Two teams have been sneaking around: QUAKE, near the volcano down south-west, and NEPTUNE, out by the big whirlpool.", "If they wake the old giants, there won't be any islands left. Go stop them!"]});
+  Object.assign(SUNDERED[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"Hey, CHAMPION! I caught the next ship after yours.\"", "KAI: \"They say GROUDON and KYOGRE broke this land apart long ago. Now two teams want to wake them.\"", "KAI: \"Calm them both and the way up MT. KEEL opens. I'll watch the harbour.\""]}});
+  Object.assign(SUNDERED[20], {rivalAfter:["The ground... it stopped shaking? GROUDON listened to YOU?", "TEAM QUAKE will be back. The land always rises again."]});
+  Object.assign(SUNDERED[21], {rivalAfter:["The rain eases... KYOGRE sinks back to the deep. You'll regret this.", "Every flood starts with one wave. Remember that."]});
+  for(const loc of SUNDERED) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------

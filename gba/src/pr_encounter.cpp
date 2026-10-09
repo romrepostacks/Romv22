@@ -51,16 +51,19 @@ namespace
         {
             lv = bn::max(3, bn::min(cap_level, avg - 1));
         }
-        if(map_region(g.map) == 2)
+        int region = map_region(g.map);
+        if(region >= 2)
         {
-            // Calderra: levels follow your Calderra badges (calderra_level), never your party's. Juniors and route
-            // trainers sit just under the cap, a leader at the next badge's level, the rival and the bosses
-            // between, the Elite Four at 196-199 and the Champion at the cap, 200.
-            int b = g.region_badges(2);
-            lv = junior ? cap_level - 4 : elite ? 196 + t.elite : t.role == trainer_role::CHAMPION ? 200
-                : t.role == trainer_role::LEADER ? calderra_level(b + 1) : route ? cap_level - 2 : calderra_level(b) + 4;
+            // Calderra and later: levels follow the region's badges (region_level), never your party's. Juniors and
+            // route trainers sit just under the cap, a leader at the next badge's level, the rival and the bosses
+            // between, the Elite Four just under the cap (196-199 in Calderra) and the Champion at it (200; the
+            // Sundered Isles' 300).
+            int b = g.region_badges(region), top = region_cap(region);
+            lv = junior ? cap_level - 4 : elite ? top - 4 + t.elite : t.role == trainer_role::CHAMPION ? top
+                : t.role == trainer_role::LEADER ? region_level(region, b + 1) : route ? cap_level - 2 : region_level(region, b) + 4;
             s.smart = true;
-            s.boss_heal = ! route || elite;
+            s.boss_heals = ! route || elite ? (region >= 3 ? 2 : 1) : 0;
+            s.sharp = region >= 3;
         }
         species_id names[6];
         int n = 0;
@@ -116,12 +119,15 @@ namespace
             int extra = bn::max(0, n - g.able_count());
             lv = bn::max(2, lv - 2 * extra);
         }
-        // Leftovers for the leaders, rivals, the Champion and the Elite Four once you have two badges.
+        // Leftovers for the leaders, rivals, the Champion and the Elite Four once you have two badges. In the
+        // Sundered Isles (3.0.0) they carry a mix: LEFTOVERS, a SITRUS BERRY, a LIFE ORB, a FOCUS SASH, a SCARF.
         held_item item = (route && ! elite) || badges < 2 ? held_item::NONE : held_item::LEFTOVERS;
+        constexpr held_item mix[] = { held_item::LEFTOVERS, held_item::SITRUS_BERRY, held_item::LIFE_ORB,
+                                      held_item::FOCUS_SASH, held_item::CHOICE_SCARF };
         s.foe_count = n;
         for(int i = 0; i < n; ++i)
         {
-            s.foes[i] = mon::make(names[i], lv, item);
+            s.foes[i] = mon::make(names[i], lv, region >= 3 && item != held_item::NONE ? mix[i % 5] : item);
         }
         s.opponent = &t;
     }
@@ -248,8 +254,8 @@ namespace
         int floor = bn::clamp(int(t.elite), 0, 4);
         int clears = g.run.tower_clears;
         bool master = floor == 4;
-        // 2.0.0: the floors climb to 200 once you're CALDERRA's CHAMPION.
-        int top = g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
+        // 2.0.0: the floors climb to 200 once you're CALDERRA's CHAMPION (3.0.0: 300, the SUNDERED ISLES').
+        int top = g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
         int base = bn::min(top, bn::max(50 + 3 * clears, g.average_level() + clears));
         int size = master ? 6 : bn::min(6, 3 + (floor + 1) / 2 + clears / 2);
         tower_team(s, type_index(floor_types[floor]), size, bn::min(top, base + floor + (master ? 2 : 0)), clears);
@@ -347,9 +353,11 @@ battle_report battle_scene(const encounter& e)
         if(e.rematch)
         {
             // A rematch: their whole team (up to six), a little above your party's level.
-            // Calderra's GYM LEADERS (after its League): six, at level 200, filled out from their juniors' kinds.
+            // Calderra's GYM LEADERS (after its League): six, at level 200, filled out from their juniors' kinds
+            // (the Sundered Isles' at 300).
             bool leader = t.role == trainer_role::LEADER;
-            int level = leader ? 200 : bn::min(map_region(g.map) == 2 ? 200 : 100, g.average_level() + 2);
+            int region = map_region(g.map);
+            int level = leader ? region_cap(region) : bn::min(region_cap(region), g.average_level() + 2);
             int n = leader ? 6 : bn::min(int(t.team_count), 6);
             s->foe_count = n;
             for(int i = 0; i < n; ++i)
@@ -358,7 +366,7 @@ battle_report battle_scene(const encounter& e)
                 s->foes[i] = mon::make(sp, level, g.badges() >= 4 ? held_item::LEFTOVERS : held_item::NONE);
             }
             s->smart = s->smart || leader;
-            s->boss_heal = leader;
+            s->boss_heals = leader ? (region >= 3 ? 2 : 1) : 0;
         }
     }
     else
@@ -391,6 +399,16 @@ battle_report battle_scene(const encounter& e)
             {
                 s->foes[0].hp = bn::min(g.roam_hp[e.roamer], s->foes[0].max_hp);
             }
+        }
+    }
+    // 3.0.0: the Sundered Isles' weather carries into battle: rain off the open sea, harsh sun by the volcano.
+    {
+        const map_def& here = world_data::maps[g.map];
+        const area_info* a = here.is_room() ? world_data::maps[here.exit_map].area : here.area;
+        if(a && a->region >= 3 && ! s->free)
+        {
+            s->weather = a->weather == area_weather::RAIN ? battle_weather::RAIN
+                       : a->weather == area_weather::ASH ? battle_weather::SUN : battle_weather::NONE;
         }
     }
     clear_pending_moves();

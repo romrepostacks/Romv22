@@ -299,9 +299,13 @@ namespace flag
 {
     constexpr int CALDERRA_CHAMPION = 4;
     constexpr int CALDERRA_STARTER = 5;
+    constexpr int GROUDON = 6;              // 3.0.0: the Sundered Isles' legendaries caught (legend_flag)
+    constexpr int KYOGRE = 7;
+    constexpr int SUNDERED_CHAMPION = 8;
 }
 
-// Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH; -1 for any other.
+// Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH, and the Sundered Isles'
+// GROUDON and KYOGRE; -1 for any other.
 int legend_flag(species_id legend);
 bool legend_caught(species_id legend);
 
@@ -314,6 +318,11 @@ void roamers_move();
 // Every beast shrine (a BOSS area with a guardian, other than the story legendary's) in a region cleared.
 bool shrines_cleared(int region);
 int calderra_level(int badges);
+
+// 3.0.0: a region's top level (100 Vellorin, 200 Calderra, 300 the Sundered Isles), and the level its badges
+// bring from Calderra on: 100 under the top, then 12 more per badge.
+int region_cap(int region);
+int region_level(int region, int badges);
 
 // A wild (or summoned) Pokémon's shiny roll: 1 in 4096, x2 in ADVENTURE MODE, x1.25 in a NUZLOCKE run.
 bool roll_shiny();

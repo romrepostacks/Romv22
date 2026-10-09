@@ -665,14 +665,25 @@ int map_region(int map)
 
 int calderra_level(int badges)
 {
-    return bn::min(200, 100 + 12 * badges);
+    return region_level(2, badges);
+}
+
+int region_cap(int region)
+{
+    return bn::max(1, region) * 100;
+}
+
+int region_level(int region, int badges)
+{
+    return bn::min(region_cap(region), region_cap(region) - 100 + 12 * badges);
 }
 
 int map_level_cap(int map)
 {
-    if(map_region(map) == 2)
+    int region = map_region(map);
+    if(region >= 2)
     {
-        return calderra_level(state().region_badges(2));
+        return region_level(region, state().region_badges(region));
     }
     return world_data::maps[map].level_cap;
 }
@@ -713,6 +724,10 @@ int legend_flag(species_id legend)
         return 2;
     case species_id::HO_OH:
         return 3;
+    case species_id::GROUDON:
+        return flag::GROUDON;
+    case species_id::KYOGRE:
+        return flag::KYOGRE;
     default:
         return -1;
     }
@@ -744,13 +759,14 @@ int level_cap_now()
     const game_state& g = state();
     if(! g.run.nuzlocke())
     {
-        return g.region >= 1 ? 200 : 100;
+        return region_cap(g.region + 1);
     }
-    if(map_region(g.map) == 2)
+    int region = map_region(g.map);
+    if(region >= 2)
     {
-        // Calderra: the next leader's level (calderra_level of one more badge), then 200 for the League.
-        int b = g.region_badges(2);
-        return b >= 8 ? 200 : calderra_level(b + 1);
+        // Calderra and later: the next leader's level (region_level of one more badge), then the top for the League.
+        int b = g.region_badges(region);
+        return b >= 8 ? region_cap(region) : region_level(region, b + 1);
     }
     // The first gym (in the region's order) whose leader you haven't beaten; after the eighth, the League.
     for(int i : world_data::area_maps)

@@ -1,7 +1,22 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 2.0.1: Party Royale is now POKé LEGENDS: LANDS OF NINE!",
+  "motd": "Version 3.0.0: set sail for the SUNDERED ISLES!",
   "changelog": [
+    {
+      "version": "GBA 3.0.0",
+      "date": "2026-10-09",
+      "title": "The Sundered Isles",
+      "changes": [
+        "THE SUNDERED ISLES, a third region themed on GROUDON and KYOGRE: after you become CALDERRA's CHAMPION, the CAPTAIN in PORT CALDER sails you to PORT KEEL",
+        "Eight gym islands around PORT KEEL, linked by sea routes, open in any order: GRASS, BUG, STEEL, FAIRY, GHOST, POISON, FIGHTING and PSYCHIC gyms",
+        "TEAM QUAKE wants GROUDON to fuse the islands into one land; TEAM NEPTUNE wants KYOGRE to drown the world. Stop both at MAGMA ISLE and THE ABYSS",
+        "Twelve SUNDERED FORMS: island forms of SANDSHREW, NUMEL, WAILMER, CORPHISH, CARVANHA, SABLEYE, TORKOAL and their evolutions, with new types",
+        "A new rival MARLO, KAI as your ally, and a new ELITE FOUR and CHAMPION at MT. KEEL",
+        "The level cap in the SUNDERED ISLES is 300. Bosses heal twice, and the best trainers carry held items and pick moves around yours",
+        "In the SUNDERED ISLES, rain on the stormy routes and harsh sun near MAGMA ISLE carry into battle",
+        "The region map is a pirate's treasure map, and somewhere out there is DOUBLOON SHOAL..."
+      ]
+    },
     {
       "version": "GBA 2.0.1",
       "date": "2026-10-08",

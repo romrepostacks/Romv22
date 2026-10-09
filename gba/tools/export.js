@@ -28,7 +28,7 @@ vm.runInContext(src + `
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, gymTheme, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, SUNDERED_FORMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
 // The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
@@ -236,11 +236,17 @@ const TALL_PIECES = new Set(['bookshelf', 'plant', 'shelf', 'healer', 'pc']);
 // it, plain painted walls, a rug and the exit mat.
 const GYM_WALL = {fire:['#e08858','#b05830'], water:['#a8d8f8','#6098d0'], ground:['#c8a060','#987038'], ghost:['#786098','#503870'],
   electric:['#f8e890','#b09020'], grass:['#a8d880','#488830'], ice:['#e8f8ff','#88c0e0'], dragon:['#8870a8','#4c3868'],
-  flying:['#d0e8f8','#7898c0'], normal:['#e8d8b8','#a88858'], rock:['#b0a090','#706050']};
+  flying:['#d0e8f8','#7898c0'], normal:['#e8d8b8','#a88858'], rock:['#b0a090','#706050'],
+  bug:['#c8d870','#788820'], steel:['#d0d8e0','#808898'], fairy:['#f8d8e8','#d088a8'], poison:['#c0a0d0','#704888'],
+  fighting:['#e8c8a0','#a07040'], psychic:['#f8c0d8','#c05888']};
 const GYM_RUG = {fire:'#f8c048', water:'#f8f8f8', ground:'#98b050', ghost:'#9870c8', electric:'#3868d0', grass:'#f0e0a0', ice:'#4890c8', dragon:'#e0a030',
-  flying:'#f8f8f8', normal:'#d84848', rock:'#c04040', league:'#9080c0'};
+  flying:'#f8f8f8', normal:'#d84848', rock:'#c04040', bug:'#e0c030', steel:'#e08030', fairy:'#f8f8f8', poison:'#a0e048',
+  fighting:'#d83830', psychic:'#f8e8a0', league:'#9080c0'};
 const GYM_FLOOR = {electric:['#f0d860','#c8a830'], grass:['#78b858','#58983c'], ice:['#d8f0f8','#a8d8f0'], dragon:['#685088','#4c3868'],
-  flying:['#a8d0f0','#7898c0'], normal:['#d8b880','#a88858'], rock:['#a89888','#786858']};
+  flying:['#a8d0f0','#7898c0'], normal:['#d8b880','#a88858'], rock:['#a89888','#786858'],
+  // 3.0.0: the Sundered Isles' gyms.
+  bug:['#b0c060','#88982c'], steel:['#b8c0c8','#888f98'], fairy:['#f8e0ec','#e8b8d0'], poison:['#a080b8','#785090'],
+  fighting:['#d8b888','#b08858'], psychic:['#f0b8d0','#d888b0']};
 // The four newer gyms have no floor or wall art, only the stylesheet's patterns (.gym-electric etc.).
 function gymFloorPattern(theme){
   const [f] = GYM_FLOOR[theme], c = new Canvas(16, 16, hex(f));
@@ -251,6 +257,12 @@ function gymFloorPattern(theme){
   if(theme==='flying') for(const [x,y] of [[3,4],[11,12]]){ c.rect(x, y, 4, 1, hex('#f8f8f8')); c.rect(x+1, y-1, 2, 1, hex('#f8f8f8')); }
   if(theme==='normal') for(let y=0; y<16; y+=4) c.rect(0, y, 16, 1, hex('#b89868'));
   if(theme==='rock') for(const [x,y] of [[2,3],[10,6],[5,11],[13,13]]) c.rect(x, y, 2, 2, hex('#786858'));
+  if(theme==='bug') for(const [x,y] of [[2,2],[10,10]]){ c.rect(x, y, 4, 3, hex('#d8d878')); c.rect(x+1, y+1, 2, 1, hex('#88982c')); }
+  if(theme==='steel'){ c.rect(0, 0, 16, 1, hex('#788088')); c.rect(0, 0, 1, 16, hex('#788088')); for(const [x,y] of [[2,2],[13,2],[2,13],[13,13]]) c.set(x, y, hex('#e8eef4')); }
+  if(theme==='fairy') for(const [x,y] of [[4,4],[12,12]]){ c.rect(x-1, y, 3, 1, hex('#ffffff')); c.rect(x, y-1, 1, 3, hex('#ffffff')); }
+  if(theme==='poison') for(const [x,y] of [[3,4],[11,9],[6,13]]) ellipse(c, x, y, 1.6, 1.6, hex('#b8e050'), 1);
+  if(theme==='fighting'){ for(let y=0; y<16; y+=8) c.rect(0, y, 16, 1, hex('#a07848')); c.rect(8, 0, 1, 8, hex('#a07848')); c.rect(0, 8, 1, 8, hex('#a07848')); }
+  if(theme==='psychic') for(let y=0; y<16; y++) for(let x=0; x<16; x++) if(Math.abs(Math.hypot(x-7.5, y-7.5)-5) < 0.6) c.set(x, y, hex('#f8e0f0'));
   if(theme==='dragon'){ c.rect(0, 0, 16, 1, hex('#4c3868')); c.rect(0, 8, 16, 1, hex('#4c3868')); c.rect(0, 0, 1, 16, hex('#4c3868')); c.rect(8, 0, 1, 16, hex('#4c3868')); }
   return {w:16, h:16, px:Array.from({length:16}, (_,y)=>Array.from({length:16}, (_,x)=>c.get(x, y)))};
 }
@@ -272,6 +284,9 @@ const GYMWALL_CSS = {electric:['#c8a830','#f8e048','#c89818','#806010','#fff8b0'
   ice:['#a8d8f0','#f0fbff','#98d0f0','#5898c8','#fff',false], dragon:['#4c3868','#a04838','#602820','#401810','#e07860',false],
   flying:['#7898c0','#e8f4ff','#a8c8e8','#587898','#fff',true], normal:['#a88858','#e8c890','#c8a068','#785830','#f8e8c0',false],
   rock:['#786858','#b8a898','#988878','#504038','#d8c8b8',false],
+  bug:['#88982c','#d8e078','#a8b840','#586018','#f0f8b0',true], steel:['#888f98','#e8eef4','#a8b0b8','#585f68','#fff',false],
+  fairy:['#e8b8d0','#fff0f8','#f0c8dc','#b07898','#fff',true], poison:['#785090','#c8a0e0','#9068a8','#482860','#e0c8f0',true],
+  fighting:['#b08858','#f0d0a0','#c8a070','#705030','#f8e8c8',false], psychic:['#d888b0','#ffe0f0','#e8a8c8','#a05080','#fff',true],
   league:['#8878b0','#e0d0f8','#9080c0','#605088','#fff',false]};
 function drawGym(room, opts={}){
   const league = room.interior==='league';
@@ -389,7 +404,7 @@ function towerRooms(li, bi, b){
 
 fs.mkdirSync(OUT, {recursive:true});
 G.setAdv({cleared:{}, picked:{}, story:{}, items:{}, party:[], box:[]});   // the League's gates start shut
-const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival', 'grunt', 'admin']);
+const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival', 'grunt', 'admin', 'captain']);
 const roomArts = new Map(), trainerSpecies = new Set();
 const lines = n=>n.lines || [];
 const STRIP_X = 10, STRIP_Y = 8;   // how far into a neighbour the camera can see (and the BG draws)
@@ -551,7 +566,8 @@ const music = G.MUSIC_TRACKS ? Object.fromEntries(Object.entries(G.MUSIC_TRACKS)
 for(const m of moves) m.fx = G.mfxScript(m);
 fs.writeFileSync(path.join(OUT, 'data.json'), JSON.stringify({
   pix:G.PIX, type_col:G.TYPE_COL,
-  areas, rooms, people, surf, species, species_v1:species.filter(sp=>!gen89.has(sp.name)).length, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
+  areas, rooms, people, surf, species, species_v1:species.filter(sp=>!gen89.has(sp.name)).length,
+  species_v2:species.length - G.SUNDERED_FORMS.length, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
   starter_trios:G.STARTER_TRIOS, prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO, held_items:G.ITEMS, prof_calls:G.PROF_CALLS,
   elites:G.ELITES, time_types:G.TIME_TYPES, night_visitors:G.NIGHT_VISITORS, tempest_pool:G.TEMPEST_POOL, admin:G.ADMIN,
   music, weather:G.WEATHER, wallpapers:G.WALLPAPERS, wall_names:G.WALL_NAMES,

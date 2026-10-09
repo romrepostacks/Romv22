@@ -422,7 +422,7 @@ def build_world(exp, data, out_inc):
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
             role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER', 'daycare': 'DAYCARE',
-                    'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF'}.get(n.get('role', ''), 'NONE')
+                    'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF', 'captain': 'CAPTAIN'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -434,11 +434,19 @@ def build_world(exp, data, out_inc):
 
     # Trainer ids (bits in game_state::beaten), areas first then rooms; each area's gate keeper is its rival,
     # its gym's leader or the Champion.
+    # 3.0.0: KAI's fights (2.0.1) took the ids right after Calderra's, so later regions' trainers come after them.
     ids = {}
+    next_id, kai_next = 0, None
+    kai_count = sum(1 for a in areas if a['name'] in KAI_FIGHTS)
     for kind, i in map_order:
+        if kai_next is None and (areas[i]['region'] if kind == 'area' else region_of[rooms[i]['area']]) >= 3:
+            kai_next, next_id = next_id, next_id + kai_count
         for ti in range((areas if kind == 'area' else rooms)[i]['trainers'].__len__()):
-            ids[(kind, i, ti)] = len(ids)
-    if len(ids) > MAX_TRAINERS:
+            ids[(kind, i, ti)] = next_id
+            next_id += 1
+    if kai_next is None:
+        kai_next, next_id = next_id, next_id + kai_count
+    if next_id > MAX_TRAINERS:
         raise SystemExit('%d trainers (max %d)' % (len(ids), MAX_TRAINERS))
     def leader_of(ai):
         a = areas[ai]
@@ -544,6 +552,18 @@ def build_world(exp, data, out_inc):
                 a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
                     'A stone statue of WREN, rival and friend, with VELLORIN\'s eight GYM LEADERS carved around the base.',
                     'RELL, SABLE, ORIN, ISKA, JUNO, BRYN, HALE and CORVIN. "They crossed the sea so CALDERRA could open its port."']})
+        if a['name'] in CAPTAIN_PORTS:
+            # 3.0.0: the ship's CAPTAIN between PORT CALDER and PORT KEEL (after everything older, so nothing moves).
+            hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+            x, y = free_spot(a, a['spawn']['x'] - 2, a['spawn']['y'] + 1, hid)
+            a['people'].append({'kind': 'captain', 'x': x, 'y': y, 'facing': 'down', 'role': 'captain', 'wander': False,
+                                'lines': ['CAPTAIN: "My ship sails between CALDERRA and the SUNDERED ISLES."']})
+            if a['region'] == 3:
+                # ...and PORT KEEL's figurehead: HO-OH, a nod to CALDERRA.
+                x, y = free_spot(a, a['spawn']['x'] + 3, a['spawn']['y'] - 3, hid)
+                a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
+                    'An old ship\'s figurehead, carved like HO-OH. A plaque reads: "From CALDERRA, with thanks."',
+                    'Someone has carved three sets of paw prints into the base: thunder, fire and rain.']})
 
     # 2.0.1: KAI before the CRATER RIM: on the dock at PORT CALDER, then at the top of each branch. Placed last,
     # with trainer ids after every other one, so nothing already beaten moves.
@@ -556,7 +576,8 @@ def build_world(exp, data, out_inc):
         x, y = free_spot(a, a['spawn']['x'], a['spawn']['y'] + dy, hid_at(a))
         a['trainers'].append({'kind': 'rivalKai', 'x': x, 'y': y, 'facing': facing, 'role': 'route', 'title': 'Rival Kai',
                               'team': team, 'intro': ['KAI: "%s"' % intro], 'after': ['KAI: "%s"' % after], 'vanish': True})
-        ids[('area', areas.index(a), len(a['trainers']) - 1)] = len(ids)
+        ids[('area', areas.index(a), len(a['trainers']) - 1)] = kai_next
+        kai_next += 1
     if len(ids) > MAX_TRAINERS:
         raise SystemExit('%d trainers (max %d)' % (len(ids), MAX_TRAINERS))
 
@@ -1070,6 +1091,7 @@ BALL = []
 WRITTEN = set()      # graphics files this run produced
 
 FERRY_PORTS = ('Portmere Harbour', 'Port Calder')
+CAPTAIN_PORTS = ('Port Calder', 'Port Keel')
 # KAI's early battles (2.0.1): area -> (rows from the spawn, facing, team, intro, after).
 KAI_BRANCH = (-3, 'down', ['Corviknight', 'Drakloak', 'Lokix', 'Bisharp'],
               "You again? The beasts are up ahead, and I'm not losing this race!",
@@ -1891,7 +1913,9 @@ def build_game_data(data, out_inc):
         E.append('    %s,' % e)
     E += ['};\n', 'constexpr int species_count = %d;' % len(names), 'constexpr int types_count = %d;\n' % len(types),
           '// 2.0.0: the species from here on came with Gen 8 and 9: CALDERRA\'s POKéDEX.',
-          'constexpr int species_v1 = %d;\n' % data.get('species_v1', len(names))]
+          'constexpr int species_v1 = %d;\n' % data.get('species_v1', len(names)),
+          '// 3.0.0: the Sundered forms, from here on: the SUNDERED ISLES\' POKéDEX.',
+          'constexpr int species_v2 = %d;\n' % data.get('species_v2', len(names))]
     E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
           'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']

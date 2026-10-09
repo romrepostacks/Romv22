@@ -211,6 +211,7 @@ public:
     void story_say(const bn::string_view& text);
     void tower_guide();
     void ferry();
+    void captain();
     void calderra_prof();
     void tutor_new_move();
     // The hidden editor's trigger: the tree beside DUSKMERE HOLLOW's MART, then A, B, A at the lone tree up and to its right.

@@ -2235,20 +2235,23 @@ void dex_screen(int register_species)
                     // In Calderra, its own POKéDEX: the Gen 8 and 9 species (species_v1 on).
                     bn::string<16> seen("SEEN ");
                     bn::string<16> own("OWN ");
-                    if(map_region(g.map) == 2)
+                    if(map_region(g.map) >= 2)
                     {
+                        // The SUNDERED ISLES' (3.0.0): its island forms (species_v2 on).
+                        const int lo = map_region(g.map) == 2 ? species_v1 : species_v2;
+                        const int hi = map_region(g.map) == 2 ? species_v2 : species_count;
                         int sn = 0, on = 0;
-                        for(int i = species_v1; i < species_count; ++i)
+                        for(int i = lo; i < hi; ++i)
                         {
                             sn += g.seen.test(i);
                             on += g.owned.test(i);
                         }
                         seen.append(bn::to_string<4>(sn));
                         seen.append("/");
-                        seen.append(bn::to_string<4>(species_count - species_v1));
+                        seen.append(bn::to_string<4>(hi - lo));
                         own.append(bn::to_string<4>(on));
                         own.append("/");
-                        own.append(bn::to_string<4>(species_count - species_v1));
+                        own.append(bn::to_string<4>(hi - lo));
                     }
                     else
                     {
@@ -2583,7 +2586,6 @@ int region_map_screen(bool travel)
     ui& u = gui();
     ui::fade_out(8);
     u.win().clear_all();
-    bn::bg_palettes::set_transparent_color(bn::color(26, 28, 31));
     bn::vector<bn::sprite_ptr, 64> cells;
     bn::vector<bn::sprite_ptr, 60> links;
     bn::vector<bn::sprite_ptr, 24> texts;
@@ -2595,7 +2597,9 @@ int region_map_screen(bool travel)
         here = world_data::maps[here].exit_map;
     }
     const int region = world_data::maps[here].area->region;
-    const int ox = region == 1 ? 30 : 12, oy = 10, cw = region == 1 ? 24 : 18, ch = 20;
+    // The SUNDERED ISLES' (3.0.0): x 0..5, drawn on a parchment treasure map.
+    const int ox = region == 1 ? 30 : region == 3 ? 36 : 12, oy = 10, cw = region == 1 ? 24 : region == 3 ? 30 : 18, ch = 20;
+    bn::bg_palettes::set_transparent_color(region == 3 ? bn::color(29, 25, 17) : bn::color(26, 28, 31));
     auto elsewhere = [&](const area_info& a)
     {
         return a.at_x >= 100 || a.region != region;     // under the sea, or another region

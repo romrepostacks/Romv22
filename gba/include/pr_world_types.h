@@ -60,7 +60,8 @@ enum class person_role : uint8_t
     DAYCARE,        // CINDERGATE TOWN's DAY CARE (GBA 1.8)
     TUTOR,          // the MOVE TUTOR in every POKéMON CENTER (GBA 1.8)
     FERRY,          // the SAILOR between PORTMERE HARBOUR and PORT CALDER (2.0.0)
-    PROF            // PORT CALDER's professor: the Calderra starter (2.0.0)
+    PROF,           // PORT CALDER's professor: the Calderra starter (2.0.0)
+    CAPTAIN         // the ship's CAPTAIN between PORT CALDER and PORT KEEL (3.0.0)
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
@@ -317,7 +318,13 @@ enum class gym_theme : uint8_t
     LEAGUE,         // (a tower room in the League's look)
     FLYING,         // Calderra's three new gyms (2.0.0)
     NORMAL,
-    ROCK
+    ROCK,
+    BUG,            // the Sundered Isles' six new gyms (3.0.0)
+    STEEL,
+    FAIRY,
+    POISON,
+    FIGHTING,
+    PSYCHIC
 };
 
 // A League gate: tiles x0..x1 of row y, open once that Elite Four trainer is beaten.
@@ -344,7 +351,7 @@ struct room_info
 struct map_def
 {
     const char* name;
-    int8_t tileset;
+    uint8_t tileset;
     int16_t w;
     int16_t h;
     const uint16_t* map;            // metatile per tile

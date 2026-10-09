@@ -205,7 +205,7 @@ namespace
         int _own_sprite_index = -1;
         bool _animating = false;    // a move animation is moving the sprites (no bobbing)
         bool _nuz_caught = false;   // NUZLOCKE: this battle's one catch is made
-        bool _foe_healed = false;   // boss_heal: the foe's FULL RESTORE is spent
+        int _foe_heals = 0;         // boss_heals: the foe's FULL RESTOREs spent
         battle_weather _weather = battle_weather::NONE;
         int _weather_turns = 0;
         int _hint = -1;             // the foe being picked (it blinks)
@@ -1403,10 +1403,11 @@ namespace
         }
         c.kind = choice_kind::MOVE;
         target = targets[r.get_int(tn)];
-        // Calderra's bosses: one FULL RESTORE a battle, on a Pokémon down to a quarter of its HP.
-        if(_s.boss_heal && ! _foe_healed && f.m->hp * 4 <= f.m->max_hp)
+        // Calderra's bosses: one FULL RESTORE a battle (the Sundered Isles' two), on a Pokémon down to a quarter of
+        // its HP.
+        if(_foe_heals < _s.boss_heals && f.m->hp * 4 <= f.m->max_hp)
         {
-            _foe_healed = true;
+            ++_foe_heals;
             c.kind = choice_kind::ITEM;
             c.item = item_id::FULLRESTORE;
             return;
@@ -1494,6 +1495,30 @@ namespace
                     score = mv.power * move_effectiveness_x4(*f.m, mv, t) * (f.m->has_type(mv.type) ? 3 : 2) / 2;
                     score = score * mv.accuracy / 100;
                     score += (t.max_hp - t.hp) * 40 / bn::max(1, int(t.max_hp));
+                    if(_s.sharp)
+                    {
+                        // The Sundered Isles' trainers (3.0.0) read held items: they go for a knockout (a LIFE ORB
+                        // hits harder), but not into a FOCUS SASH at full HP, and they don't let LEFTOVERS or a
+                        // SITRUS BERRY undo slow damage.
+                        int dmg = calc_damage(*f.m, mv, t, r).damage;
+                        if(f.m->item == held_item::LIFE_ORB)
+                        {
+                            dmg = dmg * 13 / 10;
+                        }
+                        bool sash = t.item == held_item::FOCUS_SASH && t.hp == t.max_hp;
+                        if(dmg >= t.hp && ! sash)
+                        {
+                            score += 150;
+                        }
+                        else if(sash)
+                        {
+                            score -= 40;
+                        }
+                        if(t.item == held_item::LEFTOVERS || t.item == held_item::SITRUS_BERRY)
+                        {
+                            score += 15;
+                        }
+                    }
                 }
                 score += r.get_int(20);
                 if(score > best)
@@ -2321,6 +2346,10 @@ namespace
         }
         text.append(sent > 3 ? " and the rest!" : "!");
         u.say(text);
+        if(_s.weather != battle_weather::NONE)
+        {
+            start_weather(_s.weather);      // 3.0.0: the Sundered Isles' storms and the volcano's sun
+        }
 
         while(true)
         {
