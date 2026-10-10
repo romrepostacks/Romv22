@@ -204,7 +204,10 @@ public:
     bool hatch(int slot);
     bool offer_rematch(int index);
     void update_glints();
-    void fast_travel(int area);
+    void fast_travel(int area, int at_x = -1, int at_y = -1);
+    void twin_rift();
+    void ancient_seed(bool tree);
+    void form_altar();
     void save_menu();
     void say(const bn::string_view& text);
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.

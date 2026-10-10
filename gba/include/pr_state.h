@@ -321,6 +321,7 @@ namespace flag
     constexpr int ARCEUS = 25;              // 9.0.0: the HALL OF ORIGIN's
     constexpr int ORIGIN_CHAMPION = 26;
     constexpr int ANCIENT_SEED = 27;        // 6.0.0: the seed planted in AETERNA's past
+    constexpr int TREE_GIFT = 28;           // ... and the MIND PLATE in the roots of the tree it grew into
     constexpr int MEW_SIGHTING = 30;        // 5.0.0: 30-39, the ten places GENOVA's MEW was spotted
     constexpr int mew_sightings = 10;
     constexpr int OLD_PLATE = 40;           // 9.0.0: 40-45, the plates VELLORIN, CALDERRA and the ISLES gave

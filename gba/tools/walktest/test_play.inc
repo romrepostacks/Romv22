@@ -151,7 +151,7 @@ static void test_setup()
     g.run.adventure = true;
     constexpr species_id team[] = { species_id::MEWTWO, species_id::ARCEUS, species_id::RAYQUAZA,
                                     species_id::KORAIDON, species_id::MIRAIDON, species_id::ETERNATUS };
-    int lv = scen == 4 ? 200 : scen >= 40 ? 500 : scen >= 20 ? 400 : 300;
+    int lv = scen >= 40 ? 400 + 100 * ((scen - 20) / 20) : scen == 4 ? 200 : scen >= 20 ? 400 : 300;
     for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], lv);
     if(scen == 12)
     {
@@ -203,7 +203,23 @@ static void test_setup()
         // Lead with one of GENOVA's experiments (its back sprite), and have one spare to show.
         g.party[0] = mon::make(species_id::HELIXEON, sub == 2 ? 400 : 500);
     }
-    switch(sub)
+    if(rg == 6 && ((sub >= 4 && sub <= 7) || sub >= 13))
+    {
+        // AETERNA: 4 a rift, 5 the seed in the past, 6 the tree it grew into, 7 DIALGA on the TEMPORAL SPIRE,
+        // 13 PALKIA in the SPATIAL TEMPLE, 14 the altar with DIALGA in the party.
+        if(sub == 6) g.flags.set(flag::ANCIENT_SEED);
+        if(sub == 14) g.party[0] = mon::make(species_id::DIALGA, 600);
+        if(sub <= 6) map = play::find_person(rg, sub == 4 ? person_role::TWIN : sub == 5 ? person_role::SEED : person_role::TREE, x, y);
+        else if(sub == 14) map = play::find_person(rg, person_role::FORM, x, y);
+        else
+        {
+            map = play::find_area(sub == 7 ? "TEMPORAL SPIRE" : "SPATIAL TEMPLE");
+            const map_def& m = wd::maps[map];
+            for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+            x = m.area->legend_x; y = m.area->legend_y;
+        }
+    }
+    else switch(sub)
     {
     case 0:     // the last region's guide on: travel to this region
     case 1:     // this region's guide back
@@ -216,8 +232,12 @@ static void test_setup()
     case 3:     // the badge gate out of the inner part, no badges
     case 8:     // the way up to the League: eight badges, the story bosses beaten
     {
-        const char* from = rg == 5 ? (sub == 3 ? "FOUNDRY WARD" : "GENOVA CENTRAL") : "";
-        int want = rg == 5 && sub == 3 ? 0 : -1;     // GENOVA's walls: left of FOUNDRY WARD; its spire: up from CENTRAL
+        // Where each region's badge gate is (left of it when `left`, else up from it), and the way up to its League.
+        struct gates { const char* gate; bool left; const char* league; };
+        constexpr gates where[] = { {"FOUNDRY WARD", true, "GENOVA CENTRAL"}, {"CLOCKTOWER", false, "AETERNA VILLAGE"} };
+        const gates& gw = where[bn::min(rg - 5, 1)];
+        const char* from = sub == 3 ? gw.gate : gw.league;
+        int want = sub == 3 && gw.left ? 0 : -1;
         if(sub == 8)
         {
             play::beat_region(rg, true);
@@ -270,8 +290,12 @@ static void test_setup()
             if(m.trainers[k].x == x && m.trainers[k].y == y) g.beaten.reset(m.trainers[k].id);
         break;
     }
-    case 11:    // the region's rival
-        map = play::find_trainer(rg, trainer_role::RIVAL, 0, x, y);
+    case 11:    // the region's rival (the first RIVAL outside a story boss's area)
+        for(int n = 0; n < 16; ++n)
+        {
+            map = play::find_trainer(rg, trainer_role::RIVAL, n, x, y);
+            if(map < 0 || ! (wd::maps[map].area->flags & area_flag::BOSS)) break;
+        }
         break;
     case 12:    // a route trainer, to see the region's AI and its wild-born POKéMON
         map = play::find_trainer(rg, trainer_role::ROUTE, 0, x, y);

@@ -19,7 +19,8 @@ than the last (region 1 = 100, region 2 = 200, region 3 = 300 ...).
 | 3.0.0 | The Sundered Isles (Groudon/Kyogre), level 300 | `docs/3.0.0/` |
 | 4.0.0 | The Skyreach (Rayquaza/Deoxys), level 400 | `docs/4.0.0/` |
 | 5.0.0 | Genova (Mewtwo/Mew, first homebrew species), level 500 | `docs/5.0.0/` |
-| 6.0.0+ | themes only | `/mnt/project-files/plans/regions-4-9-themes.md` |
+| 6.0.0 | Aeterna (Dialga/Palkia, one valley in two eras), level 600 | `docs/6.0.0/` |
+| 7.0.0+ | themes only | `/mnt/project-files/plans/regions-4-9-themes.md` |
 
 ## Where things are
 

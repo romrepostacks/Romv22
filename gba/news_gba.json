@@ -1,7 +1,25 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 5.0.0: Genova! Take the shuttle from WINDWARD to region five.",
+  "motd": "Version 6.0.0: Aeterna! Take the old line from GENOVA CENTRAL to region six.",
   "changelog": [
+    {
+      "version": "GBA 6.0.0",
+      "date": "2026-10-10",
+      "title": "Aeterna",
+      "changes": [
+        "A sixth region, AETERNA: after the GENOVA LEAGUE, the conductor at GENOVA CENTRAL takes you out to AETERNA VILLAGE",
+        "One valley in two eras: step through a rift to walk the same valley long ago, with its own towns, trainers and wild POKéMON",
+        "Eight gyms, four now and four then, then the Elite Four and Champion AEON at level 600",
+        "TEAM PARADOX, rival TESS, DIALGA on the TEMPORAL SPIRE and PALKIA in the SPATIAL TEMPLE that stood there before it",
+        "Altars switch DIALGA and PALKIA to their Origin forms",
+        "Iron POKéMON in the present, ancient ones in the past",
+        "Aeterna trainers go for the knockout when you'd outspeed them",
+        "Two hidden plates: the DRACO PLATE, and the MIND PLATE (plant a seed in the past...)",
+        "The region map shows the era you're in",
+        "Fixed: rival NOVA now waits on GENOVA's CANOPY WALK",
+        "The level cap rises to 600; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 5.0.0",
       "date": "2026-10-10",

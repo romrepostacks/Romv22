@@ -20,22 +20,21 @@ def main():
     areas = [x for x in json.load(open(DATA, encoding='utf8'))['areas'] if x['region'] == region and x['at'][0] < 100]
     bg, ink = THEMES.get(region, ('#eeeeee', '#555555'))
     cw, ch, ox, oy = 150, 110, 70, 130
+    # Twins (another era, the reverse side; they come after their originals) get a second panel under the first.
+    side = lambda x: 0 <= x['twin'] < x['index']
+    two = any(side(x) for x in areas)
     xs, ys = [x['at'][0] for x in areas], [x['at'][1] for x in areas]
     x0, y0 = min(xs), min(ys)
-    W, H = ox * 2 + (max(xs) - x0) * cw + 120, oy + (max(ys) - y0) * ch + 140
-    pos = {x['index']: (ox + (x['at'][0] - x0) * cw + 60, oy + (x['at'][1] - y0) * ch + 30) for x in areas}
-    # Twins (another era, the reverse side) sit on the same cell: nudge them down and right.
-    seen = {}
-    for x in areas:
-        k = tuple(x['at'])
-        if k in seen:
-            px, py = pos[x['index']]
-            pos[x['index']] = (px + 26, py + 26)
-        seen[k] = True
+    panel = (max(ys) - y0 + 1) * ch + 50
+    W = max(1120, ox * 2 + (max(xs) - x0) * cw + 120)
+    H = oy + (max(ys) - y0) * ch + 170 + (panel if two else 0)
+    pos = {x['index']: (ox + (x['at'][0] - x0) * cw + 60, oy + (x['at'][1] - y0) * ch + 30 + (panel if side(x) else 0)) for x in areas}
     s = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" font-family="DejaVu Sans, sans-serif">' % (W, H, W, H),
          '<rect width="100%%" height="100%%" fill="%s"/>' % bg,
          '<text x="%d" y="50" font-size="30" font-weight="bold" fill="%s">%s</text>' % (ox - 30, ink, html.escape(title)),
          '<text x="%d" y="82" font-size="16" fill="#444">%s</text>' % (ox - 30, html.escape(sub))]
+    if two:
+        s.append('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="2" stroke-dasharray="3 6"/>' % (ox - 30, oy + panel - 40, W - 40, oy + panel - 40, ink))
     done = set()
     for x in areas:
         for l in x['links']:
@@ -54,11 +53,12 @@ def main():
         s.append('%s fill="%s" stroke="%s" stroke-width="%d"/>' % (shape, FILL.get(kind, '#fff'), stroke, 4 if x['legend'] else 2))
         label = x['name'] + (' (' + x['legend']['name'] + ')' if x['legend'] else '')
         s.append('<text x="%d" y="%d" font-size="13" text-anchor="middle" fill="#222">%s</text>' % (px, py + r + 16, html.escape(label)))
-    ly = H - 40
+    ly = H - 50
     for i, (k, name) in enumerate((('town', 'town / League'), ('gym', 'gym town'), ('route', 'route'), ('trainer', 'story place'))):
         s.append('<rect x="%d" y="%d" width="18" height="18" fill="%s" stroke="#222"/>' % (ox - 30 + i * 170, ly - 14, FILL[k]))
         s.append('<text x="%d" y="%d" font-size="14" fill="#333">%s</text>' % (ox - 4 + i * 170, ly, name))
-    s.append('<text x="%d" y="%d" font-size="14" fill="#333">dashed: needs badges or the story · red ring: a legendary</text>' % (ox - 30 + 680, ly))
+    s.append('<text x="%d" y="%d" font-size="14" fill="#333">dashed: needs badges or the story · red ring: a legendary%s</text>' % (
+        ox - 30, ly + 26, ' · below the dotted line: the other side (reached through rifts)' if two else ''))
     s.append('</svg>')
     open(out, 'w').write('\n'.join(s))
     if png:

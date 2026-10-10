@@ -2611,9 +2611,13 @@ int region_map_screen(bool travel)
     const layout& lay = layouts[bn::max(0, bn::min(9, region))];
     const int ox = lay.ox, oy = 10, cw = lay.cw, ch = 20;
     bn::bg_palettes::set_transparent_color(bn::color(lay.r, lay.g, lay.b));
-    auto elsewhere = [&](const area_info& a)
+    // 6.0.0 on: a region with twins (AETERNA's past, the HOLLOW LANDS' reverse side) shows the side you're on; the
+    // twins come after their originals.
+    auto twin_side = [](int i) { int t = world_data::maps[i].area->twin; return t >= 0 && t < i; };
+    auto elsewhere = [&](int i)
     {
-        return a.at_x >= 100 || a.region != region;     // under the sea, or another region
+        const area_info& a = *world_data::maps[i].area;
+        return a.at_x >= 100 || a.region != region || twin_side(i) != twin_side(here);   // under the sea, another region or side
     };
     int cursor = here;
     auto cell_xy = [&](const area_info& a, int& x, int& y)
@@ -2625,7 +2629,7 @@ int region_map_screen(bool travel)
     {
         const map_def& m = world_data::maps[i];
         const area_info& a = *m.area;
-        if(elsewhere(a))
+        if(elsewhere(i))
         {
             continue;
         }
@@ -2650,7 +2654,7 @@ int region_map_screen(bool travel)
                 continue;
             }
             const area_info& b = *world_data::maps[l.target].area;
-            if(elsewhere(b))
+            if(elsewhere(l.target))
             {
                 continue;
             }
@@ -2739,7 +2743,7 @@ int region_map_screen(bool travel)
             for(int i : world_data::area_maps)
             {
                 const area_info& a = *world_data::maps[i].area;
-                if(elsewhere(a) || i == cursor)
+                if(elsewhere(i) || i == cursor)
                 {
                     continue;
                 }

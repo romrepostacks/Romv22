@@ -462,6 +462,20 @@ void overworld::talk_to(int index)
     case person_role::MEW_SIGHT:
         mew_sighting(a.who - _map->people);
         break;
+    case person_role::TWIN:
+        twin_rift();
+        break;
+    case person_role::SEED:
+    case person_role::TREE:
+        ancient_seed(p.role == person_role::TREE);
+        break;
+    case person_role::FORM:
+        for(int i = 0; i < p.lines_count; ++i)
+        {
+            say(p.lines[i]);
+        }
+        form_altar();
+        break;
     case person_role::FERRY:
         ferry();
         break;
@@ -2619,6 +2633,85 @@ void overworld::region_guide(bool on)
     }
 }
 
+// 6.0.0: a rift: through to the same spot in the area's twin (mirrored on the HOLLOW LANDS' reverse side).
+void overworld::twin_rift()
+{
+    const area_info* a = _map->area;
+    if(! a || a->twin < 0)
+    {
+        return;
+    }
+    say(a->flags & area_flag::MIRROR ? "Your reflection in the rift reaches out a hand... You take it." :
+        "The air ripples like water. You step through...");
+    game_state& g = state();
+    fast_travel(a->twin, a->flags & area_flag::MIRROR ? wd::maps[a->twin].w - 1 - g.x : g.x, g.y);
+}
+
+// 6.0.0: AETERNA's seed: picked up and planted on the bank in the past, a tree in the present with the MIND
+// PLATE in its roots.
+void overworld::ancient_seed(bool tree)
+{
+    game_state& g = state();
+    if(! tree)
+    {
+        say("A seed from the ancient tree glints on the riverbank.");
+        say("You press it deep into the soft earth. Something tells you it will grow for a long, long time.");
+        g.flags.set(flag::ANCIENT_SEED);
+    }
+    else if(! g.flags.test(flag::TREE_GIFT))
+    {
+        say("A huge, ancient tree stands on the bank. It grew from the seed you planted, long ago!");
+        say("Something glints between its roots...");
+        g.add_item(item_id::MINDPLATE, 1);
+        say("You found the MIND PLATE!");
+        g.flags.set(flag::TREE_GIFT);
+    }
+    else
+    {
+        say("The tree you planted, long ago. Its leaves rustle as if it remembers you.");
+        return;
+    }
+    save_game();
+    load_actors();
+    refresh(true);
+}
+
+// 6.0.0 on: an altar that changes a legend's form: DIALGA's and PALKIA's Origin forms, GIRATINA's.
+void overworld::form_altar()
+{
+    game_state& g = state();
+    constexpr species_id pairs[][2] = { { species_id::DIALGA, species_id::DIALGA_ORIGIN },
+                                        { species_id::PALKIA, species_id::PALKIA_ORIGIN } };
+    bool any = false;
+    for(int i = 0; i < g.party_count; ++i)
+    {
+        mon& m = g.party[i];
+        for(const auto& pr : pairs)
+        {
+            int to = m.species_index == uint16_t(pr[0]) ? int(pr[1]) : m.species_index == uint16_t(pr[1]) ? int(pr[0]) : -1;
+            if(to < 0)
+            {
+                continue;
+            }
+            if(! any)
+            {
+                say("The altar flares. Something in your party answers it...");
+            }
+            any = true;
+            m.set_species(to);
+            g.mark_owned(to);
+            bn::string<64> text(m.name());
+            text.append(" changed its form!");
+            say(text);
+            break;
+        }
+    }
+    if(any)
+    {
+        save_game();
+    }
+}
+
 // 5.0.0: a pink blur in one of GENOVA's ten places: MEW, there and gone. Seeing all ten wins its trust.
 void overworld::mew_sighting(int person)
 {
@@ -3005,12 +3098,17 @@ void overworld::start_menu()
 
 // Fast travel (the POKéNAV map): to the door of the place's POKéMON CENTER, else where the place is entered
 // (its spawn), on the nearest open ground. Called while suspended.
-void overworld::fast_travel(int area)
+void overworld::fast_travel(int area, int at_x, int at_y)
 {
     game_state& g = state();
     const map_def& m = wd::maps[area];
     int x = m.spawn_x, y = m.spawn_y;
-    for(int i = 0; i < m.doors_count; ++i)
+    if(at_x >= 0)
+    {
+        x = at_x;   // 6.0.0: a rift: the same spot on the other side
+        y = at_y;
+    }
+    for(int i = 0; i < m.doors_count && at_x < 0; ++i)
     {
         if(m.doors[i].kind == door_kind::CENTER)
         {

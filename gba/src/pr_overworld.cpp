@@ -502,6 +502,11 @@ void overworld::load_actors()
                 continue;   // 5.0.0: a MEW you've already spotted here doesn't come back
             }
         }
+        if((p.role == person_role::SEED && g.flags.test(flag::ANCIENT_SEED)) ||
+           (p.role == person_role::TREE && ! g.flags.test(flag::ANCIENT_SEED)))
+        {
+            continue;   // 6.0.0: the seed, once planted, is the tree in the present
+        }
         actor a;
         a.who = &p;
         a.kind = p.kind;

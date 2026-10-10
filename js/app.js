@@ -841,8 +841,12 @@ const GENOVA_FORMS = [
   ["Specterra", "Cubone", 2027, ["Ghost","Ground"], [70,95,100,70,80,60]],
   ["Mimicore", "Porygon", 2028, ["Psychic","Steel"], [85,70,100,110,100,65]],
   ["Helixeon", "Mew", 2029, ["Psychic","Dragon"], [95,85,85,125,95,105]]];
+// 6.0.0: DIALGA's and PALKIA's Origin forms (PokeAPI's own sprites), taken at AETERNA's altars.
+const AETERNA_FORMS = [
+  ["Dialga-Origin", "Dialga", 10245, ["Steel","Dragon"], [100,100,120,150,120,90]],
+  ["Palkia-Origin", "Palkia", 10246, ["Water","Dragon"], [90,100,100,150,120,120]]];
 // Each later region's forms, in order: they come after everything older so species indices in saves stay put.
-const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS];
+const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS];
 const ALL_FORMS = FORM_LISTS.flat();
 const PROC_RAW_FORMS = ALL_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
 for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of ALL_FORMS){
@@ -6734,7 +6738,7 @@ Object.assign(WEATHER, {"Sewer Run":'cave', "Arcology Spire":'cave', "Sealed Cav
   walk(0, [[5,'right'],[6,'right'],[7,'up'],[8,'right']]);
   join(6, 9, 'down');
   // Past the walls (four badges): the west ring to the SEALED CAVE (NOVA waits on the CANOPY WALK), the east ring.
-  walk(2, [[10,'left'],[11,'left'],[12,'up'],[13,'up'],[14,'right',true],[15,'right']]);
+  walk(2, [[10,'left'],[11,'left'],[12,'up'],[13,'up'],[14,'right'],[15,'right',true]]);
   walk(6, [[16,'right'],[17,'right'],[18,'down']]);
   join(17, 19, 'up');
   // Up the spire from CENTRAL: the Corp. stopped and MEWTWO free first.
@@ -6758,6 +6762,125 @@ Object.assign(WEATHER, {"Sewer Run":'cave', "Arcology Spire":'cave', "Sealed Cav
   // The way down from the SKYREACH: the shuttle at WINDWARD.
   LOCATIONS.find(l=>l.name==='Windward').extras = [{kind:'pilot', role:'guide_on', dx:-2, dy:2, lines:[]}];
   for(const loc of GENOVA) getMap(loc);
+}
+
+// ---------- Aeterna (6.0.0): the sixth region, one valley in two eras, reached by train from GENOVA CENTRAL ----------
+// DIALGA and PALKIA clashed over AETERNA long ago and left it torn: rifts (role 'twin') step you between the
+// valley now and the valley as it was. Each place in the past is a twin of its present (`twinOf`, the same
+// layout, see twinMap) with its own people, gyms and wild POKéMON: four gyms now, four then. TEAM PARADOX
+// wants to freeze the valley in one perfect moment. DIALGA waits atop the TEMPORAL SPIRE (now), PALKIA in the
+// SPATIAL TEMPLE that stood in its place (then). A seed from the FIRST RIVER, planted, has grown by now (role
+// 'seed' / 'tree'). Levels: 500, then 12 more per Aeterna badge, up to 600.
+Object.assign(CHARS, {
+  gruntParadox:  {head:'cap',   K:'#282830',R:'#f8f8f8',W:'#c8a040',S:'#e8b080',H:'#3a3020',B:'#504038',D:'#c8a040',Y:'#f8e080'},
+  adminParadox:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c8a8',H:'#e0e0e8',B:'#504038',D:'#c8a040',Y:'#88c8f8'},
+  bossVex:       {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8b090',H:'#383838',B:'#283058',D:'#c8a040',Y:'#f070c0'},
+  leaderBarley:  {head:'cap',   K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c88858',H:'#d0a040',B:'#78a048',D:'#806040',Y:'#f0e070'},
+  leaderPosy:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c8',H:'#f088b0',B:'#a8d880',D:'#f8f8f8',Y:'#f8a8d0'},
+  leaderHoratio: {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#a8a8b0',B:'#585870',D:'#303040',Y:'#d8c070'},
+  leaderUndine:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e0d0e0',H:'#70c8c0',B:'#3878a8',D:'#204858',Y:'#a8f0e8'},
+  leaderTor:     {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#a87048',H:'#584030',B:'#887060',D:'#584030',Y:'#c0a080'},
+  leaderKara:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c08860',H:'#202020',B:'#f0f0f0',D:'#d03030',Y:'#f0f0f0'},
+  leaderIgnatia: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#e05020',B:'#f0c040',D:'#904020',Y:'#f8e8a0'},
+  leaderRegina:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d0c0',H:'#5038a0',B:'#7858c0',D:'#302060',Y:'#f0c040'},
+  rivalTess:     {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#a06030',B:'#e8d8b0',D:'#506838',Y:'#f0c040'},
+  eliteFossa:    {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#b07850',H:'#605040',B:'#a08060',D:'#504030',Y:'#e8d8a0'},
+  eliteIon:      {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d8c8',H:'#c8d0d8',B:'#e8f0f8',D:'#4060a0',Y:'#58e0f8'},
+  eliteClio:     {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d0c0',H:'#3a2a20',B:'#c070a0',D:'#603050',Y:'#f8e0a0'},
+  eliteSaros:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c89068',H:'#f0f0f0',B:'#383058',D:'#201838',Y:'#e04040'},
+  championAeon:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#e8e8f0',B:'#283868',D:'#c8a040',Y:'#88c8f8'}});
+Object.assign(GYM_STYLE, {
+  Barley:{kind:'leaderBarley', type:'Ground', theme:'ground', juniors:{cls:'FARMHAND', kind:'hiker', team:['Wooper','Diglett','Phanpy','Hippopotas','Sandile','Toedscool']}},
+  Posy:{kind:'leaderPosy', type:'Grass and Fairy', theme:'fairy', juniors:{cls:'FLORIST', kind:'lass', team:['Cottonee','Flabebe','Petilil','Fomantis','Bounsweet','Smoliv']}},
+  Horatio:{kind:'leaderHoratio', type:'Steel and Psychic', theme:'steel', juniors:{cls:'CLOCKMAKER', kind:'gentleman', team:['Bronzor','Klink','Honedge','Beldum','Elgyem','Tinkatink']}},
+  Undine:{kind:'leaderUndine', type:'Water', theme:'water', juniors:{cls:'FISHER', kind:'boy', team:['Barboach','Wooper','Lotad','Chewtle','Tympole','Arrokuda']}},
+  Tor:{kind:'leaderTor', type:'Rock', theme:'rock', juniors:{cls:'QUARRYMAN', kind:'hiker', team:['Kabuto','Omanyte','Anorith','Lileep','Cranidos','Shieldon']}},
+  Kara:{kind:'leaderKara', type:'Fighting', theme:'fighting', juniors:{cls:'MONK', kind:'boy', team:['Machop','Makuhita','Riolu','Mienfoo','Timburr','Croagunk']}},
+  Ignatia:{kind:'leaderIgnatia', type:'Fire and Dragon', theme:'fire', juniors:{cls:'SUN PRIEST', kind:'girl', team:['Charmander','Larvesta','Litleo','Turtonator','Salandit','Heatmor']}},
+  Regina:{kind:'leaderRegina', type:'Dragon', theme:'dragon', juniors:{cls:'DRAGON KNIGHT', kind:'gentleman', team:['Gible','Deino','Axew','Jangmo-o','Frigibax','Dreepy']}}});
+const PARADOX_TEAM = {cls:'PARADOX GRUNT', kind:'gruntParadox', pool:['Bronzor','Sigilyph','Baltoy','Natu','Chingling','Hatenna'],
+  intro:["TEAM PARADOX will stop the clock. Forever. Doesn't that sound nice?", "Yesterday, today, tomorrow... we'll keep just the best one.", "Time's up, kid."],
+  after:["Out of time...", "That wasn't supposed to happen. Not in this timeline.", "Rewind! Rewind!"]};
+const ELITES_AETERNA = [
+  {kind:'eliteFossa', title:'ELITE FOUR FOSSA', team:['Great Tusk','Sandy Shocks','Rampardos','Aerodactyl','Tyrantrum','Garchomp'],
+   intro:"I dig up the past for a living. Some of it bites back.", after:"Buried. Like everything, eventually."},
+  {kind:'eliteIon', title:'ELITE FOUR ION', team:['Iron Treads','Iron Hands','Magnezone','Iron Moth','Archaludon','Iron Valiant'],
+   intro:"I came back from the far future to see this battle. I already know who wins.", after:"Huh. The records were wrong."},
+  {kind:'eliteClio', title:'ELITE FOUR CLIO', team:['Bronzong','Slowking','Hatterene','Espeon','Indeedee','Farigiraf'],
+   intro:"I write the valley's history. Let's give it a good page.", after:"I'll write you in as the hero. It's only accurate."},
+  {kind:'eliteSaros', title:'ELITE FOUR SAROS', team:['Roaring Moon','Kingdra','Dragapult','Haxorus','Baxcalibur','Hydreigon'],
+   intro:"Eclipses come back every eighteen years. I come back every battle.", after:"The sun returns. Go to the CHAMPION."}];
+const AETERNA = [
+  // 0-11: the valley now
+  {type:'town', name:"Aeterna Village", at:[4,2], center:true, desc:"A quiet farming village in the middle of the valley. The church clock has two faces, and they never agree."},
+  {type:'route', name:"Millstream Road", at:[3,2], desc:"West past the old water mill. A rift hangs in the air by the mill wheel.", pool:['Iron Treads','Bidoof','Stantler','Wooper','Bronzor','Hoppip']},
+  {type:'gym', name:"Harvest", at:[2,2], center:true, desc:"Golden fields and a grain silo. Leader Barley's gym is the big red barn.", leaderName:"Barley", leaderTeam:['Hippowdon','Ursaluna','Clodsire','Iron Treads']},
+  {type:'route', name:"Orchard Lane", at:[2,3], desc:"Apple trees in neat rows, south toward BLOOMFIELD. Some of the trees are older than the village.", pool:['Applin','Combee','Skwovet','Iron Moth','Smoliv','Cherubi']},
+  {type:'gym', name:"Bloomfield", at:[3,3], center:true, desc:"A town of flower beds. Leader Posy's gym is a glasshouse full of roses.", leaderName:"Posy", leaderTeam:['Florges','Whimsicott','Lilligant','Iron Leaves']},
+  {type:'route', name:"Riverbend Road", at:[5,2], desc:"East along the river. A bare patch of earth on the bank, where nothing has ever grown.", pool:['Iron Bundle','Marill','Psyduck','Stantler','Bibarel','Chatot']},
+  {type:'gym', name:"Clocktower", at:[6,2], center:true, desc:"A town built around a huge clock that runs backwards. Leader Horatio's gym is inside it.", leaderName:"Horatio", leaderTeam:['Bronzong','Metagross','Iron Valiant','Gholdengo']},
+  {type:'trainer', kind:'rival', name:"Lakeshore Path", at:[6,1], badges:4, desc:"Along the shore of the great lake. Someone with a notebook stands in the path. \"Wait! You came through a rift, didn't you? Battle me!\"",
+   leaderName:"Tess", rivalKind:'rivalTess', leaderTeam:['Wyrdeer','Kleavor','Iron Jugulis','Basculegion','Lucario'], pool:['Iron Jugulis','Buizel','Lotad','Shellos']},
+  {type:'gym', name:"Mirelake", at:[6,0], center:true, desc:"Stilt houses over the lake. Leader Undine's gym floats on rafts.", leaderName:"Undine", leaderTeam:['Palafin','Quagsire','Dondozo','Walking Wake']},
+  {type:'trainer', kind:'boss', name:"Temporal Spire", at:[7,0], boss:true, shrine:true, legend:'Dialga', grunts:3, theme:'rocky', gruntTeam:PARADOX_TEAM, bossKind:'adminParadox',
+   desc:"A spire of blue stone above the lake, its stairs worn by footsteps that haven't happened yet. Admin LACUNA waits. \"DIALGA will stop the clock for us!\"",
+   leaderName:"Admin Lacuna", leaderTeam:['Bronzong','Iron Moth','Slowking','Iron Thorns','Magnezone','Hatterene'], pool:['Bronzor','Baltoy','Chingling','Sigilyph']},
+  {type:'route', name:"Timeless Path", at:[4,1], badges:8, desc:"North from the village toward the League. It shimmers, as if it can't decide which era it's in.", pool:['Iron Hands','Great Tusk','Bronzong','Stantler','Togekiss','Sigilyph']},
+  {type:'town', name:"Aeterna League", at:[4,0], center:true, league:true, champion:true, elites:ELITES_AETERNA, championKind:'championAeon',
+   championQuote:"I've watched this valley for longer than you'd believe. Now and then, past and future. I've never seen anyone like you. I am AEON. Begin!",
+   desc:"The Pokémon League of AETERNA, built where both eras meet. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Aeon", leaderTeam:['Dialga','Palkia','Iron Valiant','Roaring Moon','Garchomp','Bronzong']},
+  // 12-20: the valley then (twins of 0-8; twinMap), 21: the SPATIAL TEMPLE, where the TEMPORAL SPIRE will stand
+  {type:'town', name:"Old Aeterna", twinOf:0, at:[4,2], center:true, tint:'past', desc:"AETERNA as it was: thatched roofs, a well, and one clock face. People here have never seen a train."},
+  {type:'route', name:"Ancient Millstream", twinOf:1, at:[3,2], tint:'past', desc:"The mill isn't built yet. Just the stream, and wild POKéMON nobody has named.", pool:['Great Tusk','Stantler','Wooper','Bidoof','Teddiursa','Hoppip']},
+  {type:'gym', name:"Harvest Hold", twinOf:2, at:[2,2], center:true, tint:'past', desc:"A stone fort where the fields will be. Leader Tor guards it.", leaderName:"Tor", leaderTeam:['Rampardos','Bastiodon','Kabutops','Aerodactyl']},
+  {type:'route', name:"Wildwood Path", twinOf:3, at:[2,3], tint:'past', desc:"The orchard is a wild wood, so far. In a clearing stands a little shrine.", pool:['Brute Bonnet','Applin','Combee','Teddiursa','Slither Wing','Skwovet']},
+  {type:'gym', name:"Stonebloom", twinOf:4, at:[3,3], center:true, tint:'past', desc:"A village carved into rock. Leader Kara trains in its dojo.", leaderName:"Kara", leaderTeam:['Lucario','Conkeldurr','Hariyama','Slither Wing']},
+  {type:'route', name:"First River", twinOf:5, at:[5,2], tint:'past', desc:"The river, young and fast. An ancient tree drops its seeds on the bank.", pool:['Scream Tail','Marill','Psyduck','Wooper','Stantler','Chatot']},
+  {type:'gym', name:"Sundial Temple", twinOf:6, at:[6,2], center:true, tint:'past', desc:"Before the clock, a sundial. Leader Ignatia's temple keeps the sun's time.", leaderName:"Ignatia", leaderTeam:['Charizard','Turtonator','Volcarona','Roaring Moon']},
+  {type:'route', name:"Old Lakeshore", twinOf:7, at:[6,1], badges:4, tint:'past', desc:"The lake is bigger here, and the fog never lifts.", pool:['Flutter Mane','Buizel','Lotad','Shellos','Basculin','Gible']},
+  {type:'gym', name:"Mire Throne", twinOf:8, at:[6,0], center:true, tint:'past', desc:"A queen's hall on an island in the mire. Leader Regina is its queen.", leaderName:"Regina", leaderTeam:['Dragonite','Goodra','Kommo-o','Walking Wake']},
+  {type:'trainer', kind:'boss', name:"Spatial Temple", at:[7,0], boss:true, shrine:true, legend:'Palkia', grunts:3, theme:'rocky', tint:'past', gruntTeam:PARADOX_TEAM, bossKind:'bossVex', treasure:['dracoplate'],
+   desc:"A temple of pink stone where the spire will one day stand. CHRONARCH VEX waits by the altar. \"PALKIA will hold this moment still. Forever.\"",
+   leaderName:"Chronarch Vex", leaderTeam:['Hatterene','Iron Valiant','Flutter Mane','Bronzong','Roaring Moon','Iron Boulder'], pool:['Bronzor','Baltoy','Chingling','Sigilyph']}];
+Object.assign(WEATHER, {"Wildwood Path":'fog', "Old Lakeshore":'fog', "Mirelake":'rain', "Mire Throne":'rain'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of AETERNA){ loc.region = 6; loc.tier = 45; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  const join = (a, b, dir, gate=false)=>{
+    (AETERNA[a].links ||= []).push({dir, to:S(b), gate});
+    (AETERNA[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  walk(0, [[1,'left'],[2,'left'],[3,'down'],[4,'right']]);
+  walk(0, [[5,'right'],[6,'right'],[7,'up'],[8,'up',true],[9,'right']]);
+  join(0, 10, 'up'); join(10, 11, 'up');
+  for(const l of AETERNA[0].links) if(l.to===S(10)) l.need = 'shrines';
+  // The past: each twin's exits follow its present's (twinMap); the SPIRE's twin is the TEMPLE.
+  for(let i=0; i<9; i++){ AETERNA[i].twin = S(12 + i); AETERNA[12 + i].twinOf = S(i); }
+  AETERNA[9].twin = S(21); AETERNA[21].twin = S(9);
+  AETERNA[21].links = [{dir:'left', to:S(20), gate:false}];
+  Object.assign(AETERNA[7], {rivalAfter:["You're from now, aren't you? I can tell. I'm TESS. My grandpa wrote the valley's history.", "He said DIALGA and PALKIA fought here once, and tore the valley in two. The rifts are the tear.", "TEAM PARADOX went up the TEMPORAL SPIRE. If they catch DIALGA, it's not just now that stops. It's everything."]});
+  Object.assign(AETERNA[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION! Did you see the church clock? Two faces. One says noon, one says midnight.\"", "KAI: \"I walked through a shimmer by the well and came out in the same village, but... older. Younger? Old.\"", "KAI: \"A kid there sold me an apple. Then I walked back and there was an orchard where the kid's house was.\""]},
+    extras:[
+      {kind:'gentleman', role:'guide_back', dx:2, dy:1, lines:[]},
+      {kind:'rift', role:'twin', dx:-3, dy:2},
+      {kind:'statue', dx:-3, dy:-3, lines:["The church clock. Its two faces show different times, and both hands move.", "A plaque: \"TIME IS A RIVER. THE VALLEY IS ITS BED.\""]},
+      {kind:'oldwoman', dx:4, dy:2, lines:["Tomorrow I'll tell you about yesterday. Or did I tell you tomorrow already?", "Every day here is the same day, you know. I've said that before. I'll say it again."]}]});
+  Object.assign(AETERNA[12], {extras:[{kind:'boy', dx:4, dy:2, lines:["A rift opened by the well and a stranger came out! He bought an apple. He said he was a CHAMPION.", "I'm going to plant the core. Maybe it'll be a whole orchard someday."]}]});
+  for(const i of [3, 5, 8]) (AETERNA[i].extras ||= []).push({kind:'rift', role:'twin', at:'mid', dx:-2, dy:1});
+  Object.assign(AETERNA[15], {extras:[{kind:'statue', at:'mid', dx:3, dy:-1, lines:["A tiny wooden shrine, freshly carved. Leaves swirl around it with no wind.", "For a moment you see a small green POKéMON peek out... then it's gone. Back to its own time, maybe."]}]});
+  Object.assign(AETERNA[17], {extras:[{kind:'sparkle', role:'seed', at:'mid', dx:2, dy:0, lines:[]}]});
+  Object.assign(AETERNA[5], {extras:[...AETERNA[5].extras, {kind:'statue', role:'tree', at:'mid', dx:2, dy:0, lines:[]}]});
+  Object.assign(AETERNA[9], {rivalAfter:["DIALGA... it's furious. The clock's not ours to stop.", "CHRONARCH VEX went back. Way back, to the SPATIAL TEMPLE, before this spire was even built."],
+    extras:[{kind:'statue', role:'form', at:'mid', dx:-3, dy:1, lines:["An altar of blue stone, carved with a diamond. It glows faintly."]}]});
+  Object.assign(AETERNA[21], {rivalAfter:["PALKIA... broke the moment. It's moving again. Everything's moving again.", "I only wanted to stay. Just once, to stay. Go on. The future's yours."],
+    extras:[{kind:'statue', role:'form', at:'mid', dx:3, dy:1, lines:["An altar of pink stone, carved with a pearl. It glows faintly."]}]});
+  Object.assign(AETERNA[6], {extras:[{kind:'statue', dx:-4, dy:3, lines:["The town clock, running backwards. A note pinned to it: \"BRASS TOWER, 2 MILES. ASHEN TOWER, BURNED. ASK THE THREE BEASTS.\"", "Huge paw prints in the dust under the clock. Three different kinds."]}]});
+  // The way on from GENOVA: the conductor at GENOVA CENTRAL.
+  (LOCATIONS.find(l=>l.name==='Genova Central').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:2, lines:[]});
+  for(const loc of AETERNA) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------
