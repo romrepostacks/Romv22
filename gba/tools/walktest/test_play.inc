@@ -151,7 +151,7 @@ static void test_setup()
     g.run.adventure = true;
     constexpr species_id team[] = { species_id::MEWTWO, species_id::ARCEUS, species_id::RAYQUAZA,
                                     species_id::KORAIDON, species_id::MIRAIDON, species_id::ETERNATUS };
-    int lv = scen == 4 ? 200 : 300;
+    int lv = scen == 4 ? 200 : scen >= 20 ? 400 : 300;
     for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], lv);
     if(scen == 12)
     {
@@ -173,6 +173,14 @@ static void test_setup()
         g.flags.set(flag::CALDERRA_CHAMPION);
     }
     g.region = scen <= 2 ? 1 : 2;
+    if(scen >= 20)
+    {
+        // The SKYREACH (4.0.0): the SUNDERED ISLES beaten too.
+        play::beat_region(3);
+        g.flags.set(flag::SUNDERED_CHAMPION);
+        g.region = scen == 20 ? 2 : 3;
+        if(scen == 22) for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], 300);
+    }
     int x = 0, y = 0, map = -1;
     switch(scen)
     {
@@ -260,6 +268,81 @@ static void test_setup()
     {
         play::beat_region(3);
         map = play::find_trainer(3, trainer_role::ROUTE, 0, x, y);
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.trainers_count; ++k)
+            if(m.trainers[k].x == x && m.trainers[k].y == y) g.beaten.reset(m.trainers[k].id);
+        break;
+    }
+    case 20:    // PORT KEEL's PILOT: fly to WINDWARD
+        map = play::find_person(3, person_role::PILOT, x, y);
+        break;
+    case 21:    // WINDWARD's PILOT: fly back
+        map = play::find_person(4, person_role::PILOT, x, y);
+        break;
+    case 22:    // the first SKYREACH gym leader, no badges, your team at 300
+        map = play::find_trainer(4, trainer_role::LEADER, 0, x, y);
+        break;
+    case 23:    // OCHRE GULCH's updraft up to the mesas, no badges
+    case 28:    // WINDWARD's way into PILLAR HEART: eight badges and both legends
+    {
+        if(scen == 28)
+        {
+            play::beat_region(4, true);
+            g.flags.set(flag::RAYQUAZA); g.flags.set(flag::DEOXYS);
+            for(const char* n : { "METEOR CRATER", "SKY PILLAR" })
+            {
+                const map_def& m = wd::maps[play::find_area(n)];
+                for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+            }
+        }
+        map = play::find_area(scen == 23 ? "OCHRE GULCH" : "WINDWARD");
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.links_count; ++k)
+        {
+            const pr::link& l = m.links[k];
+            if(l.oy < 0)
+            {
+                int lo = bn::max(0, int(l.ox)), hi = bn::min(int(m.w), l.ox + wd::maps[l.target].w);
+                for(int tx = lo; tx < hi; ++tx)
+                    if(play::walkable(m, tx, 0) && play::walkable(m, tx, 1)) { x = tx; y = -1; break; }
+            }
+        }
+        break;
+    }
+    case 24:    // a wind current on CLOUD ROUTE 7: stand left of the first one, then step right onto it
+    {
+        map = play::find_area("CLOUD ROUTE 7");
+        const map_def& m = wd::maps[map];
+        for(int i = 0; i < m.w * m.h && y >= 0; ++i)
+        {
+            behaviour b = behaviour(m.behaviours[i]);
+            if(b >= behaviour::WIND_UP && b <= behaviour::WIND_RIGHT && play::walkable(m, i % m.w - 1, i / m.w))
+            {
+                g.map = int16_t(map); g.x = int16_t(i % m.w - 1); g.y = int16_t(i / m.w); g.facing = direction::RIGHT;
+                y = -2;
+            }
+        }
+        if(y == -2) map = -1;
+        break;
+    }
+    case 25:    // RAYQUAZA on the SKY PILLAR, its boss beaten
+    case 26:    // DEOXYS in the METEOR CRATER
+    {
+        map = play::find_area(scen == 25 ? "SKY PILLAR" : "METEOR CRATER");
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+        x = m.area->legend_x; y = m.area->legend_y;
+        break;
+    }
+    case 27:    // OCHRE GULCH's meteorite shard with DEOXYS in the party: it becomes DEOXYS-ATTACK
+        g.party[5] = mon::make(species_id::DEOXYS, 350);
+        map = play::find_person(4, person_role::SHARD_ATTACK, x, y);
+        break;
+    case 29:    // the SKYREACH CHAMPION, the ELITE FOUR beaten
+    case 30:    // the CHAMPION just beaten: the next battle's end brings the HALL OF FAME
+    {
+        play::beat_region(4);
+        map = play::find_trainer(4, scen == 29 ? trainer_role::CHAMPION : trainer_role::ROUTE, 0, x, y);
         const map_def& m = wd::maps[map];
         for(int k = 0; k < m.trainers_count; ++k)
             if(m.trainers[k].x == x && m.trainers[k].y == y) g.beaten.reset(m.trainers[k].id);

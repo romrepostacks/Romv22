@@ -17,7 +17,7 @@ than the last (region 1 = 100, region 2 = 200, region 3 = 300 ...).
 | 1.x | Vellorin | `STORY.md` |
 | 2.0.0 | Calderra (Raikou/Entei/Suicune), level 200 | `docs/2.0.0/` |
 | 3.0.0 | The Sundered Isles (Groudon/Kyogre), level 300 | `docs/3.0.0/` |
-| 4.0.0 | The Skyreach (Rayquaza/Deoxys), level 400 | `docs/4.0.0/` (draft) |
+| 4.0.0 | The Skyreach (Rayquaza/Deoxys), level 400 | `docs/4.0.0/` |
 | 5.0.0+ | themes only | `/mnt/project-files/plans/regions-4-9-themes.md` |
 
 ## Where things are

@@ -2237,9 +2237,11 @@ void dex_screen(int register_species)
                     bn::string<16> own("OWN ");
                     if(map_region(g.map) >= 2)
                     {
-                        // The SUNDERED ISLES' (3.0.0): its island forms (species_v2 on).
-                        const int lo = map_region(g.map) == 2 ? species_v1 : species_v2;
-                        const int hi = map_region(g.map) == 2 ? species_v2 : species_count;
+                        // The SUNDERED ISLES' (3.0.0): its island forms (species_v2 on); the SKYREACH's (4.0.0): its
+                        // highland forms and DEOXYS' (species_v3 on).
+                        const int rg = map_region(g.map);
+                        const int lo = rg == 2 ? species_v1 : rg == 3 ? species_v2 : species_v3;
+                        const int hi = rg == 2 ? species_v2 : rg == 3 ? species_v3 : species_count;
                         int sn = 0, on = 0;
                         for(int i = lo; i < hi; ++i)
                         {
@@ -2598,8 +2600,10 @@ int region_map_screen(bool travel)
     }
     const int region = world_data::maps[here].area->region;
     // The SUNDERED ISLES' (3.0.0): x 0..5, drawn on a parchment treasure map.
-    const int ox = region == 1 ? 30 : region == 3 ? 36 : 12, oy = 10, cw = region == 1 ? 24 : region == 3 ? 30 : 18, ch = 20;
-    bn::bg_palettes::set_transparent_color(region == 3 ? bn::color(29, 25, 17) : bn::color(26, 28, 31));
+    // The SKYREACH's (4.0.0): x 0..8, y -1 (the clouds) to 3 (the canyon floor), on a sky blue.
+    const int ox = region == 1 || region == 4 ? (region == 4 ? 12 : 30) : region == 3 ? 36 : 12, oy = 10;
+    const int cw = region == 1 || region == 4 ? 24 : region == 3 ? 30 : 18, ch = 20;
+    bn::bg_palettes::set_transparent_color(region == 4 ? bn::color(20, 25, 31) : region == 3 ? bn::color(29, 25, 17) : bn::color(26, 28, 31));
     auto elsewhere = [&](const area_info& a)
     {
         return a.at_x >= 100 || a.region != region;     // under the sea, or another region

@@ -302,6 +302,9 @@ namespace flag
     constexpr int GROUDON = 6;              // 3.0.0: the Sundered Isles' legendaries caught (legend_flag)
     constexpr int KYOGRE = 7;
     constexpr int SUNDERED_CHAMPION = 8;
+    constexpr int RAYQUAZA = 9;             // 4.0.0: the SKYREACH's legendaries caught (legend_flag)
+    constexpr int DEOXYS = 10;
+    constexpr int SKYREACH_CHAMPION = 11;
 }
 
 // Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH, and the Sundered Isles'

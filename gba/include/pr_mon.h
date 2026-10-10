@@ -172,6 +172,9 @@ struct damage_result
 };
 
 // What a battle adds to the damage formula: stat stages (-6..6), the weather, and a move that hits several.
+// 4.0.0: a move's type multiplier x4 under strong winds: a Flying target's weakness from being Flying is gone.
+[[nodiscard]] int wind_effectiveness_x4(int eff_x4, const move& mv, const mon& target, battle_weather weather);
+
 struct damage_mods
 {
     int atk_stage = 0;

@@ -269,7 +269,8 @@ int overworld::actor_at(int tx, int ty) const
 bool overworld::walkable(int tx, int ty) const
 {
     behaviour b = behaviour_at(tx, ty);
-    return b == behaviour::WALK || b == behaviour::TALL_GRASS || b == behaviour::DOOR || b == behaviour::MAT;
+    return b == behaviour::WALK || b == behaviour::TALL_GRASS || b == behaviour::DOOR || b == behaviour::MAT ||
+           (b >= behaviour::WIND_UP && b <= behaviour::WIND_RIGHT);
 }
 
 bool overworld::water_at(int tx, int ty) const
@@ -916,6 +917,7 @@ void overworld::update_tint()
         case area_weather::RAIN: if(! off) layers[n++] = { 0x20, 0x30, 0x50, 0x18 }; break;
         case area_weather::ASH: if(! off) layers[n++] = { 0x40, 0x40, 0x40, 0x22 }; break;
         case area_weather::FOG: layers[n++] = { 0xe8, 0xe8, 0xf0, 0x40 }; break;
+        case area_weather::WIND: if(! off) layers[n++] = { 0xd8, 0xec, 0xff, 0x28 }; break;   // 4.0.0
         case area_weather::DEEP: layers[n++] = { 0x1a, 0x48, 0x80, 0x50 }; break;
         default: break;
         }
@@ -1220,13 +1222,13 @@ void overworld::step(direction want)
             hold_until_released();
             return;
         }
-        // Victory Road: all eight badges (of that region).
+        // Victory Road: all eight badges (of that region). The SKYREACH's updrafts (4.0.0): three, then six.
         if(l.badges && g.region_badges(map_region(target_place.map)) < l.badges)
         {
             set_player_frame(0);
-            bn::string<80> text("Only trainers with all ");
+            bn::string<96> text(l.badges < 8 ? "A strong updraft howls up the cliff. Riding it takes " : "Only trainers with all ");
             text.append(bn::to_string<4>(l.badges));
-            text.append(" badges may pass beyond this point.");
+            text.append(l.badges < 8 ? " SKYREACH badges." : " badges may pass beyond this point.");
             say(text);
             hold_until_released();
             return;
@@ -1243,7 +1245,9 @@ void overworld::step(direction want)
         if(l.need == link_need::SHRINES && ! shrines_cleared(map_region(_map_index)))
         {
             set_player_frame(0);
-            say(map_region(_map_index) == 3
+            say(map_region(_map_index) == 4
+                    ? "A howling wind seals the SKY PILLAR's door. It stays shut until DEOXYS and RAYQUAZA are settled."
+                    : map_region(_map_index) == 3
                     ? "The ground shakes and the sea roars. MT. KEEL stays shut until TEAM QUAKE and TEAM NEPTUNE are stopped."
                     : "A wall of heat and storm bars the way to the tower. The three beasts must be freed first.");
             hold_until_released();
@@ -1486,6 +1490,19 @@ void overworld::arrive()
         }
     }
     behaviour b = behaviour_at(g.x, g.y);
+    if(b >= behaviour::WIND_UP && b <= behaviour::WIND_RIGHT && ! g.surfing)
+    {
+        // 4.0.0: a wind current carries you on, a step at a time, until you're off it (each run ends on open ground).
+        constexpr direction blow[] = { direction::UP, direction::DOWN, direction::LEFT, direction::RIGHT };
+        direction d = blow[int(b) - int(behaviour::WIND_UP)];
+        int nx = g.x + dx_of(d), ny = g.y + dy_of(d);
+        if(walkable(nx, ny) && actor_at(nx, ny) < 0 && find(nx, ny).link < 0)
+        {
+            _fresh_press = false;
+            step(d);
+            return;
+        }
+    }
     if(b == behaviour::DOOR)
     {
         for(int i = 0; i < _map->doors_count; ++i)

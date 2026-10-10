@@ -25,6 +25,7 @@ struct battle_setup
     int8_t boss_heals = 0;          // FULL RESTOREs a battle: Calderra's leaders, rival, Elite Four and Champion
                                     // one, the Sundered Isles' two (3.0.0)
     bool sharp = false;             // the Sundered Isles' trainers (3.0.0): smart, and they read held items too
+    bool keen = false;              // the SKYREACH's (4.0.0): they also gang up on the Pokémon that threatens them most
     battle_weather weather = battle_weather::NONE;  // the weather at the start (3.0.0: the islands' storms)
 };
 

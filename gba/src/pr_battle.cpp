@@ -165,7 +165,9 @@ namespace
                 {
                     constexpr const char* themes[] = { "leader", "g_fire", "g_water", "g_ground", "g_ghost", "g_electric", "g_grass",
                                                        "g_ice", "g_dragon" };
-                    return themes[int(room.room->theme)];
+                    // (The newer gyms' themes, from FLYING on, have no music of their own: the leader's.)
+                    int th = int(room.room->theme);
+                    return th < int(sizeof(themes) / sizeof(themes[0])) ? themes[th] : "leader";
                 }
             }
             return "leader";
@@ -1264,7 +1266,7 @@ namespace
         {
             return would_fail(user, mv, target) ? text_color::GRAY : text_color::YELLOW;
         }
-        int eff = move_effectiveness_x4(*user.m, mv, *target.m);
+        int eff = wind_effectiveness_x4(move_effectiveness_x4(*user.m, mv, *target.m), mv, *target.m, _weather);
         if(eff == 0 || (target.m->abil().kind == ability_kind::DISGUISE && ! (target.m->flags & mon_flag::DISGUISE_USED)))
         {
             return eff == 0 ? text_color::GRAY : text_color::YELLOW;
@@ -1336,7 +1338,7 @@ namespace
         _weather = w;
         _weather_turns = 5;
         constexpr const char* starts[] = { "", "The sunlight turned harsh!", "It started to rain!", "A sandstorm kicked up!",
-                                           "It started to hail!" };
+                                           "It started to hail!", "Strong winds are blowing! FLYING POKéMON are shielded!" };
         gui().say(starts[int(w)]);
         return true;
     }
@@ -1344,9 +1346,9 @@ namespace
     // End of turn: the weather goes on (a sandstorm or hail hurting all but the types it doesn't), or stops.
     void battle::weather_turn()
     {
-        if(_weather == battle_weather::NONE)
+        if(_weather == battle_weather::NONE || _weather == battle_weather::WIND)
         {
-            return;
+            return;     // (strong winds blow all battle long)
         }
         int w = int(_weather);
         if(--_weather_turns <= 0)
@@ -1528,6 +1530,21 @@ namespace
                         {
                             score += 15;
                         }
+                    }
+                    if(_s.keen)
+                    {
+                        // The SKYREACH's trainers (4.0.0) gang up on whichever of yours threatens them most: one
+                        // with a super-effective move against this foe (more if it's the same type as its user).
+                        int threat = 0;
+                        for(int q = 0; q < t.move_count; ++q)
+                        {
+                            const move& tm = move_data(t.move(q));
+                            if(t.pp(q) && tm.category != move_category::STATUS && move_effectiveness_x4(t, tm, *f.m) > 4)
+                            {
+                                threat = bn::max(threat, t.has_type(tm.type) ? 90 : 60);
+                            }
+                        }
+                        score += threat;
                     }
                 }
                 score += r.get_int(20);

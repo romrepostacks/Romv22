@@ -814,14 +814,30 @@ const SUNDERED_FORMS = [
   ["Sharpedo-Sunder", "Sharpedo", 2010, ["Water","Ghost"], [70,105,45,110,45,95]],
   ["Sableye-Sunder", "Sableye", 2011, ["Ghost","Steel"], [50,70,85,60,70,45]],
   ["Torkoal-Sunder", "Torkoal", 2012, ["Fire","Water"], [70,75,130,100,80,15]]];
+// 4.0.0: Skyreach forms, highland forms found only in the SKYREACH, and DEOXYS' other three forms (a meteorite
+// shard changes them). Same shape as SUNDERED_FORMS; the Skyreach forms' sprites are recoloured by
+// gba/tools/art/sundered_forms.py, DEOXYS' are PokeAPI's own (form ids 10001-10003).
+const SKYREACH_FORMS = [
+  ["Geodude-Sky", "Geodude", 2013, ["Rock","Flying"], [40,70,85,35,40,50], "Graveler-Sky", 25],
+  ["Graveler-Sky", "Graveler", 2014, ["Rock","Flying"], [55,90,100,50,55,70]],
+  ["Ponyta-Sky", "Ponyta", 2015, ["Fire","Flying"], [50,80,50,70,65,95], "Rapidash-Sky", 40],
+  ["Rapidash-Sky", "Rapidash", 2016, ["Fire","Flying"], [65,95,65,90,80,115]],
+  ["Swablu-Sky", "Swablu", 2017, ["Ice","Flying"], [45,40,60,55,75,50], "Altaria-Sky", 35],
+  ["Altaria-Sky", "Altaria", 2018, ["Ice","Dragon"], [75,70,85,95,100,80]],
+  ["Rhyhorn-Sky", "Rhyhorn", 2019, ["Rock","Dragon"], [80,90,90,40,40,30], "Rhydon-Sky", 42],
+  ["Rhydon-Sky", "Rhydon", 2020, ["Rock","Dragon"], [105,135,115,55,55,45]],
+  ["Deoxys-Attack", "Deoxys", 10001, ["Psychic"], [50,180,20,180,20,150]],
+  ["Deoxys-Defense", "Deoxys", 10002, ["Psychic"], [50,70,160,70,160,90]],
+  ["Deoxys-Speed", "Deoxys", 10003, ["Psychic"], [50,95,90,95,90,180]]];
 const PROC_RAW_SUNDERED = SUNDERED_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
-for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of SUNDERED_FORMS){
+const PROC_RAW_SKYREACH = SKYREACH_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
+for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of SUNDERED_FORMS.concat(SKYREACH_FORMS)){
   const s = n.toLowerCase(), o = orig.toLowerCase();
   if(typeof DEXDATA!=='undefined' && DEXDATA[o])
     DEXDATA[s] = {...DEXDATA[o], types, base:{hp,atk,def,spa,spd,spe}, evo:to ? {to:to.toLowerCase(), level} : undefined};
   if(typeof MOVE_EXTRA!=='undefined' && MOVE_EXTRA.learn[o]) MOVE_EXTRA.learn[s] = MOVE_EXTRA.learn[o];
 }
-const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry)).concat(PROC_RAW_SUNDERED.map(procEntry));
+const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry)).concat(PROC_RAW_SUNDERED.map(procEntry)).concat(PROC_RAW_SKYREACH.map(procEntry));
 
 const LEVEL = 50;
 // Real data from js/dexdata.js (generated from PokeAPI by tools/build-dexdata.js) replaces the
@@ -1105,7 +1121,7 @@ const DEX_NUM = {
  "cutiefly":742,"mudbray":749,"morelull":755,"salandit":757,"grookey":810,"thwackey":811,"rillaboom":812,"scorbunny":813,"raboot":814,"cinderace":815,"sobble":816,"drizzile":817,"inteleon":818,"skwovet":819,"greedent":820,"rookidee":821,"corvisquire":822,"corviknight":823,"blipbug":824,"dottler":825,"orbeetle":826,"nickit":827,"thievul":828,"gossifleur":829,"eldegoss":830,"wooloo":831,"dubwool":832,"chewtle":833,"drednaw":834,"yamper":835,"boltund":836,"rolycoly":837,"carkol":838,"coalossal":839,"applin":840,"flapple":841,"appletun":842,"silicobra":843,"sandaconda":844,"cramorant":845,"arrokuda":846,"barraskewda":847,"toxel":848,"toxtricity":849,"sizzlipede":850,"centiskorch":851,"clobbopus":852,"grapploct":853,"sinistea":854,"polteageist":855,"hatenna":856,"hattrem":857,"hatterene":858,"impidimp":859,"morgrem":860,"grimmsnarl":861,"obstagoon":862,"perrserker":863,"cursola":864,"sirfetch-d":865,"mr-rime":866,"runerigus":867,"milcery":868,"alcremie":869,"falinks":870,"pincurchin":871,"snom":872,"frosmoth":873,"stonjourner":874,"eiscue":875,"indeedee":876,"morpeko":877,"cufant":878,"copperajah":879,"dracozolt":880,"arctozolt":881,"dracovish":882,"arctovish":883,"duraludon":884,"dreepy":885,"drakloak":886,"dragapult":887,"zacian":888,"zamazenta":889,"eternatus":890,"kubfu":891,"urshifu":892,"zarude":893,"regieleki":894,"regidrago":895,"glastrier":896,"spectrier":897,"calyrex":898,"wyrdeer":899,"kleavor":900,"ursaluna":901,"basculegion":902,"sneasler":903,"overqwil":904,"enamorus":905,"sprigatito":906,"floragato":907,"meowscarada":908,"fuecoco":909,"crocalor":910,"skeledirge":911,"quaxly":912,"quaxwell":913,"quaquaval":914,"lechonk":915,"oinkologne":916,"tarountula":917,"spidops":918,"nymble":919,"lokix":920,"pawmi":921,"pawmo":922,"pawmot":923,"tandemaus":924,"maushold":925,"fidough":926,"dachsbun":927,"smoliv":928,"dolliv":929,"arboliva":930,"squawkabilly":931,"nacli":932,"naclstack":933,"garganacl":934,"charcadet":935,"armarouge":936,"ceruledge":937,"tadbulb":938,"bellibolt":939,"wattrel":940,"kilowattrel":941,"maschiff":942,"mabosstiff":943,"shroodle":944,"grafaiai":945,"bramblin":946,"brambleghast":947,"toedscool":948,"toedscruel":949,"klawf":950,"capsakid":951,"scovillain":952,"rellor":953,"rabsca":954,"flittle":955,"espathra":956,"tinkatink":957,"tinkatuff":958,"tinkaton":959,"wiglett":960,"wugtrio":961,"bombirdier":962,"finizen":963,"palafin":964,"varoom":965,"revavroom":966,"cyclizar":967,"orthworm":968,"glimmet":969,"glimmora":970,"greavard":971,"houndstone":972,"flamigo":973,"cetoddle":974,"cetitan":975,"veluza":976,"dondozo":977,"tatsugiri":978,"annihilape":979,"clodsire":980,"farigiraf":981,"dudunsparce":982,"kingambit":983,"great-tusk":984,"scream-tail":985,"brute-bonnet":986,"flutter-mane":987,"slither-wing":988,"sandy-shocks":989,"iron-treads":990,"iron-bundle":991,"iron-hands":992,"iron-jugulis":993,"iron-moth":994,"iron-thorns":995,"frigibax":996,"arctibax":997,"baxcalibur":998,"gimmighoul":999,"gholdengo":1000,"wo-chien":1001,"chien-pao":1002,"ting-lu":1003,"chi-yu":1004,"roaring-moon":1005,"iron-valiant":1006,"koraidon":1007,"miraidon":1008,"walking-wake":1009,"iron-leaves":1010,"dipplin":1011,"poltchageist":1012,"sinistcha":1013,"okidogi":1014,"munkidori":1015,"fezandipiti":1016,"ogerpon":1017,"archaludon":1018,"hydrapple":1019,"gouging-fire":1020,"raging-bolt":1021,"iron-boulder":1022,"iron-crown":1023,"terapagos":1024,"pecharunt":1025
 };
 // 3.0.0: the Sundered forms' numbers, and their originals' POKéDEX sizes and categories.
-for(const [n, orig, num] of SUNDERED_FORMS){
+for(const [n, orig, num] of SUNDERED_FORMS.concat(SKYREACH_FORMS)){
   DEX_NUM[slug(n)] = num;
   if(typeof DEXINFO!=='undefined' && DEXINFO[DEX_NUM[slug(orig)]]) DEXINFO[num] = DEXINFO[DEX_NUM[slug(orig)]];
 }
@@ -1282,8 +1298,8 @@ function seedRand(str){
 const LEDGE_DIR = {'L':'down', '>':'right', '<':'left'};
 const TILE_CLS = {'x':'gymwall','I':'item','L':'ledge','>':'ledge-e','<':'ledge-w','N':'rsign','r':'rock','b':'bush','T':'tree','.':'grass',':':'path','"':'tall','~':'water','*':'flower','F':'fence','S':'sign','E':'exit','B':'grass','D':'path',
   '#':'wall','_':'floor','o':'rug','M':'mat','c':'counter','h':'healer','P':'pc','k':'bookshelf','v':'tv','e':'bed','t':'table','p':'plant','s':'shelf','u':'statue','^':'tablet',
-  'n':'wall wmon','m':'wall wmap','w':'wall wwin','K':'wall wclock','C':'counter cend','q':'seat','Q':'seat yellow','g':'glasstable'};
-const WALKABLE = new Set(['.',':','"','*','E','D','_','o','M']);
+  '8':'wind','2':'wind','4':'wind','6':'wind','n':'wall wmon','m':'wall wmap','w':'wall wwin','K':'wall wclock','C':'counter cend','q':'seat','Q':'seat yellow','g':'glasstable'};
+const WALKABLE = new Set(['.',':','"','*','E','D','_','o','M','8','2','4','6']);   // 4.0.0: '8' '2' '4' '6' wind
 const TOWN_ROWS = [
   'TTTTTTTTTTTTTTTTTTTTTT',
   'TT..................TT',
@@ -1616,7 +1632,7 @@ function buildRoute(loc){
   if(loc.boss){
     const trail = paths[loc.links[0].dir], spot = trail[Math.floor(trail.length*0.7)];
     npcs.push({kind:loc.bossKind || 'admin', x:spot.x, y:spot.y, facing:OPPOSITE[loc.links[0].dir], trainer:true, vanish:true});
-    npcs.push({kind:'mon:'+loc.legend, x:cx, y:cy, facing:'down', legend:loc.legend});
+    if(loc.legend) npcs.push({kind:'mon:'+loc.legend, x:cx, y:cy, facing:'down', legend:loc.legend});   // (4.0.0: ZENITH LAB has none)
   }
   // Locals with tips, spread along the route.
   const who = {forest:'bugcatcher', lake:'fisher', rocky:'hiker', sea:'fisher'}[loc.theme] || 'youngster';
@@ -1692,6 +1708,27 @@ function buildRoute(loc){
     for(const k of land){ const x = k % W, y = Math.floor(k/W); if(inside(x,y) && 'TL<>'.includes(tiles[y][x])) tiles[y][x] = '.'; }   // no trees or ledges on the islets
   }
   for(const row of tiles) row.forEach((ch,x)=>{ if(ch===',') row[x] = '.'; });   // openings: plain grass again
+  // 4.0.0: wind currents (the SKYREACH): straight runs of wind beside the path that carry you along toward the
+  // middle of the route ('8' up, '2' down, '4' left, '6' right, as on a keypad). Only on plain grass, never next to
+  // anyone, and each ends on open ground, so you always land somewhere you could walk to anyway.
+  if(loc.wind) for(const trail of Object.values(paths)){
+    for(let i=10, made=0; i+10<trail.length && made<3; i++){
+      const a = trail[i], b = trail[i+1], dx = b.x-a.x, dy = b.y-a.y;
+      if(Math.abs(dx)+Math.abs(dy)!==1 || rnd()<0.7) continue;
+      const len = 5 + Math.floor(rnd()*5), first = rnd()<0.5 ? -2 : 3;   // the path is two wide: just off either edge
+      let cells = null;
+      for(const side of [first, 1-first]){
+        const ox = dy ? side : 0, oy = dx ? side : 0, c = [];
+        for(let k=0; k<=len; k++) c.push([a.x+ox+dx*k, a.y+oy+dy*k]);
+        if(c.every(([x,y],k)=>tiles[y] && (k<len ? tiles[y][x]==='.' : '.:"'.includes(tiles[y][x])) &&
+          !npcs.some(n=>Math.abs(n.x-x)+Math.abs(n.y-y)<2) && !signs.some(sg=>sg.x===x && sg.y===y))){ cells = c; break; }
+      }
+      if(!cells) continue;
+      const ch = dx>0 ? '6' : dx<0 ? '4' : dy>0 ? '2' : '8';
+      for(let k=0; k<len; k++){ const [x,y] = cells[k]; tiles[y][x] = ch; }
+      made++; i += len + 6;
+    }
+  }
   if(loc.theme==='cave') for(const row of tiles) row.forEach((ch,x)=>{ if(':"*L<>'.includes(ch)) row[x] = '.'; else if(ch==='b') row[x] = 'r'; });
   if(loc.theme==='deep') for(const row of tiles) row.forEach((ch,x)=>{ if(':*L<>'.includes(ch)) row[x] = '.'; else if(ch==='b') row[x] = 'r'; });   // kelp ('"') stays
   const first = spots[exits[0].dir];
@@ -1723,7 +1760,7 @@ function finishMap(tiles, buildings, npcs, exits, spawn, signs){
   return {w:tiles[0].length, h:tiles.length, tiles, buildings, npcs, exits, signs, spawn};
 }
 function getMap(loc){
-  if(!loc.__map){ loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc); loc.__map.weather = WEATHER[loc.name] || null; }
+  if(!loc.__map){ loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc); loc.__map.weather = WEATHER[loc.name] || null; loc.__map.tint = loc.tint || ''; }
   // Item balls you've already picked up stay gone (adv.picked holds "Area@x,y").
   if(typeof adv!=='undefined' && adv && adv.picked) for(const k in adv.picked){
     if(!k.startsWith(loc.name+'@2:')) continue;   // "@2:" = the Phase 1.5 route layouts
@@ -1813,7 +1850,7 @@ function getInterior(loc, bi){
     npcs.push({kind:g.kind, x:7, y:2, facing:'down', trainer:true, gymLeader:true},
       {kind:'gentleman', x:9, y:12, facing:'left', lines:[`Hey, challenger! ${loc.leaderName} uses ${g.type}-type Pokémon.`, "Bring Pokémon with the right type advantage and you'll be fine!"]});
     // Two juniors whose lines of sight cross the way up: one watching row 9 from the right, one row 5 from the left.
-    const J = GYM_JUNIORS[theme] || GYM_JUNIORS.fire, pick = (k,n)=>Array.from({length:n}, (_,i)=>J.team[(k*2+i) % J.team.length]);
+    const J = g.juniors || GYM_JUNIORS[theme] || GYM_JUNIORS.fire, pick = (k,n)=>Array.from({length:n}, (_,i)=>J.team[(k*2+i) % J.team.length]);
     const names = J.kind==='lass' || J.kind==='oldwoman' ? ['MAYA','LENA'] : ['TOMMY','CARL'];
     [[12,9,'left'],[2,5,'right']].forEach(([x,y,facing],k)=>npcs.push({kind:J.kind, x, y, facing, trainer:true, id:`${loc.name}#gym${k}`,
       title:`${J.cls} ${names[k]}`, team:pick(k, k+3), intro:`${loc.leaderName} is the best! You'll have to get past me first!`,
@@ -6410,6 +6447,130 @@ Object.assign(WEATHER, {"Sea Route 2":'fog', "Sea Route 7":'rain', "Sea Route 9"
   Object.assign(SUNDERED[20], {rivalAfter:["The ground... it stopped shaking? GROUDON listened to YOU?", "TEAM QUAKE will be back. The land always rises again."]});
   Object.assign(SUNDERED[21], {rivalAfter:["The rain eases... KYOGRE sinks back to the deep. You'll regret this.", "Every flood starts with one wave. Remember that."]});
   for(const loc of SUNDERED) getMap(loc);
+}
+
+// ---------- The Skyreach (4.0.0): the fourth region, reached by airship from PORT KEEL ----------
+// A highland of red mesas and floating rock around the SKY PILLAR, where RAYQUAZA sleeps. It's stacked in three
+// bands: the CANYON FLOOR (open when you land at WINDWARD), the MESA TOPS (updrafts carry you up once you have
+// three Skyreach badges) and CLOUD LEVEL (six). Inside a band the gyms go in any order. A meteor brings DEOXYS to
+// the crater by STARFALL; TEAM ZENITH wants its DNA for "perfect" POKéMON. With DEOXYS and RAYQUAZA settled and
+// eight badges, PILLAR HEART climbs the inside of the pillar to the League in its crown. Levels follow your
+// Skyreach badges (300, then 12 more per badge, up to 400). `at` is the region map's grid: x 0..8, y -1 (the
+// clouds) to 3 (the canyon floor).
+Object.assign(CHARS, {
+  pilot:        {head:'cap',   K:'#282830',R:'#704020',W:'#f8f8f8',S:'#e8b080',H:'#503018',B:'#a06030',D:'#383028',Y:'#f0d070'},
+  gruntZenith:  {head:'cap',   K:'#282830',R:'#e8e8f0',W:'#7058c8',S:'#e8b080',H:'#302848',B:'#e8e8f0',D:'#4838a0',Y:'#7058c8'},
+  adminZenith:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#c8c8e8',B:'#4838a0',D:'#282050',Y:'#f0e070'},
+  bossZenith:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8d8c0',H:'#f8f8f8',B:'#282050',D:'#e8e8f0',Y:'#7058c8'},
+  leaderDusty:  {head:'cap',   K:'#282830',R:'#a05028',W:'#f8f8f8',S:'#c08050',H:'#604028',B:'#c87840',D:'#584030',Y:'#f0d070'},
+  leaderRill:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#2878a8',B:'#48a868',D:'#285880',Y:'#f8f8f8'},
+  leaderSelene: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#e8e0f8',B:'#9070d0',D:'#f0b8d8',Y:'#f8f0a0'},
+  leaderBrisa:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#f8f8f8',B:'#88c0e8',D:'#5878a8',Y:'#f8f8f8'},
+  leaderPyra:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#b07040',H:'#c03018',B:'#e07030',D:'#603020',Y:'#f8d040'},
+  leaderStrom:  {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#505058',B:'#f0d040',D:'#606878',Y:'#f8f8f8'},
+  leaderRime:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e8e0',H:'#a8d8f0',B:'#e8f4ff',D:'#6890b0',Y:'#a8d8f0'},
+  leaderAerin:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#208858',B:'#3858a8',D:'#203060',Y:'#e8c040'},
+  rivalSora:    {head:'cap',   K:'#282830',R:'#e8e8f0',W:'#f8f8f8',S:'#e8b080',H:'#c87830',B:'#58a8e0',D:'#384868',Y:'#f8d040'},
+  eliteCrag:    {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#a87048',H:'#504040',B:'#988068',D:'#504030',Y:'#e0c090'},
+  eliteAstra:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#302860',B:'#d070b0',D:'#502868',Y:'#f8e8a0'},
+  eliteSteele:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#787880',B:'#a8b0c0',D:'#404858',Y:'#e08030'},
+  eliteWyra:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#882020',B:'#384890',D:'#201838',Y:'#e8c040'},
+  championAltair:{head:'short',K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#f0f0f8',B:'#2f9e5b',D:'#203828',Y:'#f2d64b'}});
+Object.assign(GYM_STYLE, {
+  Dusty:{kind:'leaderDusty', type:'Rock- and Ground', theme:'rock', juniors:{cls:'MINER', kind:'hiker', team:['Geodude-Sky','Drilbur','Roggenrola','Sandile','Rhyhorn-Sky','Nosepass']}},
+  Rill:{kind:'leaderRill', type:'Water- and Grass', theme:'water', juniors:{cls:'RAFTER', kind:'fisher', team:['Lotad','Lombre','Wooper','Bellsprout','Poliwag','Oddish']}},
+  Selene:{kind:'leaderSelene', type:'Psychic- and Fairy', theme:'psychic', juniors:{cls:'STARGAZER', kind:'girl', team:['Cleffa','Clefairy','Elgyem','Ralts','Solosis','Flittle']}},
+  Brisa:{kind:'leaderBrisa', type:'Flying- and Normal', theme:'flying', juniors:{cls:'GLIDER', kind:'boy', team:['Swablu-Sky','Rufflet','Starly','Taillow','Rookidee','Squawkabilly']}},
+  Pyra:{kind:'leaderPyra', type:'Fire- and Fighting', theme:'fire', juniors:{cls:'POTTER', kind:'hiker', team:['Ponyta-Sky','Tepig','Chimchar','Torchic','Makuhita','Charcadet']}},
+  Strom:{kind:'leaderStrom', type:'Electric- and Steel', theme:'electric', juniors:{cls:'STORM CHASER', kind:'boy', team:['Magnemite','Mareep','Electrike','Klink','Pawmi','Beldum']}},
+  Rime:{kind:'leaderRime', type:'Ice- and Rock', theme:'ice', juniors:{cls:'CLIMBER', kind:'girl', team:['Snorunt','Bergmite','Amaura','Swablu-Sky','Vanillite','Cetoddle']}},
+  Aerin:{kind:'leaderAerin', type:'Dragon- and Flying', theme:'dragon', juniors:{cls:'DRAGON RIDER', kind:'gentleman', team:['Bagon','Gible','Noibat','Swablu-Sky','Axew','Deino']}}});
+const ZENITH_TEAM = {cls:'ZENITH GRUNT', kind:'gruntZenith', pool:['Beldum','Porygon','Magnemite','Elgyem','Bronzor','Solosis'],
+  intro:["The meteor belongs to TEAM ZENITH! Stand aside!", "Perfect POKéMON need perfect DNA. Yours will do nicely!", "TEAM ZENITH reaches higher than you ever will!"],
+  after:["My data... corrupted...", "Not perfect yet. Not yet.", "Director HALLEY will hear about you."]};
+const ELITES_SKYREACH = [
+  {kind:'eliteCrag', title:'ELITE FOUR CRAG', team:['Tyranitar','Aerodactyl','Rhyperior','Graveler-Sky','Archeops','Gigalith'],
+   intro:"The mesas took a million years to build. Let's see how long you last against them!", after:"You stood like a mountain. Go on."},
+  {kind:'eliteAstra', title:'ELITE FOUR ASTRA', team:['Metagross','Alakazam','Gallade','Bronzong','Espathra','Reuniclus'],
+   intro:"I read the stars, and they read you. Shall we?", after:"The stars didn't see that coming. Neither did I."},
+  {kind:'eliteSteele', title:'ELITE FOUR STEELE', team:['Skarmory','Corviknight','Aegislash','Excadrill','Scizor','Archaludon'],
+   intro:"Up here, only the toughest metal survives the wind!", after:"Tempered and tested. The next door is yours."},
+  {kind:'eliteWyra', title:'ELITE FOUR WYRA', team:['Garchomp','Hydreigon','Dragapult','Rhydon-Sky','Haxorus','Kingdra'],
+   intro:"Dragons ride the winds around the pillar. Can you ride them too?", after:"You've earned the crown's door. The CHAMPION waits."}];
+const SKYREACH = [
+  // 0-8: the CANYON FLOOR, west to east
+  {type:'town', name:"Windward", at:[4,3], center:true, tint:'mesa', desc:"A trading town at the foot of the SKY PILLAR, where the airship docks. Wind sings through the canyon all day."},
+  {type:'route', name:"Canyon Route 1", at:[3,3], theme:'rocky', tint:'mesa', wind:true, desc:"A dry canyon west of WINDWARD. Gusts race along the riverbed.", pool:['Sandile','Trapinch','Geodude-Sky','Rhyhorn-Sky','Diglett','Mudbray']},
+  {type:'gym', name:"Cascade Gorge", at:[2,3], center:true, tint:'mesa', desc:"Waterfalls pour down the canyon walls into a green gorge. Leader Rill's gym is a raft dock.", leaderName:"Rill", leaderTeam:['Ludicolo','Swampert','Tangrowth','Kingler']},
+  {type:'route', name:"Canyon Route 2", at:[1,3], theme:'rocky', tint:'mesa', wind:true, treasure:['stoneplate'], desc:"Old mine carts rust beside the trail to OCHRE GULCH. Something hums deep in a side tunnel.", pool:['Geodude-Sky','Rolycoly','Onix','Drilbur','Sandile','Roggenrola']},
+  {type:'gym', name:"Ochre Gulch", at:[0,3], center:true, tint:'mesa', desc:"A mining town cut into ochre cliffs. Leader Dusty's gym is the old mine itself.", leaderName:"Dusty", leaderTeam:['Golem','Rhydon-Sky','Gliscor','Lycanroc']},
+  {type:'route', name:"Canyon Route 3", at:[5,3], theme:'rocky', tint:'mesa', wind:true, desc:"The road east to STARFALL. At night the sky here is full of shooting stars.", pool:['Ponyta-Sky','Baltoy','Elgyem','Solrock','Lunatone','Cleffa']},
+  {type:'gym', name:"Starfall", at:[6,3], center:true, tint:'mesa', desc:"A town of observatories beside the SPACE CENTER. Leader Selene's gym has a glass roof open to the stars.", leaderName:"Selene", leaderTeam:['Clefable','Gardevoir','Hatterene','Bronzong']},
+  {type:'trainer', kind:'boss', name:"Meteor Crater", at:[7,3], boss:true, shrine:true, legend:'Deoxys', grunts:3, theme:'rocky', tint:'mesa', gruntTeam:ZENITH_TEAM, bossKind:'adminZenith',
+   desc:"A fresh crater, still warm. A strange crystal pulses at its heart, and TEAM ZENITH's diggers ring it. \"The DNA from space is ours!\"",
+   leaderName:"Admin Vega", leaderTeam:['Metang','Porygon2','Beheeyem','Bronzong','Magneton','Duosion'], pool:['Beldum','Elgyem','Solosis','Bronzor','Lunatone']},
+  {type:'route', name:"Moonfall Hollow", at:[8,3], theme:'rocky', tint:'mesa', own:true, desc:"A hollow where an older meteor fell long ago. The locals say something dances here under the full moon.",
+   tablet:["Carved in the rock: \"WHEN THE MOON IS FULL, THEY COME DOWN TO DANCE.\"", "\"Count the minutes. On the full moon's minute, look for the one who dances alone.\""],
+   pool:['Clefairy','Cleffa','Lunatone','Solrock','Elgyem','Beldum']},
+  // 9-14: the MESA TOPS: west (updraft from OCHRE GULCH) and east (updraft from STARFALL)
+  {type:'route', name:"Mesa Route 4", at:[0,2], badges:3, theme:'rocky', tint:'mesa', wind:true, desc:"An updraft carries you up the cliff to the mesa tops. Up here the wind never stops.", pool:['Hawlucha','Swablu-Sky','Ponyta-Sky','Tauros','Rufflet','Vullaby']},
+  {type:'gym', name:"Gale Mesa", at:[0,1], center:true, tint:'mesa', desc:"Windmills line the mesa's edge. Leader Brisa's gym is the tallest of them.", leaderName:"Brisa", leaderTeam:['Staraptor','Braviary','Altaria-Sky','Swellow']},
+  {type:'trainer', kind:'rival', name:"Mesa Route 5", at:[1,1], theme:'rocky', tint:'mesa', wind:true, desc:"A glider lands in front of you. \"An off-lander? Up here? Let's see if you can keep up!\"",
+   leaderName:"Sora", rivalKind:'rivalSora', leaderTeam:['Talonflame','Noivern','Graveler-Sky','Rapidash-Sky','Salamence'], pool:['Swablu-Sky','Rufflet','Vullaby','Gligar']},
+  {type:'gym', name:"Kiln Mesa", at:[2,1], center:true, tint:'mesa', desc:"Adobe houses climb the cliff, and pottery kilns glow at every door. Leader Pyra's gym is the great kiln.", leaderName:"Pyra", leaderTeam:['Infernape','Blaziken','Rapidash-Sky','Emboar']},
+  {type:'route', name:"Mesa Route 6", at:[6,2], badges:3, theme:'rocky', tint:'mesa', wind:true, desc:"An updraft lifts you onto the eastern mesas. Lightning rods dot the ridge ahead.", pool:['Ponyta-Sky','Mareep','Electrike','Skarmory','Rufflet','Gligar']},
+  {type:'gym', name:"Thunderhead", at:[6,1], center:true, tint:'mesa', desc:"A mesa town under a storm that never moves on. Leader Strom's gym is a lightning tower.", leaderName:"Strom", leaderTeam:['Magnezone','Electivire','Aggron','Ampharos']},
+  {type:'trainer', kind:'boss', name:"Zenith Lab", at:[7,1], boss:true, grunts:3, theme:'rocky', tint:'mesa', gruntTeam:ZENITH_TEAM, bossKind:'adminZenith',
+   desc:"TEAM ZENITH's lab, built into the mesa. Tanks of glowing meteor DNA line the walls. \"Perfection is one experiment away!\"",
+   leaderName:"Admin Orion", leaderTeam:['Porygon-Z','Metagross','Magnezone','Reuniclus','Beheeyem','Bronzong'], pool:['Porygon','Magnemite','Elgyem','Beldum']},
+  // 15-21: CLOUD LEVEL: updrafts from KILN MESA and THUNDERHEAD, joined over the top of the SKY PILLAR
+  {type:'route', name:"Cloud Route 7", at:[2,0], badges:6, theme:'rocky', tint:'cloud', wind:true, desc:"An updraft lifts you through the clouds. Rocks float in the wind, and you walk from one to the next.", pool:['Swablu-Sky','Altaria-Sky','Snorunt','Vanillite','Noibat','Tropius']},
+  {type:'gym', name:"Frostcrown", at:[2,-1], center:true, tint:'cloud', desc:"A snowy spire above the clouds. Leader Rime's gym is carved out of the ice.", leaderName:"Rime", leaderTeam:['Mamoswine','Aurorus','Avalugg','Glalie']},
+  {type:'route', name:"Cloud Route 9", at:[3,-1], theme:'rocky', tint:'cloud', wind:true, desc:"A causeway of floating rock toward the top of the SKY PILLAR. The wind is fierce.", pool:['Altaria-Sky','Noivern','Shelgon','Snover','Bergmite','Amaura']},
+  {type:'trainer', kind:'boss', name:"Sky Pillar", at:[4,-1], boss:true, shrine:true, legend:'Rayquaza', grunts:3, theme:'rocky', tint:'cloud', gruntTeam:ZENITH_TEAM, bossKind:'bossZenith',
+   desc:"The top of the SKY PILLAR, above the clouds. Director HALLEY waits by the old altar. \"Rayquaza will fall, and my perfect POKéMON will rule the sky!\"",
+   leaderName:"Director Halley", leaderTeam:['Metagross','Porygon-Z','Rhydon-Sky','Altaria-Sky','Magnezone','Reuniclus'], pool:['Altaria-Sky','Noivern','Salamence','Dragonair']},
+  {type:'route', name:"Cloud Route 10", at:[5,-1], theme:'rocky', tint:'cloud', wind:true, treasure:['skyplate'], desc:"Dragons nest on the floating rocks here. Something glints on the highest one.", pool:['Altaria-Sky','Noibat','Gible','Dratini','Staravia','Bagon']},
+  {type:'gym', name:"The Aerie", at:[6,-1], center:true, tint:'cloud', desc:"Dragon nests on floating rock, joined by rope bridges. Leader Aerin's gym is the biggest nest.", leaderName:"Aerin", leaderTeam:['Dragonite','Salamence','Altaria-Sky','Noivern']},
+  {type:'route', name:"Cloud Route 8", at:[6,0], badges:6, theme:'rocky', tint:'cloud', wind:true, desc:"An updraft lifts you from the storm mesa into the clouds.", pool:['Swablu-Sky','Noibat','Bagon','Rhyhorn-Sky','Skarmory','Staravia']},
+  // 22-23: inside the SKY PILLAR
+  {type:'route', name:"Pillar Heart", at:[4,2], badges:8, aces:true, theme:'cave', desc:"Stairs wind up the inside of the SKY PILLAR. Only trainers with all eight Skyreach badges, who settled RAYQUAZA and DEOXYS, may climb.", pool:['Rhydon-Sky','Graveler-Sky','Gabite','Shelgon','Metang','Altaria-Sky']},
+  {type:'town', name:"Skyreach League", at:[4,1], center:true, league:true, champion:true, elites:ELITES_SKYREACH, championKind:'championAltair',
+   championQuote:"You calmed the sky and the thing that fell from it. Now you stand in the pillar's crown. I am ALTAIR, CHAMPION of the SKYREACH!",
+   desc:"The Pokémon League of the Skyreach, in the crown of the SKY PILLAR. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Altair", leaderTeam:['Salamence','Metagross','Altaria-Sky','Rapidash-Sky','Tyranitar','Dragonite']}];
+// Weather up high: strong winds over the clouds and the pillar, the storm mesa's rain, snow on the spire.
+Object.assign(WEATHER, {"Thunderhead":'rain', "Mesa Route 6":'rain', "Frostcrown":'snow', "Cloud Route 7":'wind', "Cloud Route 8":'wind',
+  "Cloud Route 9":'wind', "Cloud Route 10":'wind', "Sky Pillar":'wind', "The Aerie":'wind', "Pillar Heart":'cave'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of SKYREACH){ loc.region = 4; loc.tier = 35; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  // Nothing inside a band is gated but SORA's glide; the updrafts ask for badges (the routes' `badges`), and
+  // PILLAR HEART for DEOXYS and RAYQUAZA too.
+  const join = (a, b, dir, gate=false)=>{
+    (SKYREACH[a].links ||= []).push({dir, to:S(b), gate});
+    (SKYREACH[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  // The canyon floor, out from WINDWARD both ways.
+  walk(0, [[1,'left'],[2,'left'],[3,'left'],[4,'left']]);
+  walk(0, [[5,'right'],[6,'right'],[7,'right'],[8,'right']]);
+  // The updrafts, and the mesas.
+  walk(4, [[9,'up'],[10,'up'],[11,'right'],[12,'right',true]]);   // SORA blocks the way to KILN MESA
+  walk(6, [[13,'up'],[14,'up'],[15,'right']]);
+  // Cloud level, over the top of the pillar.
+  walk(12, [[16,'up'],[17,'up'],[18,'right'],[19,'right'],[20,'right'],[21,'right']]);
+  join(14, 22, 'up'); join(22, 21, 'up');
+  // Inside the pillar: up from WINDWARD to the crown.
+  join(0, 23, 'up'); join(23, 24, 'up');
+  for(const l of SKYREACH[0].links) if(l.to===S(23)) l.need = 'shrines';
+  Object.assign(SKYREACH[11], {rivalAfter:["Whoa... you flew right past me, and you don't even have wings! I'm SORA. I ride the updrafts here.", "TEAM ZENITH dug up the meteor that fell by STARFALL. Now they've got a lab out on the eastern mesas.", "If they mess with the SKY PILLAR, the old dragon up top won't stay asleep. Be careful up there!"]});
+  Object.assign(SKYREACH[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION! I hitched a ride on the next airship. My ears still haven't popped.\"", "KAI: \"Did you see that meteor last night? It came down by STARFALL, east of town.\"", "KAI: \"They say RAYQUAZA sleeps up on the SKY PILLAR. Settle whatever's going on and the stairs inside open up.\""]}});
+  Object.assign(SKYREACH[7], {rivalAfter:["The crystal... it's moving? Get back! It's waking up!", "Fine. Take your space rock. ZENITH has samples enough."]});
+  Object.assign(SKYREACH[15], {rivalAfter:["The DNA is gone... Director HALLEY took it all up to the SKY PILLAR!", "With RAYQUAZA's power added in, the perfect POKéMON will be born. You're too late."]});
+  Object.assign(SKYREACH[19], {rivalAfter:["Perfect... was a lie? Then what is that, coming down from the sky?", "RAYQUAZA... it's looking at you. Not at me. At YOU."]});
+  for(const loc of SKYREACH) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------

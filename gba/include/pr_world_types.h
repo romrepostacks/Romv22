@@ -34,7 +34,11 @@ enum class behaviour : uint8_t
     COUNTER,        // talk across it
     PC,
     MAT,            // a room's exit
-    STATUE          // a gym's statue (its name, leader and winners)
+    STATUE,         // a gym's statue (its name, leader and winners)
+    WIND_UP,        // 4.0.0: the SKYREACH's wind currents carry you this way until you're off them
+    WIND_DOWN,
+    WIND_LEFT,
+    WIND_RIGHT
 };
 
 // Building kinds, as the web game names them (buildTown).
@@ -61,7 +65,12 @@ enum class person_role : uint8_t
     TUTOR,          // the MOVE TUTOR in every POKéMON CENTER (GBA 1.8)
     FERRY,          // the SAILOR between PORTMERE HARBOUR and PORT CALDER (2.0.0)
     PROF,           // PORT CALDER's professor: the Calderra starter (2.0.0)
-    CAPTAIN         // the ship's CAPTAIN between PORT CALDER and PORT KEEL (3.0.0)
+    CAPTAIN,        // the ship's CAPTAIN between PORT CALDER and PORT KEEL (3.0.0)
+    PILOT,          // the airship's PILOT between PORT KEEL and WINDWARD (4.0.0)
+    SHARD_NORMAL,   // a meteorite shard: DEOXYS in your party takes this form (4.0.0)
+    SHARD_ATTACK,
+    SHARD_DEFENSE,
+    SHARD_SPEED
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
@@ -249,7 +258,8 @@ enum class area_weather : uint8_t
     ASH,
     FOG,
     DEEP,
-    CAVE
+    CAVE,
+    WIND            // 4.0.0: strong winds above the SKYREACH's clouds (Flying types lose their weaknesses)
 };
 
 namespace area_flag

@@ -1,4 +1,4 @@
-"""Draws the Sundered forms' sprites once (3.0.0): each is its original's front, back and shiny sprites from
+"""Draws the Sundered forms' (3.0.0) and the Skyreach forms' (4.0.0) sprites once: each is its original's front, back and shiny sprites from
 sprites/pokemon/, recoloured toward the form's new type (SUNDERED_FORMS in js/app.js), saved under the form's
 own number. Greys and outlines keep their colour; everything else is pulled to the form's hue.
 Run by hand when the forms change; build_assets.py only reads the PNGs."""
@@ -8,7 +8,8 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SPRITES = os.path.join(HERE, '..', '..', '..', 'sprites', 'pokemon')
 
-# original's number -> (form's number, target hue in degrees, how far toward it 0..1, saturation scale)
+# original's number -> (form's number, target hue in degrees, how far toward it 0..1, saturation scale[, greys'
+# new saturation: 4.0.0's rocky forms tint their grey body too])
 FORMS = {
     27: (2001, 200, 0.75, 1.1),     # Sandshrew: sea-washed sand, blue-grey
     28: (2002, 200, 0.75, 1.1),
@@ -22,10 +23,19 @@ FORMS = {
     319: (2010, 270, 0.8, 0.9),
     302: (2011, 45, 0.8, 1.2),      # Sableye: pirate gold
     324: (2012, 175, 0.8, 1.0),     # Torkoal: steam, teal
+    # 4.0.0: the Skyreach forms (SKYREACH_FORMS): sky blue, white and wind.
+    74: (2013, 205, 0.7, 1.0, 0.35),    # Geodude: floating rock, sky blue (its greys too)
+    75: (2014, 205, 0.7, 1.0, 0.35),
+    77: (2015, 195, 0.85, 0.9),     # Ponyta: a cloud mane, pale blue
+    78: (2016, 195, 0.85, 0.9),
+    333: (2017, 180, 0.6, 0.7),     # Swablu: frost, icy cyan
+    334: (2018, 180, 0.6, 0.7),
+    111: (2019, 15, 0.75, 1.2, 0.45),   # Rhyhorn: red mesa rock (its greys too)
+    112: (2020, 15, 0.75, 1.2, 0.45),
 }
 
 
-def recolour(src, dst, hue, pull, sat):
+def recolour(src, dst, hue, pull, sat, grey=0):
     im = Image.open(src).convert('RGBA')
     px = im.load()
     h_to = hue / 360
@@ -35,8 +45,13 @@ def recolour(src, dst, hue, pull, sat):
             if a == 0:
                 continue
             h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if s < 0.18 or v < 0.15:
-                continue                    # greys, whites and outlines stay
+            if v < 0.15 or (s < 0.18 and (not grey or v > 0.92)):
+                continue                    # greys, whites and outlines stay (but a form's greys, if it says so)
+            if s < 0.18:
+                h, s = h_to, grey
+                r, g, b = colorsys.hsv_to_rgb(h, s, v)
+                px[x, y] = (int(r * 255), int(g * 255), int(b * 255), a)
+                continue
             d = (h_to - h + 0.5) % 1 - 0.5  # the short way round
             h = (h + d * pull) % 1
             r, g, b = colorsys.hsv_to_rgb(h, min(1, s * sat), v)
@@ -45,9 +60,9 @@ def recolour(src, dst, hue, pull, sat):
     im.save(dst)
 
 
-for orig, (num, hue, pull, sat) in FORMS.items():
+for orig, (num, hue, pull, sat, *grey) in FORMS.items():
     for sub in ('', 'back/', 'shiny/', 'back/shiny/'):
         src = os.path.join(SPRITES, sub + '%d.png' % orig)
         if os.path.exists(src):
             # Shinies take the form's hue from the other side of the wheel, so they still stand out.
-            recolour(src, os.path.join(SPRITES, sub + '%d.png' % num), hue + (150 if 'shiny' in sub else 0), pull, sat)
+            recolour(src, os.path.join(SPRITES, sub + '%d.png' % num), hue + (150 if 'shiny' in sub else 0), pull, sat, *grey)

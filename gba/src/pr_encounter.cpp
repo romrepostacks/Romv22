@@ -64,6 +64,7 @@ namespace
             s.smart = true;
             s.boss_heals = ! route || elite ? (region >= 3 ? 2 : 1) : 0;
             s.sharp = region >= 3;
+            s.keen = region >= 4;
         }
         species_id names[6];
         int n = 0;
@@ -255,7 +256,7 @@ namespace
         int clears = g.run.tower_clears;
         bool master = floor == 4;
         // 2.0.0: the floors climb to 200 once you're CALDERRA's CHAMPION (3.0.0: 300, the SUNDERED ISLES').
-        int top = g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
+        int top = g.flags.test(flag::SKYREACH_CHAMPION) ? 400 : g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
         int base = bn::min(top, bn::max(50 + 3 * clears, g.average_level() + clears));
         int size = master ? 6 : bn::min(6, 3 + (floor + 1) / 2 + clears / 2);
         tower_team(s, type_index(floor_types[floor]), size, bn::min(top, base + floor + (master ? 2 : 0)), clears);
@@ -408,7 +409,10 @@ battle_report battle_scene(const encounter& e)
         if(a && a->region >= 3 && ! s->free)
         {
             s->weather = a->weather == area_weather::RAIN ? battle_weather::RAIN
-                       : a->weather == area_weather::ASH ? battle_weather::SUN : battle_weather::NONE;
+                       : a->weather == area_weather::ASH ? battle_weather::SUN
+                       // 4.0.0: the SKYREACH's strong winds over the clouds, and hail on the snowy spire.
+                       : a->weather == area_weather::WIND ? battle_weather::WIND
+                       : a->weather == area_weather::SNOW && a->region >= 4 ? battle_weather::HAIL : battle_weather::NONE;
         }
     }
     clear_pending_moves();

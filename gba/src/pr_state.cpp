@@ -728,6 +728,10 @@ int legend_flag(species_id legend)
         return flag::GROUDON;
     case species_id::KYOGRE:
         return flag::KYOGRE;
+    case species_id::RAYQUAZA:
+        return flag::RAYQUAZA;
+    case species_id::DEOXYS:
+        return flag::DEOXYS;
     default:
         return -1;
     }

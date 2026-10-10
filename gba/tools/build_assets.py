@@ -32,10 +32,14 @@ ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awak
             'dawnstone', 'icestone', 'ovalstone', 'razorclaw', 'razorfang', 'linkingcord']
             # ... then the TMs (add_extras), then GBA 1.9's held items (after the TMs, so older saves' bags stay a prefix)
 HELD_ITEM_IDS = ['leftovers', 'lifeorb', 'choicescarf', 'focussash', 'sitrusberry']    # HELD's order
+# 4.0.0: the ARCEUS plates, two hidden in each region from the SKYREACH on (after the held items, so bags stay a prefix).
+PLATE_IDS = ['skyplate', 'stoneplate']
 # GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
 GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
              'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
              'masterball': {'name': 'MASTER BALL', 'pocket': 1, 'desc': 'The best ball there is. It catches any wild POKéMON without fail.', 'price': 0},
+             'skyplate': {'name': 'SKY PLATE', 'pocket': 4, 'desc': 'An old stone tablet, light as air. It hums when the wind blows. What is it for?'},
+             'stoneplate': {'name': 'STONE PLATE', 'pocket': 4, 'desc': 'An old stone tablet, heavy as a mountain. Something about it feels ancient.'},
              'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800},
              # GBA 1.8
              'maxpotion': {'name': 'MAX POTION', 'pocket': 0, 'desc': 'A spray-type medicine. It fully restores the HP of one POKéMON.', 'price': 2500, 'heal': 999},
@@ -426,7 +430,8 @@ def build_world(exp, data, out_inc):
         for i, n in enumerate(people):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
             role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER', 'daycare': 'DAYCARE',
-                    'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF', 'captain': 'CAPTAIN'}.get(n.get('role', ''), 'NONE')
+                    'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF', 'captain': 'CAPTAIN', 'pilot': 'PILOT',
+                    'shard0': 'SHARD_NORMAL', 'shard1': 'SHARD_ATTACK', 'shard2': 'SHARD_DEFENSE', 'shard3': 'SHARD_SPEED'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -568,6 +573,32 @@ def build_world(exp, data, out_inc):
                 a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
                     'An old ship\'s figurehead, carved like HO-OH. A plaque reads: "From CALDERRA, with thanks."',
                     'Someone has carved three sets of paw prints into the base: thunder, fire and rain.']})
+        if a['name'] in PILOT_PORTS:
+            # 4.0.0: the airship's PILOT between PORT KEEL and WINDWARD (after everything older, so nothing moves).
+            hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+            x, y = free_spot(a, a['spawn']['x'] + 2, a['spawn']['y'] + 1, hid)
+            a['people'].append({'kind': 'pilot', 'x': x, 'y': y, 'facing': 'down', 'role': 'pilot', 'wander': False,
+                                'lines': ['PILOT: "My airship flies between the SUNDERED ISLES and the SKYREACH."']})
+            if a['region'] == 4:
+                # ...and WINDWARD's carving at the foot of the SKY PILLAR: the Emerald trio.
+                x, y = free_spot(a, a['spawn']['x'] - 3, a['spawn']['y'] - 3, hid)
+                a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
+                    'An old carving on a fallen block of the SKY PILLAR: GROUDON and KYOGRE, and RAYQUAZA between them.',
+                    'Underneath: "THE ONE WHO STOPPED THE SUNDERING SLEEPS ABOVE THE CLOUDS."']})
+                # ...and the SPACE CENTER's launch board, brought down to the airship dock.
+                x, y = free_spot(a, a['spawn']['x'] + 4, a['spawn']['y'] - 2, hid)
+                a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': '', 'wander': False, 'lines': [
+                    'A launch board from the SPACE CENTER. "NEXT LAUNCH: 4.0.0". The countdown reads 4... 3... 2... 1...',
+                    '"...LIFTOFF! Thank you for flying to the SKYREACH."']})
+        if a['name'] in SHARDS:
+            # 4.0.0: a meteorite shard: DEOXYS in your party takes its form here.
+            form, where = SHARDS[a['name']]
+            hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+            # (On a route, near the middle, out of the narrow way in.)
+            near = (a['w'] // 2 + 3, a['h'] // 2 + 2) if a['type'] in ('route', 'trainer') else (a['spawn']['x'] + 1, a['spawn']['y'] - 2)
+            x, y = free_spot(a, near[0], near[1], hid)
+            a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': 'shard%d' % form, 'wander': False,
+                                'lines': ['A shard of the meteor, %s. It hums with a strange power.' % where]})
 
     # 2.0.1: KAI before the CRATER RIM: on the dock at PORT CALDER, then at the top of each branch. Placed last,
     # with trainer ids after every other one, so nothing already beaten moves.
@@ -634,7 +665,7 @@ def build_world(exp, data, out_inc):
         if a['champion']:
             gate = 'NONE'
         theme = {'plain': 'PLAIN', 'forest': 'FOREST', 'lake': 'LAKE', 'rocky': 'ROCKY', 'sea': 'SEA', 'deep': 'DEEP', 'cave': 'CAVE'}[a['theme']]
-        weather = {'': 'NONE', 'rain': 'RAIN', 'snow': 'SNOW', 'ash': 'ASH', 'fog': 'FOG', 'deep': 'DEEP', 'cave': 'CAVE'}[a['weather']]
+        weather = {'': 'NONE', 'rain': 'RAIN', 'snow': 'SNOW', 'ash': 'ASH', 'fog': 'FOG', 'deep': 'DEEP', 'cave': 'CAVE', 'wind': 'WIND'}[a['weather']]
         kind = {'town': 'TOWN', 'route': 'ROUTE', 'gym': 'GYM', 'trainer': 'TRAINER'}[a['type']]
         flags = []
         if a['center']: flags.append('area_flag::CENTER')
@@ -1100,6 +1131,10 @@ WRITTEN = set()      # graphics files this run produced
 
 FERRY_PORTS = ('Portmere Harbour', 'Port Calder')
 CAPTAIN_PORTS = ('Port Calder', 'Port Keel')
+PILOT_PORTS = ('Port Keel', 'Windward')
+# 4.0.0: the meteorite shards: area -> (DEOXYS' form there: Normal, Attack, Defense, Speed; where it lies).
+SHARDS = {'Meteor Crater': (0, 'still warm from the fall'), 'Ochre Gulch': (1, 'jagged and sharp'),
+          'Frostcrown': (2, 'frozen into the ice'), 'Gale Mesa': (3, 'spinning in the wind')}
 # KAI's early battles (2.0.1): area -> (rows from the spawn, facing, team, intro, after).
 KAI_BRANCH = (-3, 'down', ['Corviknight', 'Drakloak', 'Lokix', 'Bisharp'],
               "You again? The beasts are up ahead, and I'm not losing this race!",
@@ -1778,6 +1813,7 @@ def add_extras(data):
                           'desc': what + ' Teach it again and again.'}
         data['tms'].append({'move': mi, 'item': key, 'badges': badges, 'slug': t['move']})
     ITEM_IDS.extend(HELD_ITEM_IDS)
+    ITEM_IDS.extend(PLATE_IDS)
     if len(ITEM_IDS) > 255:
         raise SystemExit('%d kinds of items (max 255)' % len(ITEM_IDS))
     data['tm_compat'] = []
@@ -1923,7 +1959,9 @@ def build_game_data(data, out_inc):
           '// 2.0.0: the species from here on came with Gen 8 and 9: CALDERRA\'s POKéDEX.',
           'constexpr int species_v1 = %d;\n' % data.get('species_v1', len(names)),
           '// 3.0.0: the Sundered forms, from here on: the SUNDERED ISLES\' POKéDEX.',
-          'constexpr int species_v2 = %d;\n' % data.get('species_v2', len(names))]
+          'constexpr int species_v2 = %d;\n' % data.get('species_v2', len(names)),
+          '// 4.0.0: the Skyreach forms and DEOXYS\' forms, from here on: the SKYREACH\'s POKéDEX.',
+          'constexpr int species_v3 = %d;\n' % data.get('species_v3', len(names))]
     E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
           'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']

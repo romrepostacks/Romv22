@@ -397,6 +397,16 @@ int move_effectiveness_x4(const mon& user, const move& mv, const mon& target)
     return eff_x4;
 }
 
+int wind_effectiveness_x4(int eff_x4, const move& mv, const mon& target, battle_weather weather)
+{
+    static const int flying = type_index("FLYING");
+    if(weather == battle_weather::WIND && target.has_type(flying) && game_data::type_chart[mv.type][flying] > 2)
+    {
+        eff_x4 = eff_x4 * 2 / game_data::type_chart[mv.type][flying];   // the Flying half of it counts as neutral
+    }
+    return eff_x4;
+}
+
 // damage(): ((2L/5+2) * P * A/D / 50 + 2) * STAB * type * random(0.85-1), with the abilities and held
 // items that change it, and the battle's stat stages, weather and spread. Computed in floating point, as the
 // browser does.
@@ -406,7 +416,7 @@ damage_result calc_damage(const mon& user, const move& mv, const mon& target, bn
     double atk_stat = (physical ? user.atk : user.spa) * stage_x100(mods.atk_stage) / 100.0;
     double def_stat = bn::max(1, int(physical ? target.def : target.spd)) * stage_x100(mods.def_stage) / 100.0;
     double stab = user.has_type(mv.type) ? 1.5 : 1;
-    int eff_x4 = move_effectiveness_x4(user, mv, target);
+    int eff_x4 = wind_effectiveness_x4(move_effectiveness_x4(user, mv, target), mv, target, mods.weather);
     const ability& ua = user.abil();
     static const int water = type_index("WATER"), fire = type_index("FIRE"), rock = type_index("ROCK");
     double weather = 1;

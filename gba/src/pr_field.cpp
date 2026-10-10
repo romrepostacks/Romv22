@@ -162,7 +162,7 @@ namespace
     {
         game_state& g = state();
         int clears = bn::max(0, g.run.tower_clears - 1);
-        return bn::min(g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
+        return bn::min(g.flags.test(flag::SKYREACH_CHAMPION) ? 400 : g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
     }
 }
 
@@ -441,6 +441,19 @@ void overworld::talk_to(int index)
         break;
     case person_role::CAPTAIN:
         captain();
+        break;
+    case person_role::PILOT:
+        pilot();
+        break;
+    case person_role::SHARD_NORMAL:
+    case person_role::SHARD_ATTACK:
+    case person_role::SHARD_DEFENSE:
+    case person_role::SHARD_SPEED:
+        for(int i = 0; i < p.lines_count; ++i)
+        {
+            say(p.lines[i]);
+        }
+        meteor_shard(int(p.role) - int(person_role::SHARD_NORMAL));
         break;
     case person_role::FERRY:
         ferry();
@@ -2177,6 +2190,23 @@ void overworld::after_story()
             story_say("MAREA: \"Groudon sleeps, Kyogre sleeps, and the islands stay islands. Sail where you like, CHAMPION!\"");
         }
     }
+    // The Skyreach's League beaten for the first time (4.0.0).
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == 4 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
+           ! g.flags.test(flag::SKYREACH_CHAMPION))
+        {
+            g.flags.set(flag::SKYREACH_CHAMPION);
+            save_game();
+            suspend();
+            audio::play_music("credits");
+            hall_of_fame_screen("SKYREACH");
+            resume();
+            story_say("ALTAIR: \"The wind changes, and so does the crown. The SKYREACH has a new CHAMPION.\"");
+            story_say("ALTAIR: \"Rayquaza guards the sky again, and the thing from space found a friend. Fly where you like!\"");
+        }
+    }
     if(g.has(story::DIVE_GIFT))
     {
         g.story &= ~story::DIVE_GIFT;
@@ -2219,10 +2249,10 @@ void overworld::after_story()
             }
             else
             {
-                bool isles = map_region(_map_index) == 3;
-                text.append(isles ? " sank back into its slumber..." : " fled into the crater's wilds...");
+                bool isles = map_region(_map_index) == 3, sky = map_region(_map_index) == 4;
+                text.append(sky ? " rose back into the sky..." : isles ? " sank back into its slumber..." : " fled into the crater's wilds...");
                 say(text);
-                say(isles ? "It still sleeps here. Come back and try again." : "Maybe it will return to its shrine.");
+                say(sky ? "It will come back here. Try again." : isles ? "It still sleeps here. Come back and try again." : "Maybe it will return to its shrine.");
             }
         }
         else
@@ -2436,6 +2466,79 @@ void overworld::captain()
                 }
             }
         }
+    }
+}
+
+// The airship's PILOT (4.0.0): PORT KEEL to WINDWARD in the SKYREACH for the SUNDERED ISLES' CHAMPION, and back.
+// It lands you at the other end's PILOT.
+void overworld::pilot()
+{
+    game_state& g = state();
+    ui& u = gui();
+    bool home = map_region(_map_index) == 3;
+    if(home && ! g.flags.test(flag::SUNDERED_CHAMPION))
+    {
+        say("PILOT: \"The SKYREACH is a long way up, and the wind there is no joke. Beat the SUNDERED LEAGUE first.\"");
+        return;
+    }
+    u.show_text(home ? "PILOT: \"Hey, CHAMPION! My airship flies up to the SKYREACH, land of mesas and sky. Take off?\""
+                     : "PILOT: \"Heading back down to PORT KEEL? Take off?\"");
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == (home ? 4 : 3))
+        {
+            for(int k = 0; k < m.people_count; ++k)
+            {
+                if(m.people[k].role == person_role::PILOT)
+                {
+                    fast_travel(i);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+// A meteorite shard (4.0.0): DEOXYS in your party takes this shard's form (0 Normal, 1 Attack, 2 Defense, 3 Speed).
+void overworld::meteor_shard(int form)
+{
+    game_state& g = state();
+    constexpr species_id forms[] = { species_id::DEOXYS, species_id::DEOXYS_ATTACK, species_id::DEOXYS_DEFENSE,
+                                     species_id::DEOXYS_SPEED };
+    bool any = false;
+    for(int i = 0; i < g.party_count; ++i)
+    {
+        mon& m = g.party[i];
+        bool deoxys = false;
+        for(species_id f : forms)
+        {
+            deoxys |= m.species_index == uint16_t(f);
+        }
+        if(! deoxys || m.species_index == uint16_t(forms[form]))
+        {
+            continue;
+        }
+        if(! any)
+        {
+            say("The meteorite shard glows. Something in your party answers it...");
+        }
+        any = true;
+        m.set_species(int(forms[form]));
+        g.mark_owned(int(forms[form]));
+        bn::string<64> text(m.name());
+        text.append(" changed its form!");
+        say(text);
+    }
+    if(any)
+    {
+        save_game();
     }
 }
 
@@ -3680,7 +3783,8 @@ bool overworld::offer_rematch(int index)
     actor& a = _actors[index];
     // 2.0.0: once you're CALDERRA's CHAMPION, its GYM LEADERS take rematches too, at level 200.
     bool leader = a.tr->role == trainer_role::LEADER && map_region(_map_index) >= 2 &&
-                  g.flags.test(map_region(_map_index) == 3 ? flag::SUNDERED_CHAMPION : flag::CALDERRA_CHAMPION);
+                  g.flags.test(map_region(_map_index) == 4 ? flag::SKYREACH_CHAMPION :
+                               map_region(_map_index) == 3 ? flag::SUNDERED_CHAMPION : flag::CALDERRA_CHAMPION);
     if((a.tr->role != trainer_role::ROUTE && ! leader) || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
        g.first_able() < 0 || g.tower.active)
     {

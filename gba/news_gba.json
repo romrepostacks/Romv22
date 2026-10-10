@@ -1,7 +1,24 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 3.1.0: a third the size, room for all nine regions!",
+  "motd": "Version 4.0.0: the Skyreach! Fly from PORT KEEL to region four.",
   "changelog": [
+    {
+      "version": "GBA 4.0.0",
+      "date": "2026-10-10",
+      "title": "The Skyreach",
+      "changes": [
+        "A fourth region, the SKYREACH: after the SUNDERED LEAGUE, the airship pilot at PORT KEEL flies you to WINDWARD",
+        "Three altitude bands: canyon floor, mesa tops and cloud level. Updrafts lift you higher at 3 and 6 SKYREACH badges",
+        "Eight gyms, each mixing two types, then the Elite Four and Champion ALTAIR at level 400",
+        "Team ZENITH, rival SORA, and the legends RAYQUAZA (SKY PILLAR) and DEOXYS (METEOR CRATER)",
+        "Meteorite shards change DEOXYS' form: Normal, Attack, Defense and Speed",
+        "Skyreach forms of GEODUDE, PONYTA, SWABLU and RHYHORN and their evolutions",
+        "Wind currents on the routes push you along, and strong winds in battle shield FLYING POKéMON from their weaknesses",
+        "Skyreach trainers spot your threats and go after them first",
+        "Two hidden plates: the SKY PLATE and the STONE PLATE",
+        "The level cap rises to 400; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 3.1.0",
       "date": "2026-10-10",

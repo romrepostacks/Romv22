@@ -2,7 +2,8 @@
 
 Game title: Poké Legends: Lands of Nine. Version scheme: X.0.0 new region · 0.X.0 major features · 0.0.X fixes.
 4.0.0 = the fourth region, themed on Rayquaza and Deoxys, with the level cap raised to 400. Theme agreed with Kyle on
-2026-10-10 (plans/regions-4-9-themes.md); this plan is the draft for his OK.
+2026-10-10 (plans/regions-4-9-themes.md); Kyle OK'd this plan and map on 2026-10-10. Built on branch
+`claude/project-thread-h2yarj`; notes marked **Built:** say where the build differs from the draft.
 Map: [skyreach-map.png](skyreach-map.png) (source: skyreach-map.svg). It's a side view, because this region is about height.
 
 ## What earlier versions already give us
@@ -40,6 +41,8 @@ The region is stacked rather than spread out. Each band is a ring of gyms and ro
   cloud routes they make small puzzles (ride the right current to reach a ledge or an item).
 - **Pillar Heart** (Victory Road) climbs the inside of the Sky Pillar from Windward to the **Skyreach League** in its
   crown. It opens with all 8 badges and both legends settled.
+- **Built:** 25 areas. Wind currents are arrow tiles beside the route paths that push you one more step; Cloud Route 9
+  and 10 lead from Frostcrown to the Sky Pillar and The Aerie.
 - About 24 areas: Windward, 8 gym towns, 8 routes (Canyon Routes 1 to 3, Mesa Routes 4 to 6, Cloud Routes 7 and 8),
   the Meteor Crater, Zenith Lab, the Sky Pillar, Pillar Heart, the League and Moonfall Hollow.
 
@@ -87,18 +90,22 @@ Ice/Flying Swablu line, a Rock/Dragon Rhyhorn line. Fully homebrew Pokémon stil
 - Bosses keep two FULL RESTOREs, as in the Isles.
 - New for this region: the `smart` AI **switches out** of a bad matchup when another Pokémon on its team takes the hit
   better, and it saves its strongest Pokémon for last.
+- **Built:** battles put every Pokémon on the field at once, so there is nothing to switch to. Instead Skyreach
+  trainers are **keen**: they go first for whichever of your Pokémon threatens them with a super-effective move.
 - Check: stat formulas and the XP curve to 400, and the 4-digit HP and stat numbers on screen.
 
 ## Arceus plates
 Two of the 18 plates are hidden here: the **Sky Plate** on the highest floating rock past The Aerie, reached by a
 chain of wind currents, and the **Stone Plate** deep in the Ochre Gulch mine. Nothing explains them yet; region 9 does.
 They're appended as new items (the save's bag holds 256 item kinds).
+**Built:** the Sky Plate is on Cloud Route 10 and the Stone Plate on Canyon Route 2, as item balls.
 
 ## Extras
 1. **Altitude region map.** The region map is a side view like the draft: canyon floor, mesas and clouds, with the
    pillar in the middle and fast travel like the other regions.
 2. **Strong winds.** A new weather on the cloud routes and the Sky Pillar that carries into battle: Flying types lose
    their weaknesses, like Rayquaza's Delta Stream. Thunderhead gets rain, the canyon floor gets sandstorms.
+   **Built:** no canyon sandstorms; Frostcrown has snow, which becomes hail in battle.
 3. **Easter eggs:** the Space Center's launch board counts down to "4.0.0"; in **Moonfall Hollow** by the crater, a lone
    Clefairy dances only on full-moon play-time minutes; Groudon and Kyogre are carved at the pillar's base with
    Rayquaza between them.

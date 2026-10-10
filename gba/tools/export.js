@@ -28,7 +28,7 @@ vm.runInContext(src + `
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, gymTheme, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, SUNDERED_FORMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, SUNDERED_FORMS, SKYREACH_FORMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
 // The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
@@ -88,7 +88,7 @@ const savePng = (name, c)=>writePng(path.join(OUT, name), c.w, c.h, c.d);
 const GRASS = hex(G.GROUND.base);
 const tallGrass = svgPixels(G.tallGrassSvg());
 const BEHAVIOUR = {walk:0, solid:1, tall:2, water:3, ledgeDown:4, ledgeRight:5, ledgeLeft:6, sign:7, door:8, item:9,
-  counter:10, pc:11, mat:12, statue:13};
+  counter:10, pc:11, mat:12, statue:13, windUp:14, windDown:15, windLeft:16, windRight:17};
 function behaviour(ch){
   if(ch==='"') return BEHAVIOUR.tall;
   if(ch==='~') return BEHAVIOUR.water;
@@ -102,6 +102,10 @@ function behaviour(ch){
   if(ch==='P') return BEHAVIOUR.pc;
   if(ch==='M') return BEHAVIOUR.mat;
   if(ch==='u') return BEHAVIOUR.statue;
+  if(ch==='8') return BEHAVIOUR.windUp;      // 4.0.0: the SKYREACH's wind currents
+  if(ch==='2') return BEHAVIOUR.windDown;
+  if(ch==='4') return BEHAVIOUR.windLeft;
+  if(ch==='6') return BEHAVIOUR.windRight;
   return G.WALKABLE.has(ch) ? BEHAVIOUR.walk : BEHAVIOUR.solid;
 }
 
@@ -136,6 +140,7 @@ function drawArea(map, view, opts={}){
     if(deep && cls==='tree'){ c.draw(artPixels('deep_rock'), X, Y); if(y+1>=map.h || at(x,y+1)!=='T') c.draw(artPixels('deep_face'), X, Y); continue; }
     if(deep && cls==='tall'){ c.draw(artPixels('deep_weed'), X, Y); continue; }
     if(cls==='grass' || cls==='tablet') c.draw(artPixels('grass_v'+(cls==='tablet' ? 0 : v%4)), X, Y);
+    else if(cls==='wind') windTile(c, X, Y, ch);
     else if(cls==='tall') c.draw(tallGrass, X, Y);
     else if(cls==='path' || cls==='exit' || cls==='water'){
       const kind = cls==='water' ? 'water' : 'path';
@@ -209,6 +214,20 @@ function drawArea(map, view, opts={}){
   if(view==='snow') c.filter(0, 0, c.w, c.h, p=>saturate(p, 0.3).map(q=>q*1.22));
   // 3.0.1: a volcano's slopes (MAGMA ISLE): greens burn to dark basalt and scorched scrub, earth goes red;
   // the sea stays blue.
+  // 4.0.0: the SKYREACH: red mesas (greens dry to ochre scrub, earth goes red-orange) and cloud level (pale,
+  // windswept grass, grey-white earth); water stays blue.
+  if(map.tint==='mesa') c.filter(0, 0, c.w, c.h, ([r,g,b])=>{
+    const L = 0.3*r + 0.59*g + 0.11*b;
+    if(g > r && g >= b) return [L*0.95 + 40, L*0.72 + 18, L*0.36 + 8];
+    if(r >= g && g >= b) return [Math.min(255, r*1.05), g*0.7, b*0.55];
+    return [r, g, b];
+  });
+  if(map.tint==='cloud') c.filter(0, 0, c.w, c.h, ([r,g,b])=>{
+    const L = 0.3*r + 0.59*g + 0.11*b;
+    if(g > r && g >= b) return [L*0.55 + 110, L*0.6 + 112, L*0.55 + 128];
+    if(r >= g && g >= b) return [L*0.6 + 90, L*0.6 + 92, L*0.6 + 100];
+    return [r, g, b];
+  });
   if(map.volcano) c.filter(0, 0, c.w, c.h, ([r,g,b])=>{
     const L = 0.3*r + 0.59*g + 0.11*b;
     if(g > r && g >= b) return [L*0.62 + 30, L*0.40 + 12, L*0.34 + 10];
@@ -216,6 +235,14 @@ function drawArea(map, view, opts={}){
     return [r, g, b];
   });
   return c;
+}
+// 4.0.0: a wind current: grass with pale streaks and a chevron pointing the way it blows.
+function windTile(c, X, Y, ch){
+  c.draw(artPixels('grass_v0'), X, Y);
+  const t = ([x,y])=>ch==='6' ? [x,y] : ch==='4' ? [15-x,y] : ch==='2' ? [y,x] : [y,15-x];   // drawn blowing right
+  const put = (x,y,col)=>{ const [a,b] = t([x,y]); c.set(X+a, Y+b, hex(col)); };
+  for(const [y,x0,x1] of [[3,1,7],[8,3,10],[12,0,5]]) for(let x=x0; x<=x1; x++) put(x, y, x===x1 ? '#ffffff' : '#d8ecf8');
+  for(let k=0; k<4; k++){ put(10+k, 4+k, '#ffffff'); put(10+k, 11-k, '#ffffff'); }
 }
 // CSS filter maths (filter-effects spec), on 0-255 rgb.
 function saturate(p, s){
@@ -412,7 +439,7 @@ function towerRooms(li, bi, b){
 
 fs.mkdirSync(OUT, {recursive:true});
 G.setAdv({cleared:{}, picked:{}, story:{}, items:{}, party:[], box:[]});   // the League's gates start shut
-const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival', 'grunt', 'admin', 'captain']);
+const areas = [], rooms = [], peopleKinds = new Set(['player', 'prof', 'nurse', 'clerk', 'mom', 'rival', 'grunt', 'admin', 'captain', 'pilot']);
 const roomArts = new Map(), trainerSpecies = new Set();
 const lines = n=>n.lines || [];
 const STRIP_X = 10, STRIP_Y = 8;   // how far into a neighbour the camera can see (and the BG draws)
@@ -483,7 +510,7 @@ for(const li of AREAS){
       intro:['TEMPEST GRUNT: "The Admin said nobody gets past. That means you!"'],
       after:['TEMPEST GRUNT: "Go ahead, then. You\'ll never reach the shrine without a way to dive."']}] : []),
     spawn:map.spawn, pool:loc.pool || [], area_pool:G.areaPool(loc), water:G.waterPool(loc), fish:G.fishPool(loc), tier:loc.tier ?? li,
-    theme:loc.theme || 'plain', weather:map.weather || '', volcano:!!map.volcano, cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
+    theme:loc.theme || 'plain', weather:map.weather || '', volcano:!!map.volcano, tint:map.tint || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
     scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI, shrine:!!loc.shrine, roam:loc.roam || [],
     leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});
@@ -575,7 +602,7 @@ for(const m of moves) m.fx = G.mfxScript(m);
 fs.writeFileSync(path.join(OUT, 'data.json'), JSON.stringify({
   pix:G.PIX, type_col:G.TYPE_COL,
   areas, rooms, people, surf, species, species_v1:species.filter(sp=>!gen89.has(sp.name)).length,
-  species_v2:species.length - G.SUNDERED_FORMS.length, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
+  species_v2:species.length - G.SUNDERED_FORMS.length - G.SKYREACH_FORMS.length, species_v3:species.length - G.SKYREACH_FORMS.length, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
   starter_trios:G.STARTER_TRIOS, prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO, held_items:G.ITEMS, prof_calls:G.PROF_CALLS,
   elites:G.ELITES, time_types:G.TIME_TYPES, night_visitors:G.NIGHT_VISITORS, tempest_pool:G.TEMPEST_POOL, admin:G.ADMIN,
   music, weather:G.WEATHER, wallpapers:G.WALLPAPERS, wall_names:G.WALL_NAMES,

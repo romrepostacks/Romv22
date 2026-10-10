@@ -41,7 +41,8 @@ enum class battle_weather : uint8_t
     SUN,
     RAIN,
     SAND,
-    HAIL
+    HAIL,
+    WIND            // 4.0.0: strong winds (the SKYREACH's clouds): Flying types lose their weaknesses; it never stops
 };
 
 // The battle stats a move can raise or lower.
