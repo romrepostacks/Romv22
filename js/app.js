@@ -1698,6 +1698,7 @@ function buildRoute(loc){
   const built = finishMap(tiles, [], npcs, exits, {x:first.x+STEP_IN[exits[0].dir][0]*2, y:first.y+STEP_IN[exits[0].dir][1]*2}, signs);
   built.itemTypes = itemTypes;
   built.cave = loc.theme==='cave';
+  built.volcano = !!loc.volcano;
   built.deep = loc.theme==='deep';
   built.diveSpots = diveSpots;
   // Under a dive area: light shafts where you can surface, below the dive spots up top.
@@ -6359,7 +6360,7 @@ const SUNDERED = [
   {type:'route', name:"Sea Route 10", at:[1,2], theme:'sea', desc:"The sea turns murky near the swamp. Bubbles rise from below.", pool:['Wingull','Croagunk','Numel-Sunder'], water:['Mareanie','Skrelp','Tentacool','Qwilfish','Barboach','Carvanha-Sunder']},
   {type:'route', name:"Sea Route 11", at:[0,1], theme:'sea', desc:"Rocky shallows below the cliffs. Waves crash on every side.", pool:['Wingull','Pelipper','Makuhita'], water:['Crabrawler','Clauncher','Tentacool','Wailmer-Sunder','Mantyke','Corphish-Sunder']},
   // 20-22: the villains' bases and the treasure
-  {type:'trainer', kind:'boss', name:"Magma Isle", at:[0,3], boss:true, shrine:true, legend:'Groudon', grunts:3, theme:'rocky', gruntTeam:QUAKE_TEAM, bossKind:'bossQuake',
+  {type:'trainer', kind:'boss', name:"Magma Isle", at:[0,3], boss:true, shrine:true, legend:'Groudon', grunts:3, theme:'rocky', volcano:true, gruntTeam:QUAKE_TEAM, bossKind:'bossQuake',
    desc:"A volcano rises out of the sea, its slopes cracked and glowing. TEAM QUAKE's drills bite into the rock. \"GROUDON will raise the land, and the islands will be one!\"",
    leaderName:"Boss Basalt", leaderTeam:['Camerupt-Sunder','Torkoal-Sunder','Excadrill','Garchomp','Rhyperior','Coalossal'], pool:['Numel-Sunder','Torkoal-Sunder','Slugma','Magby','Sandshrew-Sunder']},
   {type:'trainer', kind:'boss', name:"The Abyss", at:[5,-2], boss:true, shrine:true, legend:'Kyogre', grunts:3, theme:'sea', gruntTeam:NEPTUNE_TEAM, bossKind:'bossNeptune',

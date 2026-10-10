@@ -207,6 +207,14 @@ function drawArea(map, view, opts={}){
   // Whole-area colour (the stylesheet's filters on #owTiles): rain is darker and richer, snow pale.
   if(view==='rain') c.filter(0, 0, c.w, c.h, p=>contrast(saturate(p.map(q=>q*0.9), 1.15), 1.05));
   if(view==='snow') c.filter(0, 0, c.w, c.h, p=>saturate(p, 0.3).map(q=>q*1.22));
+  // 3.0.1: a volcano's slopes (MAGMA ISLE): greens burn to dark basalt and scorched scrub, earth goes red;
+  // the sea stays blue.
+  if(map.volcano) c.filter(0, 0, c.w, c.h, ([r,g,b])=>{
+    const L = 0.3*r + 0.59*g + 0.11*b;
+    if(g > r && g >= b) return [L*0.62 + 30, L*0.40 + 12, L*0.34 + 10];
+    if(r >= g && g >= b) return [r*0.85, g*0.55, b*0.5];
+    return [r, g, b];
+  });
   return c;
 }
 // CSS filter maths (filter-effects spec), on 0-255 rgb.
@@ -475,7 +483,7 @@ for(const li of AREAS){
       intro:['TEMPEST GRUNT: "The Admin said nobody gets past. That means you!"'],
       after:['TEMPEST GRUNT: "Go ahead, then. You\'ll never reach the shrine without a way to dive."']}] : []),
     spawn:map.spawn, pool:loc.pool || [], area_pool:G.areaPool(loc), water:G.waterPool(loc), fish:G.fishPool(loc), tier:loc.tier ?? li,
-    theme:loc.theme || 'plain', weather:map.weather || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
+    theme:loc.theme || 'plain', weather:map.weather || '', volcano:!!map.volcano, cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
     scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI, shrine:!!loc.shrine, roam:loc.roam || [],
     leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});

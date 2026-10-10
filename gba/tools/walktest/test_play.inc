@@ -153,6 +153,14 @@ static void test_setup()
                                     species_id::KORAIDON, species_id::MIRAIDON, species_id::ETERNATUS };
     int lv = scen == 4 ? 200 : 300;
     for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], lv);
+    if(scen == 12)
+    {
+        // The CHAMPION's water, steel and ground team: each Pokémon leads with a move that hits it hard.
+        constexpr const char* lead[] = { "PSYSTRIKE", "ENERGY BALL", "OUTRAGE", "CLOSE COMBAT", "ELECTRO DRIFT", "DYNAMAX CANNON" };
+        for(int i = 0; i < 6; ++i)
+            for(int k = 0; k < pr::game_data::moves_count; ++k)
+                if(bn::string_view(pr::game_data::moves[k].name) == bn::string_view(lead[i])) g.party[i].moves[0] = uint16_t(k);
+    }
     g.party_count = 6;
     g.money = 500000;
     g.add_item(item_id::ULTRABALL, 50);
@@ -200,10 +208,14 @@ static void test_setup()
         }
         break;
     }
+    case 15:    // GROUDON again, with just one Pokémon (one action a turn: throwing a ball)
+        g.party_count = 1;
+        for(int i = 1; i < 6; ++i) g.party[i] = mon();
+        [[fallthrough]];
     case 8:     // GROUDON, its boss beaten
     case 9:     // KYOGRE
     {
-        map = play::find_area(scen == 8 ? "MAGMA ISLE" : "THE ABYSS");
+        map = play::find_area(scen == 9 ? "THE ABYSS" : "MAGMA ISLE");
         const map_def& m = wd::maps[map];
         for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
         x = m.area->legend_x; y = m.area->legend_y;
