@@ -108,6 +108,10 @@ def clean_text(s):
     return out
 
 def write_if_changed(path, text):
+    if path.endswith('.h'):
+        # 3.1.0: the data is `inline`, so every source file that includes a header shares one copy in the ROM
+        # (a plain namespace-scope constexpr is a separate copy per file: 3.0.1's ROM held about seven).
+        text = re.sub(r'^(\s*)constexpr ', r'\1inline constexpr ', text, flags=re.M)
     if os.path.exists(path) and open(path, encoding='utf8').read() == text:
         return
     with open(path, 'w', encoding='utf8') as f:
@@ -932,7 +936,7 @@ def build_mons(data, gfx):
             img = mon_sprite(path)
             pal, idx = quantize_rgba(img, 15)
             save_indexed_bmp(os.path.join(gfx, 'mon_%s_%d.bmp' % (side, s['num'])), pal, idx,
-                             {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+                             {'type': 'sprite', 'bpp_mode': 'bpp_4', 'compression': MON_COMPRESSION})
             # Its shiny colours (sprites/pokemon/[back/]shiny/, from PokeAPI), slot for slot.
             spath = os.path.join(ROOT, 'sprites', 'pokemon', sub + 'shiny', '%d.png' % s['num'])
             if not os.path.exists(spath):
@@ -950,9 +954,13 @@ def build_mons(data, gfx):
     # The icons share ICON_PALETTES palettes (Emerald uses 3): a box of 30 different species must fit the
     # 16 sprite palettes with the text's. Shiny icons keep the normal colours, as in Emerald.
     for num, pal, idx in icon_palettes(icons):
-        save_indexed_bmp(os.path.join(gfx, 'mon_icon_%s.bmp' % num), pal, idx, {'type': 'sprite', 'bpp_mode': 'bpp_4'})
+        save_indexed_bmp(os.path.join(gfx, 'mon_icon_%s.bmp' % num), pal, idx,
+                         {'type': 'sprite', 'bpp_mode': 'bpp_4', 'compression': MON_COMPRESSION})
 
 ICON_PALETTES = 6
+# 3.1.0: the Pokémon's sprites (two thirds of the ROM's art) are stored LZ77-compressed; Butano unpacks one
+# when its sprite is made. PR_MON_COMPRESSION=none builds them plain, to compare.
+MON_COMPRESSION = os.environ.get('PR_MON_COMPRESSION', 'lz77')
 
 def egg_icon():
     """A 32x32 EGG icon, drawn (no sprite for it in sprites/): a cream egg with green spots, outlined."""
@@ -1954,6 +1962,7 @@ def inputs_hash():
     files += [os.path.join(HERE, '..', 'data', 'title_%s.png' % n) for n in ('sky', 'logo', 'spark', 'hooh')]
     for f in files:
         h.update(open(f, 'rb').read())
+    h.update(MON_COMPRESSION.encode())
     return h.hexdigest()
 
 def main():

@@ -2,6 +2,9 @@
 #include "bn_sram.h"
 #include "pr_mon.h"
 #include "pr_world_data.h"
+#include "pr_game_data.h"
+#include "bn_timer.h"
+#include "bn_sprite_ptr.h"
 // Play test (3.0.0): SRAM 0x7E02 holds a scenario; test_setup() builds a save for it from scratch (Vellorin and,
 // unless the scenario says otherwise, Calderra already beaten) and puts you next to whoever it tests.
 // An assert writes "CRSH" at 0x7E10.
@@ -115,6 +118,26 @@ static void test_setup()
     int16_t scen = 0;
     bn::sram::read_offset(scen, 0x7E02);
     game_state& g = state();
+    if(scen == 99)
+    {
+        // Timing (timing.py): make and drop every Pokémon's front, back and icon sprite; the timer's ticks
+        // (64 CPU cycles each) for each kind go to SRAM 0x7E20.
+        int32_t ticks[3] = {};
+        for(int kind = 0; kind < 3; ++kind)
+        {
+            bn::timer t;
+            for(int i = 1; i < pr::species_count; ++i)
+            {
+                const auto& sp = pr::game_data::species_list[i];
+                bn::sprite_ptr spr = (kind == 0 ? sp.front : kind == 1 ? sp.back : sp.icon).create_sprite(0, 0);
+            }
+            ticks[kind] = t.elapsed_ticks();
+        }
+        bn::sram::write_offset(ticks, 0x7E20);
+        int16_t zero = 0;
+        bn::sram::write_offset(zero, 0x7E02);
+        return;
+    }
     if(save_exists() || scen <= 0)
     {
         if(save_exists()) load_game();

@@ -1,7 +1,18 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 3.0.1: set sail for the SUNDERED ISLES!",
+  "motd": "Version 3.1.0: a third the size, room for all nine regions!",
   "changelog": [
+    {
+      "version": "GBA 3.1.0",
+      "date": "2026-10-10",
+      "title": "Room for nine regions",
+      "changes": [
+        "The game is about a third of its old size (5.6 MB, down from 17.4 MB), leaving room for all nine regions",
+        "POKéMON sprites are stored compressed",
+        "More room for new maps' tilesets in future regions",
+        "Levels of 100 and up no longer run into the HP bar on the party screen"
+      ]
+    },
     {
       "version": "GBA 3.0.1",
       "date": "2026-10-10",

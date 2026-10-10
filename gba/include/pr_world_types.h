@@ -351,7 +351,7 @@ struct room_info
 struct map_def
 {
     const char* name;
-    uint8_t tileset;
+    uint16_t tileset;
     int16_t w;
     int16_t h;
     const uint16_t* map;            // metatile per tile

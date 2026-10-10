@@ -318,7 +318,7 @@ namespace
                 else
                 {
                     u.print_fit_slide(x + 22, x + 3, x + r.tw * 8 - 1, y + 2, m.name(), text_color::WHITE, _texts, true);
-                    u.print(x + 22, y + 12, lv, text_color::WHITE, _texts, true);
+                    u.print_fit(x + 22, y + 12, lv, 21, text_color::WHITE, _texts, true);     // "Lv300" left of the bar
                     draw_hp_bar(_bars[k], x + 44, y + 14, 3, m.hp, m.max_hp);
                 }
             }
