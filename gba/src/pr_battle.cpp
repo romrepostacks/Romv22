@@ -1546,8 +1546,31 @@ namespace
                         }
                         score += threat;
                     }
+                    if(_s.tier >= 5)
+                    {
+                        // Each later region's trainers read the battle a little better (5.0.0 on). GENOVA's run the real
+                        // numbers: how much of your Pokémon's HP this move takes, in that weather (TEMPESTA's, 8.0.0, also
+                        // the weather's own boost). AETERNA's (6.0.0) knock out your faster Pokémon before they can move.
+                        // The HOLLOW LANDS' (7.0.0) save their finishing blow for your strongest attacker.
+                        damage_mods dm;
+                        if(_s.tier >= 8)
+                        {
+                            dm.weather = _weather;
+                        }
+                        int dmg = calc_damage(*f.m, mv, t, r, dm).damage * mv.accuracy / 100;
+                        bool ko = dmg >= t.hp;
+                        score += bn::min(150, dmg * 100 / bn::max(1, int(t.hp)));
+                        if(_s.tier >= 6 && ko && t.spe > f.m->spe)
+                        {
+                            score += 60;
+                        }
+                        if(_s.tier >= 7 && ko && bn::max(t.atk, t.spa) >= bn::max(f.m->def, f.m->spd))
+                        {
+                            score += 40;
+                        }
+                    }
                 }
-                score += r.get_int(20);
+                score += r.get_int(_s.tier >= 5 ? 6 : 20);
                 if(score > best)
                 {
                     best = score;
@@ -2298,8 +2321,7 @@ namespace
         else if(t && (t->role == trainer_role::LEADER || t->role == trainer_role::RIVAL || t->role == trainer_role::CHAMPION))
         {
             // "Gym Leader Rell challenges you with 3 Pokémon! (Lv.9)"
-            text = t->role == trainer_role::LEADER ? "Gym Leader " : "Rival ";
-            text.append(world_data::maps[t->area].leader_name);
+            text = t->title;
             text.append(" challenges you with ");
             text.append(bn::to_string<4>(_foe_count));
             text.append(" POKéMON! (Lv.");

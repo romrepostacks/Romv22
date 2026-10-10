@@ -62,9 +62,10 @@ namespace
             lv = junior ? cap_level - 4 : elite ? top - 4 + t.elite : t.role == trainer_role::CHAMPION ? top
                 : t.role == trainer_role::LEADER ? region_level(region, b + 1) : route ? cap_level - 2 : region_level(region, b) + 4;
             s.smart = true;
-            s.boss_heals = ! route || elite ? (region >= 3 ? 2 : 1) : 0;
+            s.boss_heals = ! route || elite ? (region >= 9 ? 3 : region >= 3 ? 2 : 1) : 0;
             s.sharp = region >= 3;
             s.keen = region >= 4;
+            s.tier = uint8_t(region);
         }
         species_id names[6];
         int n = 0;
@@ -256,7 +257,7 @@ namespace
         int clears = g.run.tower_clears;
         bool master = floor == 4;
         // 2.0.0: the floors climb to 200 once you're CALDERRA's CHAMPION (3.0.0: 300, the SUNDERED ISLES').
-        int top = g.flags.test(flag::SKYREACH_CHAMPION) ? 400 : g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100;
+        int top = champion_cap();
         int base = bn::min(top, bn::max(50 + 3 * clears, g.average_level() + clears));
         int size = master ? 6 : bn::min(6, 3 + (floor + 1) / 2 + clears / 2);
         tower_team(s, type_index(floor_types[floor]), size, bn::min(top, base + floor + (master ? 2 : 0)), clears);

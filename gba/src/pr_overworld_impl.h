@@ -213,6 +213,8 @@ public:
     void ferry();
     void captain();
     void pilot();
+    void region_guide(bool on);
+    void mew_sighting(int person);
     void meteor_shard(int form);
     void calderra_prof();
     void tutor_new_move();

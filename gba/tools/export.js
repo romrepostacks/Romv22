@@ -28,7 +28,7 @@ vm.runInContext(src + `
   WALL_SWAP, HOUSE_ROOFS, HOUSE_ROOF_NAMES, tallGrassSvg, charSvg, CHARS, DEX, DEX_NUM, slug, MOVEDATA, CHART, TYPES, STRUGGLE,
   STARTER_TRIOS, EVOLUTIONS, GROUND, THING_TEXT, PROF, INTRO_LINES, ITEM_INFO, TYPE_COLORS, BALL_SVG, GYM_STYLE, gymTheme, GYM_JUNIORS, PROF_CALLS,
   areaPool, waterPool, fishPool, ELITES, WALLPAPERS, WALL_NAMES, mfxScript, PIX, TYPE_COL, WEATHER, SURF_ROWS, TIME_TYPES, NIGHT_VISITORS, TEMPEST_POOL, ADMIN, ITEMS, PROC_ENTRY:null,
-  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, SUNDERED_FORMS, SKYREACH_FORMS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
+  setAdv:a=>{ adv = a; }, CURATED_DEX, leagueGates, ROOMS, DEXINFO:typeof DEXINFO!=='undefined' ? DEXINFO : {}, DEXDATA, MOVE_EXTRA, moveByIndex, GEN89:PROC_RAW_GEN89.map(r=>r[0]), TOWER_FLOORS, TOWER_INTROS, CHAMBER_THEMES, TOWER_ROOMS, FORM_LISTS, MUSIC_TRACKS:typeof MUSIC_TRACKS!=='undefined' ? MUSIC_TRACKS : null};`, ctx);
 const G = ctx.G;
 // ---------- SPIRECREST TOWN, TRADEWIND VILLAGE and the SAFARI ZONE ----------
 // The web game adds them (js/app.js, after every older area, so those keep their indices): SPIRECREST's big
@@ -228,6 +228,16 @@ function drawArea(map, view, opts={}){
     if(r >= g && g >= b) return [L*0.6 + 90, L*0.6 + 92, L*0.6 + 100];
     return [r, g, b];
   });
+  // 5.0.0 on: GENOVA's city (greens to grey concrete, earth to slate) and its jungle (deep, wet greens); AETERNA's
+  // past (6.0.0: old sepia); the HOLLOW LANDS (7.0.0: grey, a little violet); the HALL OF ORIGIN's mountain (9.0.0:
+  // pale gold). Water stays blue but in the past and the hollows.
+  const TINTS = {
+    city:([r,g,b], L)=>g > r && g >= b ? [L*0.45 + 78, L*0.45 + 82, L*0.45 + 92] : r >= g && g >= b ? [L*0.6 + 40, L*0.6 + 42, L*0.6 + 52] : [r, g, b],
+    jungle:([r,g,b])=>g > r && g >= b ? [r*0.55, Math.min(255, g*0.92 + 12), b*0.5] : [r, g, b],
+    past:([r,g,b], L)=>[Math.min(255, L*0.9 + 42), Math.min(255, L*0.76 + 26), L*0.52 + 12],
+    hollow:([r,g,b], L)=>[L*0.62 + 34, L*0.6 + 32, L*0.66 + 46],
+    origin:([r,g,b], L)=>g > r && g >= b ? [Math.min(255, L*0.5 + 125), Math.min(255, L*0.5 + 112), L*0.4 + 70] : r >= g && g >= b ? [Math.min(255, L*0.55 + 110), Math.min(255, L*0.55 + 100), L*0.5 + 80] : [r, g, b]};
+  if(TINTS[map.tint]) c.filter(0, 0, c.w, c.h, p=>TINTS[map.tint](p, 0.3*p[0] + 0.59*p[1] + 0.11*p[2]));
   if(map.volcano) c.filter(0, 0, c.w, c.h, ([r,g,b])=>{
     const L = 0.3*r + 0.59*g + 0.11*b;
     if(g > r && g >= b) return [L*0.62 + 30, L*0.40 + 12, L*0.34 + 10];
@@ -398,7 +408,7 @@ function trainerOut(n, loc){
     : (loc.desc.match(/"([^"]+)"/)||[])[1] || "Let's battle!";
   const theme = leader ? G.gymTheme(loc.leaderName) : '';
   return {kind:n.kind, x:n.x, y:n.y, facing:n.facing, role:n.champion ? 'champion' : leader ? 'leader' : 'rival',
-    title:(leader ? 'Gym Leader ' : n.champion && loc.championKind ? 'Champion ' : 'Rival ') + name,
+    title:(leader ? 'Gym Leader ' : n.champion && loc.championKind ? 'Champion ' : loc.boss ? '' : 'Rival ') + name,
     team:loc.leaderTeam, fill:leader && G.GYM_JUNIORS[theme] ? G.GYM_JUNIORS[theme].team : G.areaPool(loc),
     intro:[`${name}: "${quote}"`],
     after:leader || n.champion ? [`${name}: "You've already beaten me. The road ahead is waiting for you!"`] : (loc.rivalAfter || []).map(l=>`${name.toUpperCase()}: ${l}`),
@@ -462,6 +472,8 @@ for(const li of AREAS){
   };
   pictureSet(map, V, null, itemsHere, `map_${li}`);
   if(V==='ash') savePng(`map_${li}_clean.png`, drawArea(map, V, {noAsh:true}));
+  // 5.0.0: people the region's data adds (loc.extras: guides, Easter eggs, rifts...); build_assets.py finds them a spot.
+  for(const n of loc.extras || []) if(!['statue', 'sparkle', 'rift', 'shadow'].includes(n.kind)) peopleKinds.add(n.kind);
   const nb = G.neighbours(li);
   const people = map.npcs.filter(n=>!n.trainer && !n.legend), trainers = map.npcs.filter(n=>n.trainer && !n.legend);
   for(const n of map.npcs) if(!n.legend) peopleKinds.add(n.kind);
@@ -513,7 +525,8 @@ for(const li of AREAS){
     theme:loc.theme || 'plain', weather:map.weather || '', volcano:!!map.volcano, tint:map.tint || '', cave:!!map.cave, deep:!!map.deep, center:!!loc.center,
     dive:loc.dive ?? -1, surface:loc.surface ?? -1, dive_spots:keys(map.diveSpots), shafts:keys(map.shafts),
     scene:loc.scene || '', legend:legend ? {name:legend.legend, x:legend.x, y:legend.y} : null, league:!!loc.league, champion:!!loc.champion, tower_town:loc===TOWER_TOWN, trade_town:loc===TRADE_TOWN, safari:loc===SAFARI, shrine:!!loc.shrine, roam:loc.roam || [],
-    leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool});
+    leader_team:loc.leaderTeam || [], rival_after:loc.rivalAfter || [], own_pool:!!loc.pool,
+    extras:loc.extras || [], twin:loc.twin ?? loc.twinOf ?? -1, mirror:!!(loc.mirror || (loc.twin!==undefined && G.LOCATIONS[loc.twin].mirror))});
   if(legend) trainerSpecies.add(legend.legend);
 }
 for(const [art, {area, building, room:own}] of roomArts){
@@ -602,7 +615,8 @@ for(const m of moves) m.fx = G.mfxScript(m);
 fs.writeFileSync(path.join(OUT, 'data.json'), JSON.stringify({
   pix:G.PIX, type_col:G.TYPE_COL,
   areas, rooms, people, surf, species, species_v1:species.filter(sp=>!gen89.has(sp.name)).length,
-  species_v2:species.length - G.SUNDERED_FORMS.length - G.SKYREACH_FORMS.length, species_v3:species.length - G.SKYREACH_FORMS.length, moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
+  // 3.0.0 on: where each later region's forms start (the SUNDERED ISLES' first), then the end.
+  species_from:G.FORM_LISTS.reduce((a, l)=>[...a, a[a.length-1] + l.length], [species.length - G.FORM_LISTS.flat().length]), moves, moves_v1, tall_grass:tallGrass.px, types:G.TYPES, chart:G.CHART, type_colors:G.TYPE_COLORS,
   starter_trios:G.STARTER_TRIOS, prof:G.PROF, intro:G.INTRO_LINES, items:G.ITEM_INFO, held_items:G.ITEMS, prof_calls:G.PROF_CALLS,
   elites:G.ELITES, time_types:G.TIME_TYPES, night_visitors:G.NIGHT_VISITORS, tempest_pool:G.TEMPEST_POOL, admin:G.ADMIN,
   music, weather:G.WEATHER, wallpapers:G.WALLPAPERS, wall_names:G.WALL_NAMES,

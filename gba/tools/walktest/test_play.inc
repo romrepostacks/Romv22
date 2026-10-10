@@ -151,7 +151,7 @@ static void test_setup()
     g.run.adventure = true;
     constexpr species_id team[] = { species_id::MEWTWO, species_id::ARCEUS, species_id::RAYQUAZA,
                                     species_id::KORAIDON, species_id::MIRAIDON, species_id::ETERNATUS };
-    int lv = scen == 4 ? 200 : scen >= 20 ? 400 : 300;
+    int lv = scen == 4 ? 200 : scen >= 40 ? 500 : scen >= 20 ? 400 : 300;
     for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], lv);
     if(scen == 12)
     {
@@ -181,7 +181,102 @@ static void test_setup()
         g.region = scen == 20 ? 2 : 3;
         if(scen == 22) for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], 300);
     }
+    if(scen >= 40)
+    {
+        // GENOVA (5.0.0) and later: every older region beaten.
+        for(int r = 3; r <= 4; ++r) play::beat_region(r);
+        g.flags.set(flag::SUNDERED_CHAMPION); g.flags.set(flag::SKYREACH_CHAMPION);
+        g.region = 4;
+        for(int r = 5; r < 5 + (scen - 40) / 20; ++r)
+        {
+            play::beat_region(r);
+            g.flags.set(champion_flag(r));
+            g.region = uint8_t(r);
+        }
+    }
     int x = 0, y = 0, map = -1;
+    // The region these scenarios test (40-59 GENOVA, 60-79 AETERNA, ...), and its first gym leader's level.
+    const int rg = scen >= 40 ? 5 + (scen - 40) / 20 : 0, sub = scen >= 40 ? (scen - 40) % 20 : -1;
+    if(sub == 2) for(int i = 0; i < 6; ++i) g.party[i] = mon::make(team[i], region_cap(rg) - 100);
+    if(rg == 5 && (sub == 2 || sub == 12))
+    {
+        // Lead with one of GENOVA's experiments (its back sprite), and have one spare to show.
+        g.party[0] = mon::make(species_id::HELIXEON, sub == 2 ? 400 : 500);
+    }
+    switch(sub)
+    {
+    case 0:     // the last region's guide on: travel to this region
+    case 1:     // this region's guide back
+        if(sub == 0) g.region = uint8_t(rg - 1);
+        map = play::find_person(sub == 0 ? rg - 1 : rg, sub == 0 ? person_role::GUIDE_ON : person_role::GUIDE_BACK, x, y);
+        break;
+    case 2:     // the first gym leader, no badges, your team 100 under the cap
+        map = play::find_trainer(rg, trainer_role::LEADER, 0, x, y);
+        break;
+    case 3:     // the badge gate out of the inner part, no badges
+    case 8:     // the way up to the League: eight badges, the story bosses beaten
+    {
+        const char* from = rg == 5 ? (sub == 3 ? "FOUNDRY WARD" : "GENOVA CENTRAL") : "";
+        int want = rg == 5 && sub == 3 ? 0 : -1;     // GENOVA's walls: left of FOUNDRY WARD; its spire: up from CENTRAL
+        if(sub == 8)
+        {
+            play::beat_region(rg, true);
+            for(int i : wd::area_maps)
+                if(map_region(i) == rg && (wd::maps[i].area->flags & area_flag::SHRINE))
+                    for(int k = 0; k < wd::maps[i].trainers_count; ++k) g.beaten.set(wd::maps[i].trainers[k].id);
+        }
+        map = play::find_area(from);
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.links_count; ++k)
+        {
+            const pr::link& l = m.links[k];
+            if(want == 0 && l.ox < 0)
+            {
+                // A link to the left: stand at the left edge on its row, facing it.
+                for(int ty = 0; ty < m.h; ++ty)
+                    if(play::walkable(m, 0, ty) && play::walkable(m, 1, ty)) { g.map = int16_t(map); g.x = 1; g.y = int16_t(ty); g.facing = direction::LEFT; y = -2; break; }
+            }
+            else if(want < 0 && l.oy < 0)
+            {
+                int lo = bn::max(0, int(l.ox)), hi = bn::min(int(m.w), l.ox + wd::maps[l.target].w);
+                for(int tx = lo; tx < hi; ++tx)
+                    if(play::walkable(m, tx, 0) && play::walkable(m, tx, 1)) { x = tx; y = -1; break; }
+            }
+        }
+        if(y == -2) map = -1;
+        break;
+    }
+    case 4:     // a MEW sighting (GENOVA)
+        map = play::find_person(rg, person_role::MEW_SIGHT, x, y);
+        break;
+    case 5:     // MEW on the LOST PIER, its admin beaten, too few sightings
+    case 6:     // ... all ten sightings
+    case 7:     // MEWTWO in the SEALED CAVE, the Chairman beaten
+    {
+        if(sub == 6) for(int k = 0; k < flag::mew_sightings; ++k) g.flags.set(flag::MEW_SIGHTING + k);
+        map = play::find_area(sub == 7 ? "SEALED CAVE" : "LOST PIER");
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+        x = m.area->legend_x; y = m.area->legend_y;
+        break;
+    }
+    case 9:     // the CHAMPION, the ELITE FOUR beaten
+    case 10:    // the CHAMPION just beaten: the next battle's end brings the HALL OF FAME
+    {
+        play::beat_region(rg);
+        map = play::find_trainer(rg, sub == 9 ? trainer_role::CHAMPION : trainer_role::ROUTE, 0, x, y);
+        const map_def& m = wd::maps[map];
+        for(int k = 0; k < m.trainers_count; ++k)
+            if(m.trainers[k].x == x && m.trainers[k].y == y) g.beaten.reset(m.trainers[k].id);
+        break;
+    }
+    case 11:    // the region's rival
+        map = play::find_trainer(rg, trainer_role::RIVAL, 0, x, y);
+        break;
+    case 12:    // a route trainer, to see the region's AI and its wild-born POKéMON
+        map = play::find_trainer(rg, trainer_role::ROUTE, 0, x, y);
+        break;
+    }
     switch(scen)
     {
     case 1:     // Port Calder's CAPTAIN before Calderra's League

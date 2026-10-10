@@ -3,7 +3,7 @@
 A real GBA ROM of Poké Legends: Lands of Nine (called Party Royale before 2.0.1), built with [Butano](https://github.com/GValiente/butano) (C++). It runs in
 emulators (Delta, mGBA) and on real hardware from a flash cart. Saves go to cartridge SRAM.
 
-Version **4.0.0**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
+Version **5.0.0**: the whole game, from the professor's welcome to the Hall of Fame, built from the retired
 web game's data (`js/`, `sprites/`), plus the two story phases planned after it (STORY.md phases 6 and 7):
 NUZLOCKE mode and ADVENTURE MODE with the CHALLENGE TOWER, shiny Pokémon, and PP, stat and weather moves.
 The GBA is now the only supported version of the game.

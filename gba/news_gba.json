@@ -1,7 +1,24 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 4.0.0: the Skyreach! Fly from PORT KEEL to region four.",
+  "motd": "Version 5.0.0: Genova! Take the shuttle from WINDWARD to region five.",
   "changelog": [
+    {
+      "version": "GBA 5.0.0",
+      "date": "2026-10-10",
+      "title": "Genova",
+      "changes": [
+        "A fifth region, GENOVA: after the SKYREACH LEAGUE, the shuttle pilot at WINDWARD flies you to GENOVA CENTRAL",
+        "A walled city of labs and towers, with the old town and the jungle outside its walls. Going past the walls takes 4 GENOVA badges",
+        "Eight gyms, then the Elite Four and Champion CASSIA at level 500, at the top of the ARCOLOGY SPIRE",
+        "The SYNTHESIS CORP., rival NOVA, and the legends MEWTWO (SEALED CAVE) and MEW (LOST PIER)",
+        "MEW only trusts you once you have spotted it 10 times around the region",
+        "The first new POKéMON made for this game: CHIMURR, VOLTADPOLE, GRAFTLING and their evolutions, SPECTERRA, MIMICORE and HELIXEON",
+        "Genova trainers work out which move hits hardest",
+        "Two hidden plates: the IRON PLATE and the ZAP PLATE",
+        "Story bosses no longer call themselves your rival",
+        "The level cap rises to 500; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 4.0.0",
       "date": "2026-10-10",

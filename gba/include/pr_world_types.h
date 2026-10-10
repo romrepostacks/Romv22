@@ -70,7 +70,17 @@ enum class person_role : uint8_t
     SHARD_NORMAL,   // a meteorite shard: DEOXYS in your party takes this form (4.0.0)
     SHARD_ATTACK,
     SHARD_DEFENSE,
-    SHARD_SPEED
+    SHARD_SPEED,
+    GUIDE_ON,       // 5.0.0: takes the last region's CHAMPION on to the next region (GENOVA on)...
+    GUIDE_BACK,     // ... and back from there
+    MEW_SIGHT,      // 5.0.0: a pink blur: MEW, seen in one of GENOVA's ten places
+    TWIN,           // 6.0.0: a rift to the same spot in the area's twin (AETERNA's other era, the HOLLOW LANDS' reverse)
+    SEED,           // 6.0.0: a patch of soil in AETERNA's past...
+    TREE,           // ... and the tree that grew from it in the present
+    FORM,           // a form changer (6.0.0 on): the area's FORM_CHANGES entry
+    POST,           // 8.0.0: TEMPESTA's DELIBIRD post office: a gift each season
+    PLATE,          // 9.0.0: an old plate shrine in VELLORIN, CALDERRA or the ISLES (OLD_PLATES)
+    ALTAR           // 9.0.0: the HALL OF ORIGIN's altar: ARCEUS takes the type of a plate you hold
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of
@@ -273,6 +283,7 @@ namespace area_flag
     constexpr uint16_t SAFARI = 64;       // the SAFARI ZONE: $5000 to enter, any species at all in the grass
     constexpr uint16_t TRADE_TOWN = 128;  // TRADEWIND VILLAGE (the TRADER)
     constexpr uint16_t SHRINE = 256;      // a beast's shrine (Calderra's three)
+    constexpr uint16_t MIRROR = 512;      // 7.0.0: this area or its twin is the HOLLOW LANDS' reverse side (mirrored)
 }
 
 // What an area is (LOCATIONS): its kind, look and weather, where it sits on the region map, the layer
@@ -300,6 +311,7 @@ struct area_info
     int8_t water_count;
     int8_t fish_count;
     const uint16_t* clean;          // ash areas: metatiles once the ash is swept off
+    int16_t twin;                   // 6.0.0: its twin (map index): AETERNA's other era, the HOLLOW LANDS' other side; or -1
 };
 
 enum class room_kind : uint8_t

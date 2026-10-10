@@ -678,6 +678,64 @@ int region_level(int region, int badges)
     return bn::min(region_cap(region), region_cap(region) - 100 + 12 * badges);
 }
 
+const char* region_name(int region)
+{
+    constexpr const char* names[] = { "VELLORIN", "VELLORIN", "CALDERRA", "SUNDERED ISLES", "SKYREACH", "GENOVA", "AETERNA",
+                                      "HOLLOW LANDS", "TEMPESTA", "ORIGIN" };
+    return names[bn::max(0, bn::min(9, region))];
+}
+
+int champion_flag(int region)
+{
+    constexpr int flags[] = { -1, -1, flag::CALDERRA_CHAMPION, flag::SUNDERED_CHAMPION, flag::SKYREACH_CHAMPION,
+                              flag::GENOVA_CHAMPION, flag::AETERNA_CHAMPION, flag::HOLLOW_CHAMPION, flag::TEMPESTA_CHAMPION,
+                              flag::ORIGIN_CHAMPION };
+    return flags[bn::max(0, bn::min(9, region))];
+}
+
+int mew_sighting_index(int map, int person)
+{
+    int k = 0;
+    for(int i : world_data::area_maps)
+    {
+        const map_def& m = world_data::maps[i];
+        for(int p = 0; p < m.people_count; ++p)
+        {
+            if(m.people[p].role == person_role::MEW_SIGHT)
+            {
+                if(i == map && p == person)
+                {
+                    return k < flag::mew_sightings ? k : -1;
+                }
+                ++k;
+            }
+        }
+    }
+    return -1;
+}
+
+int mew_sightings_seen()
+{
+    int n = 0;
+    for(int k = 0; k < flag::mew_sightings; ++k)
+    {
+        n += state().flags.test(flag::MEW_SIGHTING + k);
+    }
+    return n;
+}
+
+int champion_cap()
+{
+    for(int r = 9; r >= 2; --r)
+    {
+        if(state().flags.test(champion_flag(r)))
+        {
+            return region_cap(r);
+        }
+    }
+    return 100;
+}
+
 int map_level_cap(int map)
 {
     int region = map_region(map);
@@ -732,6 +790,27 @@ int legend_flag(species_id legend)
         return flag::RAYQUAZA;
     case species_id::DEOXYS:
         return flag::DEOXYS;
+    case species_id::MEWTWO:
+        return flag::MEWTWO;
+    case species_id::MEW:
+        return flag::MEW;
+    case species_id::DIALGA:
+        return flag::DIALGA;
+    case species_id::PALKIA:
+        return flag::PALKIA;
+    case species_id::GIRATINA:
+        return flag::GIRATINA;
+    case species_id::ARTICUNO:
+        return flag::ARTICUNO;
+    case species_id::ZAPDOS:
+        return flag::ZAPDOS;
+    case species_id::MOLTRES:
+        return flag::MOLTRES;
+    case species_id::LUGIA:
+        // ponytail: by where you are, since VELLORIN's LUGIA is the story's (story::LEGEND_CAUGHT); TEMPESTA's is a flag.
+        return map_region(state().map) == 8 ? flag::LUGIA : -1;
+    case species_id::ARCEUS:
+        return flag::ARCEUS;
     default:
         return -1;
     }

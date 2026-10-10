@@ -34,12 +34,32 @@ ITEM_IDS = ['pokeball', 'potion', 'superpotion', 'antidote', 'parlyzheal', 'awak
 HELD_ITEM_IDS = ['leftovers', 'lifeorb', 'choicescarf', 'focussash', 'sitrusberry']    # HELD's order
 # 4.0.0: the ARCEUS plates, two hidden in each region from the SKYREACH on (after the held items, so bags stay a prefix).
 PLATE_IDS = ['skyplate', 'stoneplate']
+# 5.0.0: the other sixteen, all at once so their ids never move: GENOVA's, AETERNA's, the HOLLOW LANDS', TEMPESTA's,
+# the HALL OF ORIGIN's, then the three older regions' (handed out by their plate shrines in 9.0.0).
+PLATES = [('zapplate', 'ZAP PLATE', 'It crackles faintly, like a wire that is still live.'),
+          ('ironplate', 'IRON PLATE', 'Cold and heavy. Someone tried to copy it in a lab and failed.'),
+          ('dracoplate', 'DRACO PLATE', 'Older than the valley. It feels like a scale from something enormous.'),
+          ('mindplate', 'MIND PLATE', 'Holding it, you remember things that never happened to you.'),
+          ('spookyplate', 'SPOOKY PLATE', 'It is cold, and it is never quite where you left it.'),
+          ('toxicplate', 'TOXIC PLATE', 'It smells faintly of the deep marsh.'),
+          ('fistplate', 'FIST PLATE', 'It thrums like a heartbeat after a hard climb.'),
+          ('insectplate', 'INSECT PLATE', 'The pattern on it looks like a wing, if you squint.'),
+          ('pixieplate', 'PIXIE PLATE', 'It glitters, and makes you want to laugh for no reason.'),
+          ('blankplate', 'BLANK PLATE', 'Plain and smooth. It is the first plate, and the last.'),
+          ('flameplate', 'FLAME PLATE', 'It is warm, as if it has been sitting in the sun.'),
+          ('splashplate', 'SPLASH PLATE', 'Water beads on it and runs off without wetting it.'),
+          ('meadowplate', 'MEADOW PLATE', 'It smells of cut grass after rain.'),
+          ('icicleplate', 'ICICLE PLATE', 'Frost forms on it even in your hand.'),
+          ('earthplate', 'EARTH PLATE', 'It is heavy, and the ground seems to pull at it.'),
+          ('dreadplate', 'DREAD PLATE', 'It is dark, and darker still when you look away.')]
+PLATE_IDS += [k for k, _, _ in PLATES]
 # GBA only: better POKé BALLS and the RARE CANDY (hidden items, the MART).
 GBA_ITEMS = {'greatball': {'name': 'GREAT BALL', 'pocket': 1, 'desc': 'A good ball, with a higher catch rate than a POKé BALL.', 'price': 600},
              'ultraball': {'name': 'ULTRA BALL', 'pocket': 1, 'desc': 'A very good ball, with a higher catch rate than a GREAT BALL.', 'price': 1200},
              'masterball': {'name': 'MASTER BALL', 'pocket': 1, 'desc': 'The best ball there is. It catches any wild POKéMON without fail.', 'price': 0},
              'skyplate': {'name': 'SKY PLATE', 'pocket': 4, 'desc': 'An old stone tablet, light as air. It hums when the wind blows. What is it for?'},
              'stoneplate': {'name': 'STONE PLATE', 'pocket': 4, 'desc': 'An old stone tablet, heavy as a mountain. Something about it feels ancient.'},
+             **{k: {'name': n, 'pocket': 4, 'desc': 'An old stone tablet. ' + d} for k, n, d in PLATES},
              'rarecandy': {'name': 'RARE CANDY', 'pocket': 0, 'desc': 'A candy packed with energy. It raises a POKéMON by one level.', 'price': 4800},
              # GBA 1.8
              'maxpotion': {'name': 'MAX POTION', 'pocket': 0, 'desc': 'A spray-type medicine. It fully restores the HP of one POKéMON.', 'price': 2500, 'heal': 999},
@@ -431,7 +451,9 @@ def build_world(exp, data, out_inc):
             count = lines_array('%sperson%d_lines' % (p, i), n['lines'])
             role = {'nurse': 'NURSE', 'clerk': 'CLERK', 'mom': 'MOM', 'tower': 'TOWER', 'trader': 'TRADER', 'daycare': 'DAYCARE',
                     'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF', 'captain': 'CAPTAIN', 'pilot': 'PILOT',
-                    'shard0': 'SHARD_NORMAL', 'shard1': 'SHARD_ATTACK', 'shard2': 'SHARD_DEFENSE', 'shard3': 'SHARD_SPEED'}.get(n.get('role', ''), 'NONE')
+                    'shard0': 'SHARD_NORMAL', 'shard1': 'SHARD_ATTACK', 'shard2': 'SHARD_DEFENSE', 'shard3': 'SHARD_SPEED',
+                    'guide_on': 'GUIDE_ON', 'guide_back': 'GUIDE_BACK', 'mew': 'MEW_SIGHT', 'twin': 'TWIN', 'seed': 'SEED',
+                    'tree': 'TREE', 'form': 'FORM', 'post': 'POST', 'plate': 'PLATE', 'altar': 'ALTAR'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),
@@ -543,6 +565,12 @@ def build_world(exp, data, out_inc):
     if item_count > MAX_ITEM_BALLS:
         raise SystemExit('%d item balls (max %d)' % (item_count, MAX_ITEM_BALLS))
     map_rows = {}
+    # 6.0.0: a rift in an area (loc.extras, role 'twin') has its other end at the same spot in the area's twin.
+    for a in areas:
+        for n in list(a['extras']):
+            if n.get('role') == 'twin' and not n.get('far'):
+                areas[ai_of[a['twin']]]['extras'].append({**n, 'far': True, 'dx': -n.get('dx', 0) if a['mirror'] else n.get('dx', 0),
+                                                          'lines': n.get('back_lines', n.get('lines', []))})
     # 2.0.0: the SAILOR who runs the ferry between the regions, near where you arrive (placed after the hidden
     # items, so Vellorin's stay where they were).
     for ai, a in enumerate(areas):
@@ -599,6 +627,19 @@ def build_world(exp, data, out_inc):
             x, y = free_spot(a, near[0], near[1], hid)
             a['people'].append({'kind': 'statue', 'x': x, 'y': y, 'facing': 'down', 'role': 'shard%d' % form, 'wander': False,
                                 'lines': ['A shard of the meteor, %s. It hums with a strange power.' % where]})
+
+        # 5.0.0: the people a region's data adds (loc.extras), after everything older so nothing moves. `at`: near the
+        # spawn ('spawn', the default) or the middle ('mid'), `dx`/`dy` from there; a 'twin' rift also goes at the
+        # same spot in the area's twin (mirrored on the HOLLOW LANDS' reverse side).
+        hid = {(h['x'], h['y']) for h in hidden if h['area'] == by_index[a['index']]}
+        for n in a['extras']:
+            if 'x' in n:
+                x, y = n['x'], n['y']
+            else:
+                bx, by = (a['w'] // 2, a['h'] // 2) if n.get('at') == 'mid' else (a['spawn']['x'], a['spawn']['y'])
+                x, y = free_spot(a, bx + n.get('dx', 0), by + n.get('dy', 0), hid)
+            a['people'].append({'kind': n['kind'], 'x': x, 'y': y, 'facing': n.get('facing', 'down'), 'role': n.get('role', ''),
+                                'wander': False, 'lines': n.get('lines', [])})
 
     # 2.0.1: KAI before the CRATER RIM: on the dock at PORT CALDER, then at the top of each branch. Placed last,
     # with trainer ids after every other one, so nothing already beaten moves.
@@ -676,16 +717,18 @@ def build_world(exp, data, out_inc):
         if a.get('safari'): flags.append('area_flag::SAFARI')
         if a.get('trade_town'): flags.append('area_flag::TRADE_TOWN')
         if a.get('shrine'): flags.append('area_flag::SHRINE')
+        if a.get('mirror'): flags.append('area_flag::MIRROR')
         legend = a['legend']
         if a['own_pool']:
             flags.append('area_flag::OWN_POOL')
         L.append('constexpr area_info %sarea = {area_kind::%s, area_theme::%s, area_weather::%s, %s, %d, %d, %d, %d, %d, %d, %s, '
-                 '%sdive, %d, %sshafts, %d, %s, %d, %d, %d, %d, %s};' % (
+                 '%sdive, %d, %sshafts, %d, %s, %d, %d, %d, %d, %s, %d};' % (
             p, kind, theme, weather, ' | '.join(flags) or '0', a['tier'], a['region'], a['at'][0], a['at'][1],
             by_index.get(a['dive'], -1) if a['dive'] >= 0 else -1, by_index.get(a['surface'], -1) if a['surface'] >= 0 else -1,
             c_text(a['scene']), p, nd, p, ns,
             'species_id::%s' % enum_name(legend['name']) if legend else 'species_id::PIDGEY', legend['x'] if legend else -1,
-            legend['y'] if legend else -1, nw, nf, '%sclean' % p if info['clean_meta'] is not None else 'nullptr'))
+            legend['y'] if legend else -1, nw, nf, '%sclean' % p if info['clean_meta'] is not None else 'nullptr',
+            by_index[a['twin']] if a['twin'] >= 0 else -1))
         map_rows[by_index[a['index']]] = ('{%s, %d, %d, %d, %smap, %sbehaviour, %ssigns, %d, %sdoors, %d, %speople, %d, %strainers, %d, %sitems, %d, '
                         'nullptr, 0, %slinks, %d, %spool, %d, %d, %d, %d, -1, 0, 0, %d, gate_kind::%s, %s, %s, &%sarea, %swater, %sfish, %s, nullptr}' % (
             c_text(a['name'].upper()), info['ts'], a['w'], a['h'], p, p, p, len(a['signs']), p, len(a['doors']), p, len(a['people']),
@@ -1747,6 +1790,39 @@ def add_statue(data):
     frame = {'dy': 0, 'px': [[stone(c) for c in row] for row in f['px']]}
     data['people']['statue'] = {d: [frame] * 3 for d in ('down', 'up', 'left')}
 
+def add_specials(data):
+    """5.0.0 on: people that aren't people. A pink SPARKLE (GENOVA's MEW, seen for a moment), a RIFT (AETERNA's way
+    between eras, 6.0.0) and a SHADOW (the HOLLOW LANDS' way to the reverse side, 7.0.0): 16x21 frames, drawn here."""
+    def frame(rows, pal):
+        return {'dy': 0, 'px': [[pal[ch] if ch != '.' else 0 for ch in row] for row in rows]}
+    blank = ['.' * 16] * 21
+    def ring(cx, cy, r0, r1, ch, rows):
+        rows = [list(r) for r in rows]
+        for y in range(21):
+            for x in range(16):
+                d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+                if r0 <= d < r1:
+                    rows[y][x] = ch
+        return [''.join(r) for r in rows]
+    def star(cx, cy, n, rows):
+        rows = [list(r) for r in rows]
+        for k in range(-n, n + 1):
+            for x, y, ch in ((cx + k, cy, 'p'), (cx, cy + k, 'p')):
+                if 0 <= x < 16 and 0 <= y < 21:
+                    rows[y][x] = 'w' if abs(k) <= 1 else ch
+        return [''.join(r) for r in rows]
+    pink = {'p': [248, 136, 200], 'w': [255, 240, 250], 'q': [200, 96, 168]}
+    sparkle = [frame(star(8, 12, 4, ring(8, 12, 5.5, 6.5, 'q', blank)), pink), frame(star(8, 12, 3, blank), pink),
+               frame(star(8, 12, 5, blank), pink)]
+    violet = {'a': [56, 24, 96], 'b': [120, 64, 200], 'c': [200, 168, 248], 'w': [248, 240, 255]}
+    rift = ring(8, 12, 0, 2, 'w', ring(8, 12, 2, 4, 'c', ring(8, 12, 4, 6, 'b', ring(8, 12, 6, 7.5, 'a', blank))))
+    rift2 = ring(8, 12, 0, 1.5, 'w', ring(8, 12, 1.5, 3.5, 'b', ring(8, 12, 3.5, 6, 'c', ring(8, 12, 6, 7.5, 'b', blank))))
+    grey = {'a': [24, 20, 32], 'b': [56, 48, 72], 'c': [96, 88, 120]}
+    shadow = ring(8, 16, 0, 3, 'a', ring(8, 16, 3, 5, 'b', ring(8, 16, 5, 6.5, 'c', blank)))
+    data['people']['sparkle'] = {d: sparkle for d in ('down', 'up', 'left')}
+    data['people']['rift'] = {d: [frame(rift, violet), frame(rift2, violet), frame(rift, violet)] for d in ('down', 'up', 'left')}
+    data['people']['shadow'] = {d: [frame(shadow, grey)] * 3 for d in ('down', 'up', 'left')}
+
 def free_spot(a, x, y, also=()):
     """The nearest open path tile to (x, y) in an area: nobody on it, and not right below a door."""
     beh = a['behaviour']
@@ -1959,9 +2035,13 @@ def build_game_data(data, out_inc):
           '// 2.0.0: the species from here on came with Gen 8 and 9: CALDERRA\'s POKéDEX.',
           'constexpr int species_v1 = %d;\n' % data.get('species_v1', len(names)),
           '// 3.0.0: the Sundered forms, from here on: the SUNDERED ISLES\' POKéDEX.',
-          'constexpr int species_v2 = %d;\n' % data.get('species_v2', len(names)),
+          'constexpr int species_v2 = %d;\n' % data['species_from'][0],
           '// 4.0.0: the Skyreach forms and DEOXYS\' forms, from here on: the SKYREACH\'s POKéDEX.',
-          'constexpr int species_v3 = %d;\n' % data.get('species_v3', len(names))]
+          'constexpr int species_v3 = %d;\n' % data['species_from'][1],
+          '// 5.0.0: where each region\'s own POKéDEX starts, from the SUNDERED ISLES (3) on, and where the last ends.',
+          'constexpr int region_species_first = 3;',
+          'constexpr int region_species[] = {%s};\n' % ', '.join(map(str, data['species_from'])),
+          'constexpr int region_species_count = %d;\n' % (len(data['species_from']) - 1)]
     E += ['enum class item_id : uint8_t\n{'] + ['    %s,' % i.upper() for i in ITEM_IDS] + ['};\n',
           'constexpr int items_count = %d;\n' % len(ITEM_IDS)]
     E += ['enum class person_kind : uint8_t\n{'] + ['    %s,' % k for k in kinds] + ['};\n', '}\n', '#endif']
@@ -2026,6 +2106,7 @@ def main():
     data = json.load(open(os.path.join(EXP, 'data.json'), encoding='utf8'))
     add_extras(data)
     add_statue(data)
+    add_specials(data)
     build_world(EXP, data, inc)
     build_game_data(data, inc)
     build_music(data, inc)

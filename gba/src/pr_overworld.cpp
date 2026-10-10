@@ -494,6 +494,14 @@ void overworld::load_actors()
         {
             continue;       // the CHALLENGE TOWER's guide only comes in ADVENTURE MODE
         }
+        if(p.role == person_role::MEW_SIGHT)
+        {
+            int k = mew_sighting_index(_map_index, i);
+            if(k < 0 || g.flags.test(flag::MEW_SIGHTING + k))
+            {
+                continue;   // 5.0.0: a MEW you've already spotted here doesn't come back
+            }
+        }
         actor a;
         a.who = &p;
         a.kind = p.kind;
@@ -1226,9 +1234,21 @@ void overworld::step(direction want)
         if(l.badges && g.region_badges(map_region(target_place.map)) < l.badges)
         {
             set_player_frame(0);
-            bn::string<96> text(l.badges < 8 ? "A strong updraft howls up the cliff. Riding it takes " : "Only trainers with all ");
+            // (5.0.0 on: a later region's inner gates, by its own name.)
+            const int rg = map_region(target_place.map);
+            bn::string<128> text(l.badges >= 8 ? "Only trainers with all " : rg == 4 ? "A strong updraft howls up the cliff. Riding it takes "
+                                 : "A guard checks your badges. Going on takes ");
             text.append(bn::to_string<4>(l.badges));
-            text.append(l.badges < 8 ? " SKYREACH badges." : " badges may pass beyond this point.");
+            if(l.badges < 8)
+            {
+                text.append(" ");
+                text.append(region_name(rg));
+                text.append(" badges.");
+            }
+            else
+            {
+                text.append(" badges may pass beyond this point.");
+            }
             say(text);
             hold_until_released();
             return;
@@ -1245,11 +1265,16 @@ void overworld::step(direction want)
         if(l.need == link_need::SHRINES && ! shrines_cleared(map_region(_map_index)))
         {
             set_player_frame(0);
-            say(map_region(_map_index) == 4
-                    ? "A howling wind seals the SKY PILLAR's door. It stays shut until DEOXYS and RAYQUAZA are settled."
-                    : map_region(_map_index) == 3
-                    ? "The ground shakes and the sea roars. MT. KEEL stays shut until TEAM QUAKE and TEAM NEPTUNE are stopped."
-                    : "A wall of heat and storm bars the way to the tower. The three beasts must be freed first.");
+            constexpr const char* shut[] = {
+                "A wall of heat and storm bars the way to the tower. The three beasts must be freed first.",
+                "The ground shakes and the sea roars. MT. KEEL stays shut until TEAM QUAKE and TEAM NEPTUNE are stopped.",
+                "A howling wind seals the SKY PILLAR's door. It stays shut until DEOXYS and RAYQUAZA are settled.",
+                "SECURITY LOCKDOWN. The ARCOLOGY SPIRE stays sealed until the SYNTHESIS CORP. is stopped and MEWTWO is free.",
+                "The road shimmers and loops back on itself. It won't hold still until DIALGA and PALKIA are calmed.",
+                "The mist is too thick to pass. It won't lift until TEAM HOLLOW is stopped and GIRATINA is calmed.",
+                "A wall of wind and frost and flame. It won't part until all three birds are free.",
+                "The light is too bright to face. The HALL OF ORIGIN waits for the one who calms ARCEUS." };
+            say(shut[bn::max(0, bn::min(7, map_region(_map_index) - 2))]);
             hold_until_released();
             return;
         }

@@ -26,6 +26,7 @@ struct battle_setup
                                     // one, the Sundered Isles' two (3.0.0)
     bool sharp = false;             // the Sundered Isles' trainers (3.0.0): smart, and they read held items too
     bool keen = false;              // the SKYREACH's (4.0.0): they also gang up on the Pokémon that threatens them most
+    uint8_t tier = 0;               // 5.0.0 on: the region whose trainers these are; each new one reads the battle better
     battle_weather weather = battle_weather::NONE;  // the weather at the start (3.0.0: the islands' storms)
 };
 

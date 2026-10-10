@@ -829,15 +829,29 @@ const SKYREACH_FORMS = [
   ["Deoxys-Attack", "Deoxys", 10001, ["Psychic"], [50,180,20,180,20,150]],
   ["Deoxys-Defense", "Deoxys", 10002, ["Psychic"], [50,70,160,70,160,90]],
   ["Deoxys-Speed", "Deoxys", 10003, ["Psychic"], [50,95,90,95,90,180]]];
-const PROC_RAW_SUNDERED = SUNDERED_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
-const PROC_RAW_SKYREACH = SKYREACH_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
-for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of SUNDERED_FORMS.concat(SKYREACH_FORMS)){
+// 5.0.0: GENOVA's experiments, the first all-new POKéMON: the Synthesis Corp. spliced them from two others (the
+// original here gives the learnset and size), and they escaped into the city. Sprites: gba/tools/art/genova_splices.py.
+const GENOVA_FORMS = [
+  ["Chimurr", "Rattata", 2021, ["Normal","Poison"], [50,62,48,40,45,75], "Chimaul", 34],
+  ["Chimaul", "Raticate", 2022, ["Normal","Poison"], [80,95,70,60,70,100]],
+  ["Voltadpole", "Chinchou", 2023, ["Electric","Water"], [55,40,45,65,50,70], "Voltoad", 36],
+  ["Voltoad", "Lanturn", 2024, ["Electric","Water"], [95,65,80,105,85,80]],
+  ["Graftling", "Ferroseed", 2025, ["Grass","Steel"], [55,75,85,40,60,35], "Graftree", 40],
+  ["Graftree", "Ferrothorn", 2026, ["Grass","Steel"], [90,115,125,60,85,45]],
+  ["Specterra", "Cubone", 2027, ["Ghost","Ground"], [70,95,100,70,80,60]],
+  ["Mimicore", "Porygon", 2028, ["Psychic","Steel"], [85,70,100,110,100,65]],
+  ["Helixeon", "Mew", 2029, ["Psychic","Dragon"], [95,85,85,125,95,105]]];
+// Each later region's forms, in order: they come after everything older so species indices in saves stay put.
+const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS];
+const ALL_FORMS = FORM_LISTS.flat();
+const PROC_RAW_FORMS = ALL_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
+for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of ALL_FORMS){
   const s = n.toLowerCase(), o = orig.toLowerCase();
   if(typeof DEXDATA!=='undefined' && DEXDATA[o])
     DEXDATA[s] = {...DEXDATA[o], types, base:{hp,atk,def,spa,spd,spe}, evo:to ? {to:to.toLowerCase(), level} : undefined};
   if(typeof MOVE_EXTRA!=='undefined' && MOVE_EXTRA.learn[o]) MOVE_EXTRA.learn[s] = MOVE_EXTRA.learn[o];
 }
-const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry)).concat(PROC_RAW_SUNDERED.map(procEntry)).concat(PROC_RAW_SKYREACH.map(procEntry));
+const DEX = CURATED_DEX.concat(PROC_RAW.map(procEntry)).concat(PROC_RAW_GEN2.map(procEntry)).concat(PROC_RAW_GEN3.map(procEntry)).concat(PROC_RAW_GEN4.map(procEntry)).concat(PROC_RAW_GEN5.map(procEntry)).concat(PROC_RAW_GEN6.map(procEntry)).concat(PROC_RAW_GEN7.map(procEntry)).concat(PROC_RAW_GEN89.map(procEntry)).concat(PROC_RAW_FORMS.map(procEntry));
 
 const LEVEL = 50;
 // Real data from js/dexdata.js (generated from PokeAPI by tools/build-dexdata.js) replaces the
@@ -1121,10 +1135,12 @@ const DEX_NUM = {
  "cutiefly":742,"mudbray":749,"morelull":755,"salandit":757,"grookey":810,"thwackey":811,"rillaboom":812,"scorbunny":813,"raboot":814,"cinderace":815,"sobble":816,"drizzile":817,"inteleon":818,"skwovet":819,"greedent":820,"rookidee":821,"corvisquire":822,"corviknight":823,"blipbug":824,"dottler":825,"orbeetle":826,"nickit":827,"thievul":828,"gossifleur":829,"eldegoss":830,"wooloo":831,"dubwool":832,"chewtle":833,"drednaw":834,"yamper":835,"boltund":836,"rolycoly":837,"carkol":838,"coalossal":839,"applin":840,"flapple":841,"appletun":842,"silicobra":843,"sandaconda":844,"cramorant":845,"arrokuda":846,"barraskewda":847,"toxel":848,"toxtricity":849,"sizzlipede":850,"centiskorch":851,"clobbopus":852,"grapploct":853,"sinistea":854,"polteageist":855,"hatenna":856,"hattrem":857,"hatterene":858,"impidimp":859,"morgrem":860,"grimmsnarl":861,"obstagoon":862,"perrserker":863,"cursola":864,"sirfetch-d":865,"mr-rime":866,"runerigus":867,"milcery":868,"alcremie":869,"falinks":870,"pincurchin":871,"snom":872,"frosmoth":873,"stonjourner":874,"eiscue":875,"indeedee":876,"morpeko":877,"cufant":878,"copperajah":879,"dracozolt":880,"arctozolt":881,"dracovish":882,"arctovish":883,"duraludon":884,"dreepy":885,"drakloak":886,"dragapult":887,"zacian":888,"zamazenta":889,"eternatus":890,"kubfu":891,"urshifu":892,"zarude":893,"regieleki":894,"regidrago":895,"glastrier":896,"spectrier":897,"calyrex":898,"wyrdeer":899,"kleavor":900,"ursaluna":901,"basculegion":902,"sneasler":903,"overqwil":904,"enamorus":905,"sprigatito":906,"floragato":907,"meowscarada":908,"fuecoco":909,"crocalor":910,"skeledirge":911,"quaxly":912,"quaxwell":913,"quaquaval":914,"lechonk":915,"oinkologne":916,"tarountula":917,"spidops":918,"nymble":919,"lokix":920,"pawmi":921,"pawmo":922,"pawmot":923,"tandemaus":924,"maushold":925,"fidough":926,"dachsbun":927,"smoliv":928,"dolliv":929,"arboliva":930,"squawkabilly":931,"nacli":932,"naclstack":933,"garganacl":934,"charcadet":935,"armarouge":936,"ceruledge":937,"tadbulb":938,"bellibolt":939,"wattrel":940,"kilowattrel":941,"maschiff":942,"mabosstiff":943,"shroodle":944,"grafaiai":945,"bramblin":946,"brambleghast":947,"toedscool":948,"toedscruel":949,"klawf":950,"capsakid":951,"scovillain":952,"rellor":953,"rabsca":954,"flittle":955,"espathra":956,"tinkatink":957,"tinkatuff":958,"tinkaton":959,"wiglett":960,"wugtrio":961,"bombirdier":962,"finizen":963,"palafin":964,"varoom":965,"revavroom":966,"cyclizar":967,"orthworm":968,"glimmet":969,"glimmora":970,"greavard":971,"houndstone":972,"flamigo":973,"cetoddle":974,"cetitan":975,"veluza":976,"dondozo":977,"tatsugiri":978,"annihilape":979,"clodsire":980,"farigiraf":981,"dudunsparce":982,"kingambit":983,"great-tusk":984,"scream-tail":985,"brute-bonnet":986,"flutter-mane":987,"slither-wing":988,"sandy-shocks":989,"iron-treads":990,"iron-bundle":991,"iron-hands":992,"iron-jugulis":993,"iron-moth":994,"iron-thorns":995,"frigibax":996,"arctibax":997,"baxcalibur":998,"gimmighoul":999,"gholdengo":1000,"wo-chien":1001,"chien-pao":1002,"ting-lu":1003,"chi-yu":1004,"roaring-moon":1005,"iron-valiant":1006,"koraidon":1007,"miraidon":1008,"walking-wake":1009,"iron-leaves":1010,"dipplin":1011,"poltchageist":1012,"sinistcha":1013,"okidogi":1014,"munkidori":1015,"fezandipiti":1016,"ogerpon":1017,"archaludon":1018,"hydrapple":1019,"gouging-fire":1020,"raging-bolt":1021,"iron-boulder":1022,"iron-crown":1023,"terapagos":1024,"pecharunt":1025
 };
 // 3.0.0: the Sundered forms' numbers, and their originals' POKéDEX sizes and categories.
-for(const [n, orig, num] of SUNDERED_FORMS.concat(SKYREACH_FORMS)){
+for(const [n, orig, num] of ALL_FORMS){
   DEX_NUM[slug(n)] = num;
   if(typeof DEXINFO!=='undefined' && DEXINFO[DEX_NUM[slug(orig)]]) DEXINFO[num] = DEXINFO[DEX_NUM[slug(orig)]];
 }
+// 5.0.0: GENOVA's experiments are their own kind, whatever they were spliced from.
+if(typeof DEXINFO!=='undefined') for(const [n, , num] of GENOVA_FORMS) DEXINFO[num] = {...DEXINFO[num], g:'Experiment'};
 function spritePath(d, facing, shiny){
   const num = DEX_NUM[slug(d.name)] || 0;
   return `sprites/pokemon/${facing==='back'?'back/':''}${shiny?'shiny/':''}${num}.png`;
@@ -1759,8 +1775,53 @@ function finishMap(tiles, buildings, npcs, exits, spawn, signs){
   }
   return {w:tiles[0].length, h:tiles.length, tiles, buildings, npcs, exits, signs, spawn};
 }
+// 6.0.0: a twin: an area built as a copy of another (`twinOf`, its LOCATIONS index; that one's `twin` points back).
+// AETERNA's other era is the same valley, so the same layout; the HOLLOW LANDS' reverse side (`mirror`) has left
+// and right swapped. Its exits lead to the twins of its original's neighbours (an exit to a place with no twin is
+// grown over), its signs say its own name, and its trainers use its own wild Pokémon.
+function twinMap(loc){
+  const src = getMap(LOCATIONS[loc.twinOf]), W = src.w, m = !!loc.mirror, me = LOCATIONS.indexOf(loc);
+  const SWAP = {'>':'<', '<':'>', '4':'6', '6':'4'}, fx = x=>m ? W-1-x : x;
+  const tiles = src.tiles.map(r=>{ const row = r.map(ch=>(m && SWAP[ch]) || ch); return m ? row.reverse() : row; });
+  const exits = [];
+  for(const e of src.exits){
+    const dir = m && (e.dir==='left' || e.dir==='right') ? OPPOSITE[e.dir] : e.dir;
+    const x = e.dir==='left' || e.dir==='right' ? fx(e.x) : m ? W - e.x - e.len : e.x;
+    const to = LOCATIONS[e.to].twin;
+    if(to===undefined){
+      // Grown over: the opening, two trees deep, and the path into it.
+      const horiz = dir==='left' || dir==='right', [ix, iy] = STEP_IN[dir];
+      for(let i=0; i<e.len; i++) for(let d=0; d<2; d++) tiles[e.y + (horiz ? i : 0) + iy*d][x + (horiz ? 0 : i) + ix*d] = 'T';
+      continue;
+    }
+    exits.push({x, y:e.y, len:e.len, dir, to, gate:false});
+  }
+  loc.links = exits.map(e=>({dir:e.dir, to:e.to, gate:false}));
+  const flipBox = b=>m ? {...b, x:W - b.x - (b.w || 1), door:b.door ? {...b.door, x:fx(b.door.x)} : b.door} : {...b};
+  const renames = [[LOCATIONS[loc.twinOf], loc], ...src.exits.filter(e=>LOCATIONS[e.to].twin!==undefined).map(e=>[LOCATIONS[e.to], LOCATIONS[LOCATIONS[e.to].twin]])];
+  const rename = t=>renames.reduce((t, [a, b])=>t.split(a.name.toUpperCase()).join(b.name.toUpperCase()), t);
+  const signs = src.signs.map(sg=>({...sg, x:fx(sg.x), text:sg.text ? rename(sg.text) : sg.text}));
+  const pool = loc.pool || areaPool(loc), rnd = seedRand(loc.name);
+  const npcs = src.npcs.filter(n=>!n.legend && !n.gymLeader && !(n.trainer && !n.id)).map(n=>{
+    const c = {...n, x:fx(n.x), facing:m && (n.facing==='left' || n.facing==='right') ? OPPOSITE[n.facing] : n.facing};
+    if(n.home) c.home = {x:fx(n.home.x), y:n.home.y};
+    if(n.trainer && n.team) c.team = n.team.map(()=>pool[Math.floor(rnd()*pool.length)]), c.id = n.id.replace(LOCATIONS[loc.twinOf].name, loc.name);
+    return c;
+  });
+  const map = {w:W, h:src.h, tiles, buildings:src.buildings.map(flipBox), npcs, exits, signs, spawn:{x:fx(src.spawn.x), y:src.spawn.y}};
+  // The original's item balls are here too, but not its treasure (a plate is one of a kind).
+  const theirs = LOCATIONS[loc.twinOf].treasure || [];
+  if(src.itemTypes) map.itemTypes = Object.fromEntries(Object.entries(src.itemTypes).map(([k, v])=>{ const [x, y] = k.split(',').map(Number); return [`${fx(x)},${y}`, v]; })
+    .filter(([k, v])=>{ if(!theirs.includes(v)) return true; const [x, y] = k.split(',').map(Number); tiles[y][x] = '.'; return false; }));
+  for(const t of loc.treasure || []){
+    // Its own treasure: on open ground near the middle.
+    for(let r=0, done=false; r<20 && !done; r++) for(let y=(src.h>>1)-r; y<=(src.h>>1)+r && !done; y++) for(let x=(W>>1)-r; x<=(W>>1)+r && !done; x++)
+      if(tiles[y] && tiles[y][x]==='.' && !npcs.some(n=>n.x===x && n.y===y)){ tiles[y][x] = 'I'; (map.itemTypes ||= {})[`${x},${y}`] = t; done = true; }
+  }
+  return map;
+}
 function getMap(loc){
-  if(!loc.__map){ loc.__map = (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc); loc.__map.weather = WEATHER[loc.name] || null; loc.__map.tint = loc.tint || ''; }
+  if(!loc.__map){ loc.__map = loc.twinOf!==undefined ? twinMap(loc) : (loc.type==='route'||loc.type==='trainer') ? buildRoute(loc) : buildTown(loc); loc.__map.weather = WEATHER[loc.name] || null; loc.__map.tint = loc.tint || ''; }
   // Item balls you've already picked up stay gone (adv.picked holds "Area@x,y").
   if(typeof adv!=='undefined' && adv && adv.picked) for(const k in adv.picked){
     if(!k.startsWith(loc.name+'@2:')) continue;   // "@2:" = the Phase 1.5 route layouts
@@ -6571,6 +6632,132 @@ Object.assign(WEATHER, {"Thunderhead":'rain', "Mesa Route 6":'rain', "Frostcrown
   Object.assign(SKYREACH[15], {rivalAfter:["The DNA is gone... Director HALLEY took it all up to the SKY PILLAR!", "With RAYQUAZA's power added in, the perfect POKéMON will be born. You're too late."]});
   Object.assign(SKYREACH[19], {rivalAfter:["Perfect... was a lie? Then what is that, coming down from the sky?", "RAYQUAZA... it's looking at you. Not at me. At YOU."]});
   for(const loc of SKYREACH) getMap(loc);
+}
+
+// ---------- Genova (5.0.0): the fifth region, a city-state of labs, reached by shuttle from WINDWARD ----------
+// One huge city built by the SYNTHESIS CORP., who cloned MEWTWO from a MEW eyelash found in the jungle. MEWTWO
+// escaped and hides in the SEALED CAVE; the Corp. wants a second, obedient clone. The inner wards (gyms 1-4) are
+// open when you land at GENOVA CENTRAL; the outer ring past the walls (the old labs, the jungle and the skyline)
+// takes four Genova badges. The lab's escaped experiments (GENOVA_FORMS) live wild. MEW is seen in ten places
+// (role 'mew'): spot it in all ten and it comes out from under the truck on the LOST PIER. With MEWTWO free and the
+// SYNTHESIS TOWER stopped, and eight badges, the ARCOLOGY SPIRE climbs to the League. Levels: 400, then 12 more per
+// Genova badge, up to 500. `at` is the region map's grid: x 0..8, y 0..3.
+Object.assign(CHARS, {
+  gruntSynth:    {head:'cap',   K:'#282830',R:'#f8f8f8',W:'#38b0a0',S:'#e8b080',H:'#283838',B:'#f0f0f0',D:'#30887c',Y:'#38b0a0'},
+  adminSynth:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c098',H:'#204848',B:'#f0f0f0',D:'#285858',Y:'#78e0d0'},
+  bossVoss:      {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#a0a0a8',B:'#202830',D:'#38b0a0',Y:'#f0e070'},
+  leaderCobalt:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c89068',H:'#3858a0',B:'#8890a0',D:'#404858',Y:'#e08030'},
+  leaderNerine:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0c8a8',H:'#3070c0',B:'#58b8e8',D:'#204870',Y:'#f8f8f8'},
+  leaderVolta:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#f0d040',B:'#383848',D:'#f0d040',Y:'#58e0f8'},
+  leaderHelix:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#c058c8',B:'#f0f0f8',D:'#7048a0',Y:'#f8b8f0'},
+  leaderWisteria:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e0e8',H:'#8868c0',B:'#403058',D:'#201830',Y:'#c8a8f0'},
+  leaderSylva:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c88858',H:'#386828',B:'#88b848',D:'#405828',Y:'#e8d050'},
+  leaderJett:    {head:'cap',   K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#202020',B:'#e8e8f0',D:'#5878c8',Y:'#f0a030'},
+  leaderIvy:     {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#58a048',B:'#8848a8',D:'#304820',Y:'#d0f080'},
+  rivalNova:     {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#e86090',B:'#f0f0f0',D:'#4058a0',Y:'#38b0a0'},
+  eliteCipher:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#303038',B:'#a8b0c0',D:'#383848',Y:'#58e0f8'},
+  eliteVenna:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d0c0',H:'#602878',B:'#a050c0',D:'#382048',Y:'#b8f070'},
+  eliteRook:     {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#a87048',H:'#282828',B:'#383040',D:'#181820',Y:'#e04040'},
+  eliteLyra:     {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d0',H:'#f0c8f8',B:'#e070c0',D:'#603880',Y:'#f8f0a0'},
+  championCassia:{head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#203040',B:'#f0f0f8',D:'#38b0a0',Y:'#f2d64b'}});
+Object.assign(GYM_STYLE, {
+  Cobalt:{kind:'leaderCobalt', type:'Steel', theme:'steel', juniors:{cls:'WELDER', kind:'hiker', team:['Magnemite','Klink','Bronzor','Graftling','Pawniard','Aron']}},
+  Nerine:{kind:'leaderNerine', type:'Water', theme:'water', juniors:{cls:'CANAL DIVER', kind:'lass', team:['Voltadpole','Chinchou','Finizen','Arrokuda','Wiglett','Tentacool']}},
+  Volta:{kind:'leaderVolta', type:'Electric', theme:'electric', juniors:{cls:'ENGINEER', kind:'boy', team:['Voltadpole','Rotom','Toxel','Tadbulb','Pawmi','Blitzle']}},
+  Helix:{kind:'leaderHelix', type:'Psychic', theme:'psychic', juniors:{cls:'SCIENTIST', kind:'gentleman', team:['Mimicore','Solosis','Elgyem','Porygon','Hatenna','Duosion']}},
+  Wisteria:{kind:'leaderWisteria', type:'Ghost', theme:'ghost', juniors:{cls:'MEDIUM', kind:'oldwoman', team:['Specterra','Sinistea','Greavard','Litwick','Duskull','Phantump']}},
+  Sylva:{kind:'leaderSylva', type:'Bug and Grass', theme:'bug', juniors:{cls:'BUG MANIAC', kind:'bugcatcher', team:['Sewaddle','Nymble','Graftling','Tarountula','Paras','Sizzlipede']}},
+  Jett:{kind:'leaderJett', type:'Flying', theme:'flying', juniors:{cls:'SKY RUNNER', kind:'boy', team:['Wattrel','Rookidee','Starly','Noibat','Flittle','Squawkabilly']}},
+  Ivy:{kind:'leaderIvy', type:'Grass and Poison', theme:'poison', juniors:{cls:'GARDENER', kind:'lass', team:['Chimurr','Budew','Bramblin','Toedscool','Oddish','Shroodle']}}});
+const SYNTH_TEAM = {cls:'SYNTH GRUNT', kind:'gruntSynth', pool:['Porygon','Ditto','Chimurr','Grimer','Koffing','Mimicore'],
+  intro:["Property of the SYNTHESIS CORP. That includes you now.", "Every POKéMON can be improved. Let me show you.", "The Chairman wants a perfect clone. You're in the way."],
+  after:["My samples! Scattered!", "Experiment... failed.", "The Chairman won't like this."]};
+const ELITES_GENOVA = [
+  {kind:'eliteCipher', title:'ELITE FOUR CIPHER', team:['Magnezone','Rotom','Mimicore','Porygon-Z','Gholdengo','Voltoad'],
+   intro:"Every battle is an equation. I've already solved yours.", after:"A variable I didn't account for. You."},
+  {kind:'eliteVenna', title:'ELITE FOUR VENNA', team:['Toxapex','Chimaul','Roserade','Overqwil','Glimmora','Toxtricity'],
+   intro:"The city grew from a laboratory. So did my poisons. Shall we?", after:"Immune to everything, it seems. Go on."},
+  {kind:'eliteRook', title:'ELITE FOUR ROOK', team:['Kingambit','Hydreigon','Grimmsnarl','Krookodile','Specterra','Bisharp'],
+   intro:"Every city has an underside. I rule it. Let's fight in the dark.", after:"You fight clean. That's rare down here."},
+  {kind:'eliteLyra', title:'ELITE FOUR LYRA', team:['Gardevoir','Reuniclus','Espathra','Hatterene','Gallade','Helixeon'],
+   intro:"MEWTWO's mind is still echoing through this city. Can you hear it?", after:"It's quiet now. You did that. The CHAMPION waits."}];
+const GENOVA = [
+  // 0-9: the inner wards, open when you land
+  {type:'town', name:"Genova Central", at:[4,2], center:true, tint:'city', desc:"The heart of GENOVA: glass towers, monorail lines overhead, and the statue of FOUNDER ARDEN in the plaza."},
+  {type:'route', name:"Monorail Line West", at:[3,2], tint:'city', desc:"A walkway under the monorail, west to the FOUNDRY WARD. Escaped experiments nest in the planters.", pool:['Chimurr','Voltadpole','Rattata','Grimer','Trubbish','Pawmi']},
+  {type:'gym', name:"Foundry Ward", at:[2,2], center:true, tint:'city', desc:"Smokestacks and steelworks. Leader Cobalt's gym is a working forge.", leaderName:"Cobalt", leaderTeam:['Metagross','Kingambit','Copperajah','Graftree']},
+  {type:'route', name:"Sewer Run", at:[2,3], theme:'cave', treasure:['ironplate'], desc:"The sewers under the FOUNDRY WARD. Something metal is wedged in a grate, humming.", pool:['Grimer','Koffing','Chimurr','Specterra','Trubbish','Zubat']},
+  {type:'gym', name:"Canal Ward", at:[3,3], center:true, tint:'city', desc:"Canals run between the towers, and water taxis buzz past. Leader Nerine's gym floats on the main canal.", leaderName:"Nerine", leaderTeam:['Palafin','Voltoad','Gyarados','Barraskewda']},
+  {type:'route', name:"Monorail Line East", at:[5,2], tint:'city', desc:"East along the monorail toward the NEON WARD, where the signs never switch off.", pool:['Voltadpole','Pawmi','Magnemite','Chimurr','Rotom','Porygon']},
+  {type:'gym', name:"Neon Ward", at:[6,2], center:true, tint:'city', desc:"Billboards and arcades, bright all night. Leader Volta's gym is the biggest arcade of all.", leaderName:"Volta", leaderTeam:['Electivire','Toxtricity','Rotom','Bellibolt']},
+  {type:'route', name:"Rooftop Run", at:[6,1], tint:'city', treasure:['zapplate'], desc:"Across the rooftops above the NEON WARD, from fire escape to fire escape, toward the SYNTHESIS TOWER. A billboard sparks where something is stuck in it.", pool:['Wattrel','Murkrow','Mimicore','Rookidee','Chimurr','Noibat']},
+  {type:'trainer', kind:'boss', name:"Synthesis Tower", at:[7,1], boss:true, shrine:true, grunts:3, tint:'city', gruntTeam:SYNTH_TEAM, bossKind:'adminSynth',
+   desc:"The SYNTHESIS CORP.'s headquarters, a tower of glass and steel. Cloning tanks hum in every window. \"The new clone will obey!\"",
+   leaderName:"Admin Ridley", leaderTeam:['Porygon-Z','Mimicore','Chimaul','Magnezone','Voltoad','Reuniclus'], pool:['Porygon','Ditto','Mimicore','Magnemite']},
+  {type:'gym', name:"Helix Ward", at:[6,3], center:true, tint:'city', desc:"The gene labs, white and spotless. Leader Helix runs the city's biggest lab, and the gym inside it.", leaderName:"Helix", leaderTeam:['Reuniclus','Mimicore','Gallade','Espathra']},
+  // 10-15: the west ring, past the walls: the old labs and the jungle (four badges)
+  {type:'route', name:"Overgrown Lab", at:[1,2], badges:4, theme:'forest', tint:'jungle', desc:"An old lab outside the walls, broken open by roots. The first experiments escaped from here.", pool:['Graftling','Chimurr','Specterra','Voltadpole','Paras','Bellsprout']},
+  {type:'gym', name:"Old Town", at:[0,2], center:true, tint:'jungle', desc:"GENOVA as it was before the towers: old brick lanes, half swallowed by vines. Leader Wisteria's gym is a haunted manor.", leaderName:"Wisteria", leaderTeam:['Gengar','Specterra','Chandelure','Mimikyu']},
+  {type:'route', name:"Jungle Trail", at:[0,1], theme:'forest', tint:'jungle', desc:"The jungle the Corp. found MEW in. The air is thick and something always seems to be watching.", pool:['Graftling','Paras','Bellsprout','Tropius','Aipom','Chimurr']},
+  {type:'gym', name:"Verdance", at:[0,0], center:true, tint:'jungle', desc:"A village of treehouses deep in the jungle. Leader Sylva's gym is the tallest tree.", leaderName:"Sylva", leaderTeam:['Leavanny','Scizor','Graftree','Lokix']},
+  {type:'trainer', kind:'rival', name:"Canopy Walk", at:[1,0], theme:'forest', tint:'jungle', desc:"A trainer drops from the canopy on a vine. \"You're the off-lander the whole city's talking about? Battle me!\"",
+   leaderName:"Nova", rivalKind:'rivalNova', leaderTeam:['Helixeon','Voltoad','Graftree','Chimaul','Lucario'], pool:['Graftling','Aipom','Tropius','Paras']},
+  {type:'trainer', kind:'boss', name:"Sealed Cave", at:[2,0], boss:true, shrine:true, legend:'Mewtwo', grunts:3, theme:'cave', gruntTeam:SYNTH_TEAM, bossKind:'bossVoss',
+   desc:"A cave the Corp. sealed with steel doors, now blasted open. Chairman VOSS stands at the back. \"MEWTWO is company property!\"",
+   leaderName:"Chairman Voss", leaderTeam:['Porygon-Z','Mimicore','Helixeon','Chimaul','Metagross','Magnezone'], pool:['Specterra','Zubat','Golbat','Mimicore']},
+  // 16-19: the east ring: the skyline and the old pier (four badges)
+  {type:'route', name:"Skyline Way", at:[7,2], badges:4, tint:'city', desc:"A glass skybridge past the walls, east to the SKYLINE towers. The wind up here never stops.", pool:['Wattrel','Rookidee','Noibat','Swablu','Mimicore','Voltadpole']},
+  {type:'gym', name:"Skyline", at:[8,2], center:true, tint:'city', desc:"The tallest towers in GENOVA, joined by skybridges. Leader Jett's gym is on the highest roof.", leaderName:"Jett", leaderTeam:['Corviknight','Talonflame','Kilowattrel','Noivern']},
+  {type:'trainer', kind:'boss', name:"Lost Pier", at:[8,3], boss:true, legend:'Mew', grunts:2, tint:'city', gruntTeam:SYNTH_TEAM, bossKind:'adminSynth',
+   desc:"An old pier the city forgot. An old truck is parked at the very end. A Corp. admin is searching it. \"There's something pink under there, I know it!\"",
+   leaderName:"Admin Kessler", leaderTeam:['Ditto','Porygon2','Chimaul','Voltoad','Mimicore','Magnezone'], pool:['Tentacool','Wingull','Voltadpole','Finizen']},
+  {type:'gym', name:"Greenhouse", at:[8,1], center:true, tint:'jungle', desc:"A glass dome full of plants from every region, some of them grown in labs. Leader Ivy's gym is its poison garden.", leaderName:"Ivy", leaderTeam:['Roserade','Chimaul','Venusaur','Toedscruel']},
+  // 20-21: up the ARCOLOGY SPIRE to the League
+  {type:'route', name:"Arcology Spire", at:[4,1], badges:8, aces:true, theme:'cave', desc:"Stairs up the city's tallest arcology. Only trainers with all eight Genova badges, who stopped the Corp. and freed MEWTWO, may climb.", pool:['Mimicore','Chimaul','Voltoad','Graftree','Porygon2','Specterra']},
+  {type:'town', name:"Genova League", at:[4,0], center:true, league:true, champion:true, elites:ELITES_GENOVA, championKind:'championCassia',
+   championQuote:"You freed the one thing this city was most ashamed of. Now you stand at its top. I am CASSIA, CHAMPION of GENOVA!",
+   desc:"The Pokémon League of GENOVA, at the top of the ARCOLOGY SPIRE. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Cassia", leaderTeam:['Helixeon','Metagross','Voltoad','Gardevoir','Graftree','Dragonite']}];
+// The sewers and the spire are caves; the jungle is humid and grey with rain.
+Object.assign(WEATHER, {"Sewer Run":'cave', "Arcology Spire":'cave', "Sealed Cave":'cave', "Jungle Trail":'rain', "Canopy Walk":'rain', "Verdance":'rain'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of GENOVA){ loc.region = 5; loc.tier = 40; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  const join = (a, b, dir, gate=false)=>{
+    (GENOVA[a].links ||= []).push({dir, to:S(b), gate});
+    (GENOVA[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  // The inner wards: west and east of CENTRAL.
+  walk(0, [[1,'left'],[2,'left'],[3,'down'],[4,'right']]);
+  walk(0, [[5,'right'],[6,'right'],[7,'up'],[8,'right']]);
+  join(6, 9, 'down');
+  // Past the walls (four badges): the west ring to the SEALED CAVE (NOVA waits on the CANOPY WALK), the east ring.
+  walk(2, [[10,'left'],[11,'left'],[12,'up'],[13,'up'],[14,'right',true],[15,'right']]);
+  walk(6, [[16,'right'],[17,'right'],[18,'down']]);
+  join(17, 19, 'up');
+  // Up the spire from CENTRAL: the Corp. stopped and MEWTWO free first.
+  join(0, 20, 'up'); join(20, 21, 'up');
+  for(const l of GENOVA[0].links) if(l.to===S(20)) l.need = 'shrines';
+  Object.assign(GENOVA[14], {rivalAfter:["You beat my HELIXEON? Nobody beats HELIXEON. I'm NOVA. My mom was a lab tech at the Corp.", "HELIXEON was an experiment they were going to throw away. I took it. Don't tell anyone.", "The Chairman's gone into the SEALED CAVE with a whole team. If MEWTWO's in there... go. Fast."]});
+  Object.assign(GENOVA[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION! This city's something else. Everything's made in a lab. Even the trees.\"", "KAI: \"See that statue? FOUNDER ARDEN. Everyone loves him. I read the plaque... he was a geneticist.\"", "KAI: \"People say MEWTWO was made here. If that's true, I bet it's still around somewhere.\""]},
+    extras:[
+      {kind:'pilot', role:'guide_back', dx:2, dy:1, lines:[]},
+      {kind:'statue', dx:-3, dy:-3, lines:["A bronze statue of FOUNDER ARDEN. The plaque reads: \"He built GENOVA from a single lab. SCIENCE WITHOUT LIMITS.\"", "Someone has scratched underneath: \"HE MADE MEWTWO. ASK HIM WHY IT CRIED.\""]},
+      {kind:'prof', dx:4, dy:1, lines:["PROF. LINNEA: \"Welcome to GENOVA. I study the escaped experiments: CHIMURR, VOLTADPOLE, GRAFTLING...\"", "PROF. LINNEA: \"The Corp. spliced them from two POKéMON each. They're nothing like anything else, and they're happy out there.\"", "PROF. LINNEA: \"There's a rumour of a pink POKéMON, too. People keep seeing it for a second, then it's gone.\""]},
+      {kind:'sparkle', role:'mew', dx:-6, dy:4}]});
+  Object.assign(GENOVA[8], {rivalAfter:["The new clone's DNA is gone? Chairman VOSS took it to the SEALED CAVE!", "He's going to find MEWTWO and make it obey. Or make a copy that will."],
+    extras:[{kind:'statue', at:'mid', dx:-3, dy:2, lines:["A lab terminal, still on. LOG 1: \"CINNABAR ISLAND. July 5. A new POKéMON was discovered deep in a jungle.\"", "LOG 2: \"Feb. 6. MEW gave birth. We named the newborn MEWTWO.\" The rest of the file is corrupted."]}]});
+  Object.assign(GENOVA[15], {rivalAfter:["MEWTWO... it looked at me like I was nothing. Like we made it, and it owes us nothing.", "...Maybe it's right. Take it, then. If it'll go with anyone, it's you."]});
+  Object.assign(GENOVA[18], {rivalAfter:["Fine! Keep your pink rumour. The Corp. has bigger problems now."],
+    extras:[{kind:'statue', at:'mid', dx:3, dy:1, lines:["An old pickup truck, parked at the very end of the pier. Nobody knows how it got here, or why it never left.", "Kids in GENOVA say if you push it, something pink is underneath. Nobody's ever managed to push it."]}]});
+  Object.assign(GENOVA[9], {extras:[{kind:'statue', dx:3, dy:-2, lines:["A tank of green fluid. Inside floats a copy of the very first POKéMON you were ever given. It opens one eye.", "A label: \"SUBJECT 001-B. DO NOT WAKE.\" You tap the glass. It taps back."]}]});
+  // MEW, seen in ten places (CENTRAL's is above).
+  for(const i of [1, 3, 5, 7, 10, 12, 13, 16, 19]) (GENOVA[i].extras ||= []).push({kind:'sparkle', role:'mew', at:'mid', dx:(i % 3) * 2 - 2, dy:(i % 2) * 2 - 1});
+  // The way down from the SKYREACH: the shuttle at WINDWARD.
+  LOCATIONS.find(l=>l.name==='Windward').extras = [{kind:'pilot', role:'guide_on', dx:-2, dy:2, lines:[]}];
+  for(const loc of GENOVA) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------

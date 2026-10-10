@@ -162,7 +162,7 @@ namespace
     {
         game_state& g = state();
         int clears = bn::max(0, g.run.tower_clears - 1);
-        return bn::min(g.flags.test(flag::SKYREACH_CHAMPION) ? 400 : g.flags.test(flag::SUNDERED_CHAMPION) ? 300 : g.flags.test(flag::CALDERRA_CHAMPION) ? 200 : 100, bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
+        return bn::min(champion_cap(), bn::max(50 + 3 * clears, g.average_level() + clears) + 5);
     }
 }
 
@@ -455,6 +455,13 @@ void overworld::talk_to(int index)
         }
         meteor_shard(int(p.role) - int(person_role::SHARD_NORMAL));
         break;
+    case person_role::GUIDE_ON:
+    case person_role::GUIDE_BACK:
+        region_guide(p.role == person_role::GUIDE_ON);
+        break;
+    case person_role::MEW_SIGHT:
+        mew_sighting(a.who - _map->people);
+        break;
     case person_role::FERRY:
         ferry();
         break;
@@ -491,6 +498,18 @@ void overworld::legend_talk(int index)
         return;
     }
     species_id legend = _actors[index].legend_species;
+    if(legend == species_id::MEW && map_region(_map_index) == 5 && mew_sightings_seen() < flag::mew_sightings)
+    {
+        // 5.0.0: GENOVA's MEW hides under the old truck until you've seen it in all ten places.
+        say("An old truck sits at the end of the pier. Something pink peeks out from underneath... and hides again.");
+        bn::string<96> text("MEW sightings: ");
+        text.append(bn::to_string<4>(mew_sightings_seen()));
+        text.append(" of ");
+        text.append(bn::to_string<4>(flag::mew_sightings));
+        text.append(". It doesn't trust you yet.");
+        say(text);
+        return;
+    }
     if(_map->room && _map->room->kind == room_kind::CHAMBER)
     {
         bn::string<64> call;
@@ -2156,55 +2175,48 @@ void overworld::after_story()
             return;
         }
     }
-    // Calderra's League beaten for the first time (2.0.0).
+    // A later region's League beaten for the first time (Calderra's 2.0.0, ...): its Hall of Fame and the CHAMPION's
+    // farewell.
+    struct farewell { const char* champion; const char* line1; const char* line2; };
+    static constexpr farewell farewells[] = {
+        { "SOLENNE", "Calderra has a new CHAMPION. The beasts knew it before any of us did.",
+          "The crater is yours to roam. And the GYM LEADERS are already asking for a rematch!" },
+        { "MAREA", "The tide turns, and so does the crown. The SUNDERED ISLES have a new CHAMPION.",
+          "Groudon sleeps, Kyogre sleeps, and the islands stay islands. Sail where you like, CHAMPION!" },
+        { "ALTAIR", "The wind changes, and so does the crown. The SKYREACH has a new CHAMPION.",
+          "Rayquaza guards the sky again, and the thing from space found a friend. Fly where you like!" },
+        { "CASSIA", "Every experiment in this city was meant to make something perfect. GENOVA got a CHAMPION instead.",
+          "MEWTWO is free, and nobody will build another. Go wherever you like, CHAMPION!" },
+        { "AEON", "Past and present agree on one thing now: AETERNA has a new CHAMPION.",
+          "Time flows and space holds. The valley will remember you in both eras." },
+        { "ELEGY", "Even in the HOLLOW LANDS, some things come back. Hope, for one. You're our CHAMPION.",
+          "GIRATINA watches the tear, and the grey is lifting. Walk where you like, on either side." },
+        { "ZEPHYRA", "Winter, storm and summer, all turning again. TEMPESTA crowns a new CHAMPION!",
+          "The birds fly free. Come back every season: the festival will save you a seat." },
+        { "KAI", "Every region, every League, and now the Hall of Origin. You're the CHAMPION of all nine lands.",
+          "ARCEUS made the lands, and you crossed every one. Thanks for the race, CHAMPION." },
+    };
     for(int i : wd::area_maps)
     {
         const map_def& m = wd::maps[i];
-        if(m.area->region == 2 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
-           ! g.flags.test(flag::CALDERRA_CHAMPION))
+        int rg = m.area->region, f = champion_flag(rg);
+        if(rg >= 2 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) && ! g.flags.test(f))
         {
-            g.flags.set(flag::CALDERRA_CHAMPION);
+            g.flags.set(f);
             save_game();
             suspend();
             audio::play_music("credits");
-            hall_of_fame_screen("CALDERRA");
+            hall_of_fame_screen(region_name(rg));
             resume();
-            story_say("SOLENNE: \"Calderra has a new CHAMPION. The beasts knew it before any of us did.\"");
-            story_say("SOLENNE: \"The crater is yours to roam. And the GYM LEADERS are already asking for a rematch!\"");
-        }
-    }
-    // The Sundered Isles' League beaten for the first time (3.0.0).
-    for(int i : wd::area_maps)
-    {
-        const map_def& m = wd::maps[i];
-        if(m.area->region == 3 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
-           ! g.flags.test(flag::SUNDERED_CHAMPION))
-        {
-            g.flags.set(flag::SUNDERED_CHAMPION);
-            save_game();
-            suspend();
-            audio::play_music("credits");
-            hall_of_fame_screen("SUNDERED ISLES");
-            resume();
-            story_say("MAREA: \"The tide turns, and so does the crown. The SUNDERED ISLES have a new CHAMPION.\"");
-            story_say("MAREA: \"Groudon sleeps, Kyogre sleeps, and the islands stay islands. Sail where you like, CHAMPION!\"");
-        }
-    }
-    // The Skyreach's League beaten for the first time (4.0.0).
-    for(int i : wd::area_maps)
-    {
-        const map_def& m = wd::maps[i];
-        if(m.area->region == 4 && (m.area->flags & area_flag::CHAMPION) && m.leader_id >= 0 && g.beaten.test(m.leader_id) &&
-           ! g.flags.test(flag::SKYREACH_CHAMPION))
-        {
-            g.flags.set(flag::SKYREACH_CHAMPION);
-            save_game();
-            suspend();
-            audio::play_music("credits");
-            hall_of_fame_screen("SKYREACH");
-            resume();
-            story_say("ALTAIR: \"The wind changes, and so does the crown. The SKYREACH has a new CHAMPION.\"");
-            story_say("ALTAIR: \"Rayquaza guards the sky again, and the thing from space found a friend. Fly where you like!\"");
+            const farewell& fw = farewells[rg - 2];
+            for(const char* line : { fw.line1, fw.line2 })
+            {
+                bn::string<160> text(fw.champion);
+                text.append(": \"");
+                text.append(line);
+                text.append("\"");
+                story_say(text);
+            }
         }
     }
     if(g.has(story::DIVE_GIFT))
@@ -2249,10 +2261,20 @@ void overworld::after_story()
             }
             else
             {
-                bool isles = map_region(_map_index) == 3, sky = map_region(_map_index) == 4;
-                text.append(sky ? " rose back into the sky..." : isles ? " sank back into its slumber..." : " fled into the crater's wilds...");
+                // What it does when it gets away, region by region (Calderra's HO-OH first).
+                constexpr const char* fled[][2] = {
+                    { " fled into the crater's wilds...", "Maybe it will return to its shrine." },
+                    { " sank back into its slumber...", "It still sleeps here. Come back and try again." },
+                    { " rose back into the sky...", "It will come back here. Try again." },
+                    { " vanished in a flash of psychic light...", "It hasn't left. Come back and try again." },
+                    { " slipped through a rift in time...", "The rift is still open. Come back and try again." },
+                    { " sank into the shadows...", "It still watches from the other side. Try again." },
+                    { " flew back to its peak...", "It will roost here again. Try again." },
+                    { " withdrew into the light...", "The HALL OF ORIGIN waits. Try again." } };
+                const auto& f = fled[bn::max(0, bn::min(7, map_region(_map_index) - 2))];
+                text.append(f[0]);
                 say(text);
-                say(sky ? "It will come back here. Try again." : isles ? "It still sleeps here. Come back and try again." : "Maybe it will return to its shrine.");
+                say(f[1]);
             }
         }
         else
@@ -2539,6 +2561,88 @@ void overworld::meteor_shard(int form)
     if(any)
     {
         save_game();
+    }
+}
+
+// 5.0.0 on: the guide who takes the last region's CHAMPION on to the next region (GUIDE_ON), and back (GUIDE_BACK).
+// It lands you by the guide at the other end.
+void overworld::region_guide(bool on)
+{
+    game_state& g = state();
+    ui& u = gui();
+    struct guide { const char* who; const char* on_ask; const char* back_ask; const char* wait; };
+    static constexpr guide guides[] = {
+        { "SHUTTLE PILOT", "The SYNTHESIS CORP. shuttle flies down to GENOVA, the city of labs. Board?",
+          "Back up to WINDWARD in the SKYREACH? Board?", "GENOVA only lets CHAMPIONS through its gates. Beat the SKYREACH LEAGUE first." },
+        { "CONDUCTOR", "The old line runs out past the city walls to AETERNA, a valley where time runs strange. All aboard?",
+          "Back to GENOVA CENTRAL? All aboard?", "The valley line only runs for GENOVA's CHAMPION. Beat the GENOVA LEAGUE first." },
+        { "FERRYMAN", "Across the grey lake lie the HOLLOW LANDS. Not many come back the same. Shall we cross?",
+          "Back across to AETERNA? Shall we cross?", "The lake won't carry you yet. Beat the AETERNA LEAGUE first." },
+        { "BALLOONIST", "My balloon rides the winds to TEMPESTA, the land of seasons. Up we go?",
+          "Back down to the HOLLOW LANDS? Up we go?", "The winds to TEMPESTA are too wild for you yet. Beat the HOLLOW LEAGUE first." },
+        { "MOUNTAIN GUIDE", "The mountain all nine lands surround... the HALL OF ORIGIN is at its peak. Shall we climb?",
+          "Back down to TEMPESTA? Shall we go?", "Only the CHAMPION of TEMPESTA may climb. Beat the TEMPESTA LEAGUE first." } };
+    int here = map_region(_map_index), dest = on ? here + 1 : here - 1;
+    const guide& gd = guides[bn::max(0, bn::min(4, (on ? dest : here) - 5))];
+    bn::string<160> text(gd.who);
+    text.append(": \"");
+    if(on && ! g.flags.test(champion_flag(here)))
+    {
+        text.append(gd.wait);
+        text.append("\"");
+        say(text);
+        return;
+    }
+    text.append(on ? gd.on_ask : gd.back_ask);
+    text.append("\"");
+    u.show_text(text);
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    for(int i : wd::area_maps)
+    {
+        const map_def& m = wd::maps[i];
+        if(m.area->region == dest)
+        {
+            for(int k = 0; k < m.people_count; ++k)
+            {
+                if(m.people[k].role == (on ? person_role::GUIDE_BACK : person_role::GUIDE_ON))
+                {
+                    fast_travel(i);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+// 5.0.0: a pink blur in one of GENOVA's ten places: MEW, there and gone. Seeing all ten wins its trust.
+void overworld::mew_sighting(int person)
+{
+    game_state& g = state();
+    int k = mew_sighting_index(_map_index, person);
+    say("A pink blur darts past you... and it's gone!");
+    if(k < 0 || g.flags.test(flag::MEW_SIGHTING + k))
+    {
+        return;
+    }
+    g.flags.set(flag::MEW_SIGHTING + k);
+    save_game();
+    load_actors();
+    refresh(true);
+    int seen = mew_sightings_seen();
+    bn::string<96> text("MEW sightings: ");
+    text.append(bn::to_string<4>(seen));
+    text.append(" of ");
+    text.append(bn::to_string<4>(flag::mew_sightings));
+    text.append(".");
+    say(text);
+    if(seen == flag::mew_sightings)
+    {
+        say("Somewhere in GENOVA, something pink is waiting for you. Maybe by the water...");
     }
 }
 
@@ -3783,8 +3887,7 @@ bool overworld::offer_rematch(int index)
     actor& a = _actors[index];
     // 2.0.0: once you're CALDERRA's CHAMPION, its GYM LEADERS take rematches too, at level 200.
     bool leader = a.tr->role == trainer_role::LEADER && map_region(_map_index) >= 2 &&
-                  g.flags.test(map_region(_map_index) == 4 ? flag::SKYREACH_CHAMPION :
-                               map_region(_map_index) == 3 ? flag::SUNDERED_CHAMPION : flag::CALDERRA_CHAMPION);
+                  g.flags.test(champion_flag(map_region(_map_index)));
     if((a.tr->role != trainer_role::ROUTE && ! leader) || a.tr->vanish || a.tr->scene || ! g.beaten.test(a.tr->id) ||
        g.first_able() < 0 || g.tower.active)
     {

@@ -305,7 +305,36 @@ namespace flag
     constexpr int RAYQUAZA = 9;             // 4.0.0: the SKYREACH's legendaries caught (legend_flag)
     constexpr int DEOXYS = 10;
     constexpr int SKYREACH_CHAMPION = 11;
+    constexpr int MEWTWO = 12;              // 5.0.0: GENOVA's legendaries caught (legend_flag)
+    constexpr int MEW = 13;
+    constexpr int GENOVA_CHAMPION = 14;
+    constexpr int DIALGA = 15;              // 6.0.0: AETERNA's
+    constexpr int PALKIA = 16;
+    constexpr int AETERNA_CHAMPION = 17;
+    constexpr int GIRATINA = 18;            // 7.0.0: the HOLLOW LANDS'
+    constexpr int HOLLOW_CHAMPION = 19;
+    constexpr int ARTICUNO = 20;            // 8.0.0: TEMPESTA's
+    constexpr int ZAPDOS = 21;
+    constexpr int MOLTRES = 22;
+    constexpr int TEMPESTA_CHAMPION = 23;
+    constexpr int LUGIA = 24;               // (TEMPESTA's LUGIA; VELLORIN's is story::LEGEND_CAUGHT)
+    constexpr int ARCEUS = 25;              // 9.0.0: the HALL OF ORIGIN's
+    constexpr int ORIGIN_CHAMPION = 26;
+    constexpr int ANCIENT_SEED = 27;        // 6.0.0: the seed planted in AETERNA's past
+    constexpr int MEW_SIGHTING = 30;        // 5.0.0: 30-39, the ten places GENOVA's MEW was spotted
+    constexpr int mew_sightings = 10;
+    constexpr int OLD_PLATE = 40;           // 9.0.0: 40-45, the plates VELLORIN, CALDERRA and the ISLES gave
+    constexpr int SEASON_GIFT = 48;         // 8.0.0: 48-50, the DELIBIRD post office's gift for each season
 }
+
+// 5.0.0: a region's name for the player ("SKYREACH"), and its CHAMPION flag (-1 for VELLORIN: story::CHAMPION).
+const char* region_name(int region);
+int champion_flag(int region);
+// 5.0.0: GENOVA's MEW sightings: which of the ten a MEW_SIGHT person is (map, person index), and how many you've seen.
+int mew_sighting_index(int map, int person);
+int mew_sightings_seen();
+// The top level you've earned outside a region (the CHALLENGE TOWER's): 100, then the latest League's cap.
+int champion_cap();
 
 // Calderra's legendaries caught (bits in game_state::flags): the three beasts and HO-OH, and the Sundered Isles'
 // GROUDON and KYOGRE; -1 for any other.

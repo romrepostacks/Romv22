@@ -2239,9 +2239,10 @@ void dex_screen(int register_species)
                     {
                         // The SUNDERED ISLES' (3.0.0): its island forms (species_v2 on); the SKYREACH's (4.0.0): its
                         // highland forms and DEOXYS' (species_v3 on).
-                        const int rg = map_region(g.map);
-                        const int lo = rg == 2 ? species_v1 : rg == 3 ? species_v2 : species_v3;
-                        const int hi = rg == 2 ? species_v2 : rg == 3 ? species_v3 : species_count;
+                        // 5.0.0 on: each region's own forms (region_species).
+                        const int rg = bn::min(map_region(g.map), region_species_first + region_species_count - 1);
+                        const int lo = rg == 2 ? species_v1 : region_species[rg - region_species_first];
+                        const int hi = rg == 2 ? species_v2 : region_species[rg - region_species_first + 1];
                         int sn = 0, on = 0;
                         for(int i = lo; i < hi; ++i)
                         {
@@ -2601,9 +2602,15 @@ int region_map_screen(bool travel)
     const int region = world_data::maps[here].area->region;
     // The SUNDERED ISLES' (3.0.0): x 0..5, drawn on a parchment treasure map.
     // The SKYREACH's (4.0.0): x 0..8, y -1 (the clouds) to 3 (the canyon floor), on a sky blue.
-    const int ox = region == 1 || region == 4 ? (region == 4 ? 12 : 30) : region == 3 ? 36 : 12, oy = 10;
-    const int cw = region == 1 || region == 4 ? 24 : region == 3 ? 30 : 18, ch = 20;
-    bn::bg_palettes::set_transparent_color(region == 4 ? bn::color(20, 25, 31) : region == 3 ? bn::color(29, 25, 17) : bn::color(26, 28, 31));
+    // 5.0.0 on: x 0..8 like the SKYREACH, each on its own colour: GENOVA's concrete, AETERNA's old parchment, the HOLLOW
+    // LANDS' grey, TEMPESTA's meadow and ORIGIN's gold.
+    struct layout { int8_t ox, cw; uint8_t r, g, b; };
+    static constexpr layout layouts[] = { {12, 18, 26, 28, 31}, {30, 24, 26, 28, 31}, {12, 18, 26, 28, 31}, {36, 30, 29, 25, 17},
+                                          {12, 24, 20, 25, 31}, {12, 24, 22, 24, 27}, {12, 24, 27, 27, 21}, {12, 24, 21, 20, 25},
+                                          {12, 24, 23, 29, 21}, {12, 24, 30, 28, 20} };
+    const layout& lay = layouts[bn::max(0, bn::min(9, region))];
+    const int ox = lay.ox, oy = 10, cw = lay.cw, ch = 20;
+    bn::bg_palettes::set_transparent_color(bn::color(lay.r, lay.g, lay.b));
     auto elsewhere = [&](const area_info& a)
     {
         return a.at_x >= 100 || a.region != region;     // under the sea, or another region
