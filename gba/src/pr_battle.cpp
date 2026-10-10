@@ -449,6 +449,16 @@ namespace
                 // A long name takes the whole top line (condensed); the level number or status goes beside a
                 // shorter bar.
                 int rw = u.narrow_width(number);
+                // A form's name still too long even condensed (SANDSLASH-SUNDER): its form cut to one letter.
+                int dash = -1;
+                for(int i = 0; i < name.size(); ++i)
+                {
+                    dash = name[i] == '-' ? i : dash;
+                }
+                if(u.narrow_width(name) > f.hud_tw * 8 - 7 && dash > 0 && dash + 2 < name.size())
+                {
+                    name.resize(dash + 2);
+                }
                 u.print_fit(x + 4, y + 2, name, bn::min(u.narrow_width(name), f.hud_tw * 8 - 7), text_color::HUD,
                             f.hud_text, true);
                 int segments = (f.hud_tw * 8 - 10 - rw) / 8;

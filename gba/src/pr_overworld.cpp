@@ -1243,7 +1243,9 @@ void overworld::step(direction want)
         if(l.need == link_need::SHRINES && ! shrines_cleared(map_region(_map_index)))
         {
             set_player_frame(0);
-            say("A wall of heat and storm bars the way to the tower. The three beasts must be freed first.");
+            say(map_region(_map_index) == 3
+                    ? "The ground shakes and the sea roars. MT. KEEL stays shut until TEAM QUAKE and TEAM NEPTUNE are stopped."
+                    : "A wall of heat and storm bars the way to the tower. The three beasts must be freed first.");
             hold_until_released();
             return;
         }

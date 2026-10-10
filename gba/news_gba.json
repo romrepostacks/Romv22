@@ -1,7 +1,17 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 3.0.0: set sail for the SUNDERED ISLES!",
+  "motd": "Version 3.0.1: set sail for the SUNDERED ISLES!",
   "changelog": [
+    {
+      "version": "GBA 3.0.1",
+      "date": "2026-10-10",
+      "title": "Sundered Isles fixes",
+      "changes": [
+        "Long form names like SANDSLASH-SUNDER no longer turn into a jumble in battle",
+        "The HALL OF FAME line fits on screen for the SUNDERED ISLES",
+        "MT. KEEL's sealed path and a GROUDON or KYOGRE that gets away now say the right thing for the SUNDERED ISLES"
+      ]
+    },
     {
       "version": "GBA 3.0.0",
       "date": "2026-10-09",

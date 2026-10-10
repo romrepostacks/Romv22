@@ -2219,9 +2219,10 @@ void overworld::after_story()
             }
             else
             {
-                text.append(" fled into the crater's wilds...");
+                bool isles = map_region(_map_index) == 3;
+                text.append(isles ? " sank back into its slumber..." : " fled into the crater's wilds...");
                 say(text);
-                say("Maybe it will return to its shrine.");
+                say(isles ? "It still sleeps here. Come back and try again." : "Maybe it will return to its shrine.");
             }
         }
         else

@@ -2796,7 +2796,8 @@ void hall_of_fame_screen(const char* region)
         line.append(" became the CHAMPION of ");
         line.append(region);
         line.append("!");
-        u.print(120 - u.width(line, true) / 2, 120, line, text_color::WHITE, texts, true);
+        int lw = bn::min(u.width(line, true), 232);
+        u.print_fit(120 - lw / 2, 120, line, lw, text_color::WHITE, texts, true);
         u.text().set_left_alignment();
         ui::fade_in(16);
         wait(300);

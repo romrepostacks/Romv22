@@ -11,7 +11,7 @@ import argparse, os, random, shutil, struct, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 GBA = os.path.dirname(os.path.dirname(HERE))
 
-def build(work):
+def build(work, inc='test_walk.inc'):
     # A copy of gba/ whose main() runs test_setup() from test_walk.inc (js/ and sprites/ next to it).
     gba = os.path.join(work, 'gba')
     shutil.copytree(GBA, gba, symlinks=True, ignore=shutil.ignore_patterns('build', 'roms', 'butano', '*.gba', '*.elf'))
@@ -20,7 +20,7 @@ def build(work):
         os.symlink(os.path.join(os.path.dirname(GBA), d), os.path.join(work, d))
     main = os.path.join(gba, 'src', 'main.cpp')
     s = open(main).read()
-    s = s.replace('int main()', '#include "%s"\nint main()' % os.path.join(HERE, 'test_walk.inc'), 1)
+    s = s.replace('int main()', '#include "%s"\nint main()' % os.path.join(HERE, inc), 1)
     s = s.replace('pr::ui::set_faded(true);', 'pr::ui::set_faded(true);\n    test_setup();', 1)
     open(main, 'w').write(s)
     subprocess.run(['make', '-j8'], cwd=gba, check=True, stdout=subprocess.DEVNULL)
