@@ -219,6 +219,28 @@ static void test_setup()
             x = m.area->legend_x; y = m.area->legend_y;
         }
     }
+    else if(rg >= 7 && ((sub >= 4 && sub <= 7) || sub >= 13))
+    {
+        auto legend_at = [&](const char* area)
+        {
+            map = play::find_area(area);
+            const map_def& m = wd::maps[map];
+            for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+            x = m.area->legend_x; y = m.area->legend_y;
+        };
+        auto beat_area = [&](const char* area)
+        {
+            const map_def& m = wd::maps[play::find_area(area)];
+            for(int k = 0; k < m.trainers_count; ++k) g.beaten.set(m.trainers[k].id);
+        };
+        if(rg == 7)
+        {
+            // THE HOLLOW LANDS: 4 a shadow to the reverse side, 5 GIRATINA, 6 the altar with GIRATINA.
+            if(sub == 4) map = play::find_person(rg, person_role::TWIN, x, y);
+            if(sub == 5) legend_at("DISTORTION WORLD");
+            if(sub == 6) { g.party[0] = mon::make(species_id::GIRATINA, 700); map = play::find_person(rg, person_role::FORM, x, y); }
+        }
+    }
     else switch(sub)
     {
     case 0:     // the last region's guide on: travel to this region
@@ -233,11 +255,13 @@ static void test_setup()
     case 8:     // the way up to the League: eight badges, the story bosses beaten
     {
         // Where each region's badge gate is (left of it when `left`, else up from it), and the way up to its League.
-        struct gates { const char* gate; bool left; const char* league; };
-        constexpr gates where[] = { {"FOUNDRY WARD", true, "GENOVA CENTRAL"}, {"CLOCKTOWER", false, "AETERNA VILLAGE"} };
-        const gates& gw = where[bn::min(rg - 5, 1)];
+        // (side: 0 left, 1 right, -1 up)
+        struct gates { const char* gate; int side; const char* league; int league_side; };
+        constexpr gates where[] = { {"FOUNDRY WARD", 0, "GENOVA CENTRAL", -1}, {"CLOCKTOWER", -1, "AETERNA VILLAGE", -1},
+                                    {"STILLWATER", 1, "CENOTAPH", -1}, {"BLOOMTIDE", 1, "BLOOMTIDE", 1}, {"ORIGIN GATE", -1, "TEMPESTA HALL", -1} };
+        const gates& gw = where[bn::min(rg - 5, 4)];
         const char* from = sub == 3 ? gw.gate : gw.league;
-        int want = sub == 3 && gw.left ? 0 : -1;
+        int want = sub == 3 ? gw.side : gw.league_side;
         if(sub == 8)
         {
             play::beat_region(rg, true);
@@ -255,6 +279,12 @@ static void test_setup()
                 // A link to the left: stand at the left edge on its row, facing it.
                 for(int ty = 0; ty < m.h; ++ty)
                     if(play::walkable(m, 0, ty) && play::walkable(m, 1, ty)) { g.map = int16_t(map); g.x = 1; g.y = int16_t(ty); g.facing = direction::LEFT; y = -2; break; }
+            }
+            else if(want == 1 && l.ox >= m.w)
+            {
+                // ... to the right.
+                for(int ty = 0; ty < m.h; ++ty)
+                    if(play::walkable(m, m.w - 1, ty) && play::walkable(m, m.w - 2, ty)) { g.map = int16_t(map); g.x = int16_t(m.w - 2); g.y = int16_t(ty); g.facing = direction::RIGHT; y = -2; break; }
             }
             else if(want < 0 && l.oy < 0)
             {

@@ -2681,7 +2681,8 @@ void overworld::form_altar()
 {
     game_state& g = state();
     constexpr species_id pairs[][2] = { { species_id::DIALGA, species_id::DIALGA_ORIGIN },
-                                        { species_id::PALKIA, species_id::PALKIA_ORIGIN } };
+                                        { species_id::PALKIA, species_id::PALKIA_ORIGIN },
+                                        { species_id::GIRATINA, species_id::GIRATINA_ORIGIN } };
     bool any = false;
     for(int i = 0; i < g.party_count; ++i)
     {

@@ -845,8 +845,10 @@ const GENOVA_FORMS = [
 const AETERNA_FORMS = [
   ["Dialga-Origin", "Dialga", 10245, ["Steel","Dragon"], [100,100,120,150,120,90]],
   ["Palkia-Origin", "Palkia", 10246, ["Water","Dragon"], [90,100,100,150,120,120]]];
+// 7.0.0: GIRATINA's Origin form, taken at the DISTORTION WORLD's altar.
+const HOLLOW_FORMS = [["Giratina-Origin", "Giratina", 10007, ["Ghost","Dragon"], [150,120,100,120,100,90]]];
 // Each later region's forms, in order: they come after everything older so species indices in saves stay put.
-const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS];
+const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS, HOLLOW_FORMS];
 const ALL_FORMS = FORM_LISTS.flat();
 const PROC_RAW_FORMS = ALL_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
 for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of ALL_FORMS){
@@ -6881,6 +6883,133 @@ Object.assign(WEATHER, {"Wildwood Path":'fog', "Old Lakeshore":'fog', "Mirelake"
   // The way on from GENOVA: the conductor at GENOVA CENTRAL.
   (LOCATIONS.find(l=>l.name==='Genova Central').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:2, lines:[]});
   for(const loc of AETERNA) getMap(loc);
+}
+
+// ---------- The Hollow Lands (7.0.0): the seventh region, a ring of faded towns across the grey lake from AETERNA ----------
+// Everything here has a reverse side: a shadow (role 'twin') on each road between the towns steps you through to
+// the same road mirrored (`mirror`, see twinMap), where the colours have drained away and lost things wait. The
+// reverse of the northern roads leads on to the DISTORTION WORLD, where GIRATINA was banished. TEAM HOLLOW's DR.
+// LORNE lost someone to the reverse side and means to tear it open to bring them back. The ring has seven gyms,
+// the CENOTAPH in the middle the eighth; the northern half of the ring takes four Hollow badges. Levels: 600, then
+// 12 more per Hollow badge, up to 700.
+Object.assign(CHARS, {
+  gruntHollow:   {head:'cap',   K:'#282830',R:'#f8f8f8',W:'#8878a8',S:'#e0d0c8',H:'#303038',B:'#484058',D:'#8878a8',Y:'#c8c0e0'},
+  adminHollow:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8d0c8',H:'#c04838',B:'#484058',D:'#282030',Y:'#f0a050'},
+  bossLorne:     {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c8b8',H:'#909098',B:'#e8e8f0',D:'#484058',Y:'#a898d0'},
+  leaderMara:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e0e8',H:'#383050',B:'#6848a0',D:'#282038',Y:'#a8f0d0'},
+  leaderFenwick: {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8b8a0',H:'#a0a0a0',B:'#a8a090',D:'#686058',Y:'#d0c8b0'},
+  leaderMirela:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8f0f8',H:'#d8e8f8',B:'#88b8e0',D:'#384868',Y:'#f8f8f8'},
+  leaderNoctis:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#b88868',H:'#181820',B:'#282830',D:'#101018',Y:'#e04040'},
+  leaderEmber:   {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#c86030',B:'#584870',D:'#302840',Y:'#f8b040'},
+  leaderThorne:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c8a888',H:'#486038',B:'#605038',D:'#384028',Y:'#a0c070'},
+  leaderCoral:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8d8e0',H:'#e88898',B:'#5088a0',D:'#284858',Y:'#f8e8f0'},
+  leaderMortimer:{head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e0c8b0',H:'#e8e8e8',B:'#383040',D:'#201828',Y:'#c8a0f0'},
+  rivalLumen:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c8a8',H:'#f0e8c0',B:'#a8a0c0',D:'#484058',Y:'#f8f080'},
+  eliteDirge:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e8f0',H:'#201830',B:'#403060',D:'#201830',Y:'#a080e0'},
+  eliteShade:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#a87858',H:'#101010',B:'#202028',D:'#101018',Y:'#c03040'},
+  elitePallor:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8f8f8',H:'#c8d8e8',B:'#e8f0f8',D:'#8898b0',Y:'#a8d8f8'},
+  eliteKnell:    {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c09878',H:'#585058',B:'#584870',D:'#302840',Y:'#e8c040'},
+  championElegy: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0e0e0',H:'#e8e8f0',B:'#202028',D:'#6848a0',Y:'#f2d64b'}});
+Object.assign(GYM_STYLE, {
+  Mara:{kind:'leaderMara', type:'Ghost', theme:'ghost', juniors:{cls:'CHANNELER', kind:'oldwoman', team:['Gastly','Misdreavus','Litwick','Sinistea','Greavard','Drifloon']}},
+  Fenwick:{kind:'leaderFenwick', type:'Normal', theme:'normal', juniors:{cls:'GRAVEKEEPER', kind:'hiker', team:['Dunsparce','Furret','Linoone','Lechonk','Bidoof','Zigzagoon']}},
+  Mirela:{kind:'leaderMirela', type:'Ice and Ghost', theme:'ice', juniors:{cls:'SNOW MAIDEN', kind:'girl', team:['Snorunt','Cetoddle','Frigibax','Snom','Vanillite','Cubchoo']}},
+  Noctis:{kind:'leaderNoctis', type:'Dark', theme:'ghost', juniors:{cls:'NIGHTWALKER', kind:'boy', team:['Murkrow','Sneasel','Zorua','Impidimp','Maschiff','Nickit']}},
+  Ember:{kind:'leaderEmber', type:'Fire and Ghost', theme:'fire', juniors:{cls:'LAMPLIGHTER', kind:'boy', team:['Litwick','Charcadet','Houndour','Sizzlipede','Fuecoco','Salandit']}},
+  Thorne:{kind:'leaderThorne', type:'Grass and Ghost', theme:'grass', juniors:{cls:'GROUNDSKEEPER', kind:'hiker', team:['Phantump','Pumpkaboo','Bramblin','Rowlet','Foongus','Morelull']}},
+  Coral:{kind:'leaderCoral', type:'Water and Ghost', theme:'water', juniors:{cls:'DROWNED SAILOR', kind:'boy', team:['Frillish','Sandygast','Corsola','Shellos','Wimpod','Mareanie']}},
+  Mortimer:{kind:'leaderMortimer', type:'Psychic', theme:'psychic', juniors:{cls:'MOURNER', kind:'gentleman', team:['Duskull','Spiritomb','Yamask','Elgyem','Gothita','Golett']}}});
+const HOLLOW_TEAM = {cls:'HOLLOW GRUNT', kind:'gruntHollow', pool:['Duskull','Yamask','Shuppet','Golett','Sableye','Greavard'],
+  intro:["The reverse side has my sister. Dr. LORNE says we can bring them all back.", "Don't you miss anyone? Don't you want them back?", "Stand aside. We're opening the door."],
+  after:["Maybe... some doors should stay shut.", "I just wanted to say goodbye.", "Sorry. I'm so sorry."]};
+const ELITES_HOLLOW = [
+  {kind:'eliteDirge', title:'ELITE FOUR DIRGE', team:['Dusknoir','Banette','Cursola','Golurk','Spiritomb','Gengar'],
+   intro:"Every song ends. Let's hear how yours does.", after:"A lovely finale. Go on."},
+  {kind:'eliteShade', title:'ELITE FOUR SHADE', team:['Kingambit','Zoroark','Houndoom','Honchkrow','Grimmsnarl','Tyranitar'],
+   intro:"You can't see me in the dark. I can see you fine.", after:"Lights on, then. You win."},
+  {kind:'elitePallor', title:'ELITE FOUR PALLOR', team:['Froslass','Cetitan','Baxcalibur','Glaceon','Mamoswine','Weavile'],
+   intro:"The cold keeps things the way they were. I like that.", after:"Thawed. It feels... strange."},
+  {kind:'eliteKnell', title:'ELITE FOUR KNELL', team:['Dragapult','Hydreigon','Goodra','Noivern','Kommo-o','Dragonite'],
+   intro:"The bell tolls once for every trainer I've beaten. Shall I ring it?", after:"Silence. The CHAMPION waits for you."}];
+const HOLLOW = [
+  // 0-15: the ring, clockwise from GLOAMING; 16-19: the middle
+  {type:'town', name:"Gloaming", at:[4,3], center:true, desc:"A grey town on the shore of the lake, where the ferry lands. The lamps are always lit, even at noon."},
+  {type:'route', name:"Dimmer Road", at:[3,3], desc:"West along the shore. Your shadow seems to lag a step behind you.", pool:['Duskull','Gastly','Murkrow','Zorua','Sinistea','Greavard']},
+  {type:'gym', name:"Wanewick", at:[2,3], center:true, desc:"A town of candles. Leader Mara's gym is the old chapel.", leaderName:"Mara", leaderTeam:['Gengar','Mismagius','Polteageist','Ceruledge']},
+  {type:'route', name:"Pale Way", at:[2,2], desc:"North past the graveyard. The flowers here have no colour.", pool:['Misdreavus','Shuppet','Phantump','Pumpkaboo','Nickit','Spiritomb']},
+  {type:'gym', name:"Greyhaven", at:[2,1], center:true, desc:"A quiet harbour where nobody speaks above a whisper. Leader Fenwick keeps the graves.", leaderName:"Fenwick", leaderTeam:['Dudunsparce','Ursaring','Kangaskhan','Porygon-Z']},
+  {type:'trainer', kind:'rival', name:"Hushed Road", at:[2,0], desc:"A road where your footsteps make no sound. Someone pale waits by the milestone. \"You can see me? Nobody here can see me. Battle me, quick!\"",
+   leaderName:"Lumen", rivalKind:'rivalLumen', leaderTeam:['Mimikyu','Annihilape','Froslass','Houndstone','Gardevoir'], pool:['Yamask','Golett','Snorunt','Drifloon']},
+  {type:'gym', name:"Stillwater", at:[2,-1], center:true, desc:"A frozen town by a frozen falls. Leader Mirela's gym is carved in the ice.", leaderName:"Mirela", leaderTeam:['Froslass','Cetitan','Glalie','Chien-Pao']},
+  {type:'route', name:"Lost Road", at:[3,-1], badges:4, desc:"East along the northern cliffs. People say if you walk it backwards, you end up somewhere else.", pool:['Drifblim','Sableye','Golett','Murkrow','Houndour','Duskull']},
+  {type:'gym', name:"Duskfall", at:[4,-1], center:true, desc:"A town where the sun never quite rises. Leader Noctis's gym has no windows.", leaderName:"Noctis", leaderTeam:['Kingambit','Zoroark','Honchkrow','Mabosstiff']},
+  {type:'route', name:"Echo Road", at:[5,-1], badges:4, desc:"Every word you say comes back a moment later. Sometimes it comes back different.", pool:['Noibat','Drifloon','Sableye','Golett','Banette','Zorua']},
+  {type:'gym', name:"Lanternfall", at:[6,-1], center:true, desc:"Hundreds of paper lanterns float over the town. Leader Ember lights them every night.", leaderName:"Ember", leaderTeam:['Chandelure','Skeledirge','Houndoom','Ceruledge']},
+  {type:'route', name:"Ashfall Road", at:[6,0], desc:"South past the old crematorium. A tower stands west of the road.", pool:['Litwick','Houndour','Charcadet','Sizzlipede','Duskull','Golett']},
+  {type:'gym', name:"Mossgrave", at:[6,1], center:true, desc:"A sunken graveyard grown over with moss. Leader Thorne tends it.", leaderName:"Thorne", leaderTeam:['Trevenant','Gourgeist','Decidueye','Brambleghast']},
+  {type:'route', name:"Weeping Road", at:[6,2], desc:"Willows on both sides, all bent toward the lake.", pool:['Phantump','Pumpkaboo','Bramblin','Morelull','Foongus','Shroodle']},
+  {type:'gym', name:"Echo Bay", at:[6,3], center:true, desc:"Shipwrecks lie in the shallows. Leader Coral's gym is the biggest wreck.", leaderName:"Coral", leaderTeam:['Jellicent','Dhelmise','Palossand','Basculegion']},
+  {type:'route', name:"Shore Road", at:[5,3], desc:"Back west along the shore to GLOAMING. The ferry's horn sounds, but there's no ferry.", pool:['Frillish','Sandygast','Shellos','Wingull','Mareanie','Wimpod']},
+  {type:'gym', name:"Cenotaph", at:[4,2], center:true, desc:"A town built around a great empty tomb in the middle of the ring. Leader Mortimer's gym is the tomb itself.", leaderName:"Mortimer", leaderTeam:['Hatterene','Spiritomb','Runerigus','Gallade']},
+  {type:'route', name:"Mourning Path", at:[4,1], badges:8, desc:"North from the CENOTAPH. Grey petals fall and never land.", pool:['Spiritomb','Dusknoir','Golurk','Banette','Froslass','Gengar']},
+  {type:'town', name:"Hollow League", at:[4,0], center:true, league:true, champion:true, elites:ELITES_HOLLOW, championKind:'championElegy',
+   championQuote:"I lost someone to the reverse side, too. I didn't tear the world open. I became CHAMPION and waited for someone like you. I am ELEGY!",
+   desc:"The Pokémon League of the HOLLOW LANDS, in the middle of the ring. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Elegy", leaderTeam:['Giratina','Gengar','Dragapult','Froslass','Kingambit','Hatterene']},
+  {type:'trainer', kind:'boss', name:"Pyre Tower", at:[5,0], boss:true, shrine:true, grunts:3, theme:'cave', gruntTeam:HOLLOW_TEAM, bossKind:'adminHollow', treasure:['spookyplate'],
+   desc:"A tall tower of grey stone, full of graves. TEAM HOLLOW's Admin CINDER is at the top. \"The reverse side is thinnest here!\"",
+   leaderName:"Admin Cinder", leaderTeam:['Chandelure','Dusknoir','Houndoom','Skeledirge','Banette','Drifblim'], pool:['Gastly','Haunter','Duskull','Litwick']},
+  // 20-27: the reverse side of the eight roads (mirrored twins); 28: the DISTORTION WORLD, past the far side of DUSKFALL
+  ...[[1, "Reverse Dimmer Road"], [3, "Reverse Pale Way"], [5, "Reverse Hushed Road"], [7, "Reverse Lost Road"], [9, "Reverse Echo Road"],
+      [11, "Reverse Ashfall Road"], [13, "Reverse Weeping Road"], [15, "Reverse Shore Road"]].map(([i, name])=>({type:'route', name, twinOf:i, mirror:true, tint:'hollow'})),
+  {type:'trainer', kind:'boss', name:"Distortion World", at:[4,-2], boss:true, shrine:true, legend:'Giratina', grunts:3, theme:'cave', tint:'hollow', gruntTeam:HOLLOW_TEAM, bossKind:'bossLorne',
+   desc:"Up is down, and waterfalls run sideways. Dr. LORNE stands at the edge. \"Just one more step and the door opens. I'll see her again.\"",
+   leaderName:"Dr. Lorne", leaderTeam:['Gengar','Dusknoir','Golurk','Mimikyu','Spiritomb','Hydreigon'], pool:['Gastly','Haunter','Sableye','Golett']}];
+// The reverse roads: their own colourless wild POKéMON.
+[['Duskull','Gastly','Shuppet','Zorua','Sinistea','Murkrow'], ['Misdreavus','Spiritomb','Phantump','Pumpkaboo','Yamask','Shuppet'],
+ ['Yamask','Golett','Snorunt','Drifloon','Duskull','Greavard'], ['Haunter','Sableye','Golett','Dusclops','Houndour','Spiritomb'],
+ ['Haunter','Drifblim','Sableye','Banette','Noibat','Zorua'], ['Litwick','Lampent','Houndour','Charcadet','Dusclops','Golett'],
+ ['Phantump','Pumpkaboo','Bramblin','Shroodle','Morelull','Toxel'], ['Frillish','Sandygast','Mareanie','Wimpod','Shellos','Dhelmise']]
+  .forEach((pool, k)=>{ HOLLOW[20 + k].pool = pool; HOLLOW[20 + k].at = HOLLOW[1 + 2*k].at; HOLLOW[20 + k].desc = 'The reverse side of ' + HOLLOW[1 + 2*k].name.toUpperCase() + '. Left is right, the colours are gone, and nobody casts a shadow.'; });
+Object.assign(WEATHER, {"Pale Way":'fog', "Hushed Road":'fog', "Lost Road":'fog', "Mourning Path":'fog', "Weeping Road":'rain', "Stillwater":'snow',
+  "Pyre Tower":'cave', "Distortion World":'cave'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of HOLLOW){ loc.region = 7; loc.tier = 47; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  const join = (a, b, dir, gate=false)=>{
+    (HOLLOW[a].links ||= []).push({dir, to:S(b), gate});
+    (HOLLOW[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  // The ring, clockwise from GLOAMING (LUMEN waits on the HUSHED ROAD), and back.
+  walk(0, [[1,'left'],[2,'left'],[3,'up'],[4,'up'],[5,'up'],[6,'up',true],[7,'right'],[8,'right'],[9,'right'],[10,'right'],
+           [11,'down'],[12,'down'],[13,'down'],[14,'down'],[15,'left'],[0,'left']]);
+  join(11, 19, 'left');
+  join(0, 16, 'up'); join(16, 17, 'up'); join(17, 18, 'up');
+  for(const l of HOLLOW[16].links) if(l.to===S(17)) l.need = 'shrines';
+  // The reverse side: each road's twin; DUSKFALL's is the DISTORTION WORLD, so the reverse LOST and ECHO ROADS lead there.
+  for(let k=0; k<8; k++){ HOLLOW[1 + 2*k].twin = S(20 + k); HOLLOW[20 + k].twinOf = S(1 + 2*k); }
+  HOLLOW[8].twin = S(28); HOLLOW[28].twin = S(8);
+  HOLLOW[28].links = [{dir:'right', to:S(23), gate:false}, {dir:'left', to:S(24), gate:false}];
+  for(let k=0; k<8; k++) (HOLLOW[1 + 2*k].extras ||= []).push({kind:'shadow', role:'twin', at:'mid', dx:k % 2 ? 2 : -2, dy:1,
+    lines:[], back_lines:[]});
+  Object.assign(HOLLOW[5], {rivalAfter:["You beat me. You really can see me! I'm LUMEN. I fell through to the reverse side, years ago.", "I came back, but only halfway. Nobody here notices me any more. Except you.", "Dr. LORNE thinks he can pull people back through. He'll pull the whole reverse side through. Stop him."]});
+  Object.assign(HOLLOW[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION... it's so quiet here. Even my footsteps sound sad.\"", "KAI: \"I stepped on a shadow by the road and everything went backwards. Left was right. My own reflection waved first.\"", "KAI: \"There's a grave in the churchyard with no name. Just a bunch of question marks. Creepy.\""]},
+    extras:[
+      {kind:'gentleman', role:'guide_back', dx:2, dy:1, lines:[]},
+      {kind:'statue', dx:-4, dy:-3, lines:["A grave with no name. The stone just says: \"?????????\" The date is \"MISSING\".", "Someone has left a RARE CANDY on it. And another. And another. Hundreds of them."]},
+      {kind:'oldwoman', dx:4, dy:2, lines:["Lost someone? Everyone here has. That's why we came.", "They say the HOLLOW LANDS are as close as you can get without going over."]}]});
+  Object.assign(HOLLOW[19], {rivalAfter:["The tower didn't open. The reverse side is too strong here.", "Dr. LORNE has gone through himself. Past DUSKFALL, the far side. The DISTORTION WORLD."],
+    extras:[{kind:'statue', at:'mid', dx:-3, dy:2, lines:["A grave with fresh flowers. \"CUBONE'S MOTHER. SHE PROTECTED HER CHILD.\"", "A faint tune is playing from somewhere. It sounds like an old town you've never been to."]}]});
+  Object.assign(HOLLOW[28], {rivalAfter:["She's not here. She was never here. I see it now.", "GIRATINA only keeps the balance. It doesn't keep people. I'm... I'm going home."],
+    extras:[{kind:'statue', role:'form', at:'mid', dx:3, dy:1, lines:["A shard of the reverse side, floating in the air. Your reflection in it has wings."]}]});
+  // The one who only lives on the reverse side: you.
+  (HOLLOW[23].extras ||= []).push({kind:'player', at:'mid', dx:-4, dy:-1, lines:["...", "Your reflection just looks at you. Then it smiles, and waves goodbye."]});
+  HOLLOW[26].treasure = ['toxicplate'];
+  // The way on from AETERNA: the ferryman at AETERNA VILLAGE.
+  (LOCATIONS.find(l=>l.name==='Aeterna Village').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:3, lines:[]});
+  for(const loc of HOLLOW) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------

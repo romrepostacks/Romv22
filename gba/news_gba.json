@@ -1,7 +1,23 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 6.0.0: Aeterna! Take the old line from GENOVA CENTRAL to region six.",
+  "motd": "Version 7.0.0: the Hollow Lands! Cross the grey lake from AETERNA to region seven.",
   "changelog": [
+    {
+      "version": "GBA 7.0.0",
+      "date": "2026-10-10",
+      "title": "The Hollow Lands",
+      "changes": [
+        "A seventh region, the HOLLOW LANDS: after the AETERNA LEAGUE, the ferryman at AETERNA VILLAGE rows you across to GLOAMING",
+        "A ring of faded towns around the CENOTAPH. The northern half of the ring takes four Hollow badges",
+        "Every road has a reverse side: step on a shadow to walk it mirrored, colourless, with its own wild POKéMON",
+        "Eight gyms, then the Elite Four and Champion ELEGY at level 700",
+        "TEAM HOLLOW and DR. LORNE, rival LUMEN, the PYRE TOWER, and GIRATINA in the DISTORTION WORLD past the reverse roads",
+        "An altar in the DISTORTION WORLD switches GIRATINA to its Origin form",
+        "Hollow trainers also weigh how hard your POKéMON can hit them back",
+        "Two hidden plates: the SPOOKY PLATE and the TOXIC PLATE",
+        "The level cap rises to 700; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 6.0.0",
       "date": "2026-10-10",
