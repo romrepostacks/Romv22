@@ -10,10 +10,12 @@ loads `js/*.js` (maps, art, story, Pokémon and moves) and `sprites/` and turns 
 ## Folder structure
 
 ```
+├── AGENTS.md         start here if you're an AI agent or new contributor: layout, build, rules
 ├── gba/              the GBA game (Butano, C++) and its build tools
 ├── js/               game data the ROM is built from (maps, art, story, Pokémon, moves, music)
 ├── sprites/          Pokémon sprites (sprites/pokemon/<num>.png, back/ and shiny/)
 ├── tools/            generators for js/dexdata.js, js/dexinfo.js and js/tileart.js
+├── docs/             plans and region maps per version (docs/2.0.0, docs/3.0.0), audits
 └── STORY.md          the story and the phase plan
 ```
 
