@@ -852,8 +852,27 @@ const TEMPESTA_FORMS = [
   ["Articuno-Galar", "Articuno", 10169, ["Psychic","Flying"], [90,85,85,125,100,95]],
   ["Zapdos-Galar", "Zapdos", 10170, ["Fighting","Flying"], [90,125,90,85,90,100]],
   ["Moltres-Galar", "Moltres", 10171, ["Dark","Flying"], [90,85,90,100,125,90]]];
+// 9.0.0: ARCEUS's seventeen types (PokeAPI's 493-<type> sprites, saved as 2101-2117), at the altar of origin.
+const ORIGIN_FORMS = [
+  ["Arceus-Fighting", "Arceus", 2101, ["Fighting"], [120,120,120,120,120,120]],
+  ["Arceus-Flying", "Arceus", 2102, ["Flying"], [120,120,120,120,120,120]],
+  ["Arceus-Poison", "Arceus", 2103, ["Poison"], [120,120,120,120,120,120]],
+  ["Arceus-Ground", "Arceus", 2104, ["Ground"], [120,120,120,120,120,120]],
+  ["Arceus-Rock", "Arceus", 2105, ["Rock"], [120,120,120,120,120,120]],
+  ["Arceus-Bug", "Arceus", 2106, ["Bug"], [120,120,120,120,120,120]],
+  ["Arceus-Ghost", "Arceus", 2107, ["Ghost"], [120,120,120,120,120,120]],
+  ["Arceus-Steel", "Arceus", 2108, ["Steel"], [120,120,120,120,120,120]],
+  ["Arceus-Fire", "Arceus", 2109, ["Fire"], [120,120,120,120,120,120]],
+  ["Arceus-Water", "Arceus", 2110, ["Water"], [120,120,120,120,120,120]],
+  ["Arceus-Grass", "Arceus", 2111, ["Grass"], [120,120,120,120,120,120]],
+  ["Arceus-Electric", "Arceus", 2112, ["Electric"], [120,120,120,120,120,120]],
+  ["Arceus-Psychic", "Arceus", 2113, ["Psychic"], [120,120,120,120,120,120]],
+  ["Arceus-Ice", "Arceus", 2114, ["Ice"], [120,120,120,120,120,120]],
+  ["Arceus-Dragon", "Arceus", 2115, ["Dragon"], [120,120,120,120,120,120]],
+  ["Arceus-Dark", "Arceus", 2116, ["Dark"], [120,120,120,120,120,120]],
+  ["Arceus-Fairy", "Arceus", 2117, ["Fairy"], [120,120,120,120,120,120]]];
 // Each later region's forms, in order: they come after everything older so species indices in saves stay put.
-const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS, HOLLOW_FORMS, TEMPESTA_FORMS];
+const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS, HOLLOW_FORMS, TEMPESTA_FORMS, ORIGIN_FORMS];
 const ALL_FORMS = FORM_LISTS.flat();
 const PROC_RAW_FORMS = ALL_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
 for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of ALL_FORMS){
@@ -7139,6 +7158,95 @@ Object.assign(WEATHER, {"Frost Peak":'snow', "Thunder Peak":'rain', "Ember Peak"
   // The way on from the HOLLOW LANDS: the balloonist at GLOAMING.
   (LOCATIONS.find(l=>l.name==='Gloaming').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:3, lines:[]});
   for(const loc of TEMPESTA) getMap(loc);
+}
+
+// ---------- Origin (9.0.0): the ninth region, the mountain all eight lands surround, reached on foot from FAIRHAVEN ----------
+// No gyms here: eight halls up the mountain, each kept by a CHAMPION you've already beaten (VELLORIN's WREN to
+// TEMPESTA's ZEPHYRA), fielding their best at full strength. Past the last hall, the KEEPER guards the HALL OF
+// ORIGIN, where ARCEUS waits for someone holding all 18 plates (two from each land; VELLORIN's, CALDERRA's and the
+// ISLES' were never found, so their hubs get plate shrines, role 'plate'). The League's Elite Four are the villains
+// you beat on the way, given a second chance; its CHAMPION is KAI. The altar (role 'altar') turns ARCEUS to the type
+// of the next plate you hold. Levels: 800, then 12 more per hall, up to 900.
+Object.assign(CHARS, {
+  keeperIlex:    {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8d0b0',H:'#f0f0f0',B:'#f0e8d0',D:'#c8a040',Y:'#f8f8f8'},
+  monkOrigin:    {head:'bald',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a878',H:'#f0f0f0',B:'#f0e8d0',D:'#c8a040',Y:'#f0d070'}});
+// Each hall's keeper: a past CHAMPION with their region's style, and an ACE TRAINER pool for the juniors.
+Object.assign(GYM_STYLE, {
+  Wren:{kind:'rival', type:'Vellorin\'s best', theme:'normal', juniors:{cls:'ACE TRAINER', kind:'boy', team:['Pidgeot','Arcanine','Raichu','Espeon','Gyarados','Honchkrow']}},
+  Solenne:{kind:'championSolenne', type:'Calderra\'s best', theme:'fire', juniors:{cls:'ACE TRAINER', kind:'girl', team:['Arcanine','Volcarona','Skeledirge','Ceruledge','Talonflame','Houndoom']}},
+  Marea:{kind:'championMarea', type:'the ISLES\' best', theme:'water', juniors:{cls:'ACE TRAINER', kind:'lass', team:['Swampert','Gyarados','Sharpedo-Sunder','Wailord-Sunder','Milotic','Kingdra']}},
+  Altair:{kind:'championAltair', type:'the SKYREACH\'s best', theme:'flying', juniors:{cls:'ACE TRAINER', kind:'boy', team:['Salamence','Altaria-Sky','Rapidash-Sky','Staraptor','Noivern','Corviknight']}},
+  Cassia:{kind:'championCassia', type:'GENOVA\'s best', theme:'psychic', juniors:{cls:'ACE TRAINER', kind:'gentleman', team:['Helixeon','Voltoad','Graftree','Chimaul','Mimicore','Specterra']}},
+  Aeon:{kind:'championAeon', type:'AETERNA\'s best', theme:'steel', juniors:{cls:'ACE TRAINER', kind:'hiker', team:['Iron Valiant','Roaring Moon','Great Tusk','Iron Hands','Bronzong','Flutter Mane']}},
+  Elegy:{kind:'championElegy', type:'the HOLLOW LANDS\' best', theme:'ghost', juniors:{cls:'ACE TRAINER', kind:'oldwoman', team:['Gengar','Dusknoir','Froslass','Mimikyu','Chandelure','Spiritomb']}},
+  Zephyra:{kind:'championZephyra', type:'TEMPESTA\'s best', theme:'ice', juniors:{cls:'ACE TRAINER', kind:'girl', team:['Sawsbuck','Kilowattrel','Lapras','Florges','Castform','Weavile']}}});
+const ELITES_ORIGIN = [
+  {kind:'bossZenith', title:'ELITE FOUR HALLEY', team:['Deoxys','Metagross','Porygon-Z','Rhydon-Sky','Magnezone','Reuniclus'],
+   intro:"I chased the perfect POKéMON across the sky. I'm still looking. Show me yours.", after:"Not perfect. Better. Go on."},
+  {kind:'bossVoss', title:'ELITE FOUR VOSS', team:['Mewtwo','Helixeon','Metagross','Porygon-Z','Mimicore','Magnezone'],
+   intro:"MEWTWO forgave me. I asked it to come here and fight beside me. It said yes.", after:"Science without limits... I've found my limit. It's you."},
+  {kind:'bossVex', title:'ELITE FOUR VEX', team:['Dialga','Palkia','Hatterene','Iron Valiant','Roaring Moon','Bronzong'],
+   intro:"I stopped trying to hold on to one moment. Now I just try to make each one count.", after:"A good moment. Thank you."},
+  {kind:'bossHelios', title:'ELITE FOUR HELIOS', team:['Moltres','Volcarona','Ninetales','Torkoal','Florges','Cetitan'],
+   intro:"Every season, every land, every story leads here. Let's end this one well.", after:"The year turns. The CHAMPION waits. You know who."}];
+const ORIGIN = [
+  {type:'town', name:"Origin Gate", at:[4,3], center:true, tint:'origin', desc:"A village of pilgrims at the foot of the mountain. From here you can see all eight lands spread out below, and the light at the peak."},
+  {type:'route', name:"Path of Firsts", at:[3,3], tint:'origin', desc:"West, to the first hall. The path is paved with stones from every town in VELLORIN.", pool:['Pidgeot','Arcanine','Gyarados','Snorlax','Lapras','Dragonite']},
+  {type:'gym', name:"Vellorin Hall", at:[2,3], center:true, tint:'origin', desc:"The first hall, built of DUSKMERE stone. WREN, VELLORIN's CHAMPION, waits inside.", leaderName:"Wren", leaderTeam:['Pidgeot','Espeon','Arcanine','Raichu','Honchkrow','Gyarados']},
+  {type:'route', name:"Ember Path", at:[2,2], tint:'origin', desc:"Up past warm springs, like CALDERRA's.", pool:['Magcargo','Volcarona','Magmortar','Houndoom','Camerupt','Coalossal']},
+  {type:'gym', name:"Calderra Hall", at:[2,1], center:true, tint:'origin', desc:"A hall of black volcanic stone. SOLENNE, CALDERRA's CHAMPION, waits inside.", leaderName:"Solenne", leaderTeam:['Dragapult','Kingambit','Gholdengo','Baxcalibur','Annihilape','Hydrapple']},
+  {type:'route', name:"Tide Path", at:[5,3], tint:'origin', desc:"East, along a stream that tastes of the sea.", pool:['Kingdra','Milotic','Sharpedo-Sunder','Wailord-Sunder','Lanturn','Vaporeon']},
+  {type:'gym', name:"Sundered Hall", at:[6,3], center:true, tint:'origin', desc:"A hall of coral and driftwood. MAREA, the ISLES' CHAMPION, waits inside.", leaderName:"Marea", leaderTeam:['Swampert','Gyarados','Metagross','Camerupt-Sunder','Crawdaunt-Sunder','Garchomp']},
+  {type:'route', name:"Wind Path", at:[6,2], tint:'origin', desc:"Up a ridge where the wind never stops, like the SKYREACH's.", pool:['Salamence','Altaria-Sky','Staraptor','Noivern','Graveler-Sky','Braviary']},
+  {type:'gym', name:"Skyreach Hall", at:[6,1], center:true, tint:'origin', desc:"An open hall above the clouds. ALTAIR, the SKYREACH's CHAMPION, waits inside.", leaderName:"Altair", leaderTeam:['Salamence','Metagross','Altaria-Sky','Rapidash-Sky','Tyranitar','Dragonite']},
+  {type:'route', name:"Mountain Ascent", at:[4,2], badges:4, tint:'origin', desc:"Straight up the mountain from the gate. Only those who've passed four halls may climb.", pool:['Lucario','Gallade','Gardevoir','Togekiss','Garchomp','Tyranitar']},
+  {type:'gym', name:"Genova Hall", at:[4,1], center:true, tint:'origin', desc:"A hall of glass and steel. CASSIA, GENOVA's CHAMPION, waits inside.", leaderName:"Cassia", leaderTeam:['Helixeon','Metagross','Voltoad','Gardevoir','Graftree','Dragonite']},
+  {type:'route', name:"Time Path", at:[3,1], tint:'origin', desc:"The path loops back on itself, like AETERNA's valley.", pool:['Iron Valiant','Roaring Moon','Bronzong','Great Tusk','Iron Hands','Slowking']},
+  {type:'gym', name:"Aeterna Hall", at:[3,0], center:true, tint:'origin', desc:"A hall with a clock that runs both ways. AEON, AETERNA's CHAMPION, waits inside.", leaderName:"Aeon", leaderTeam:['Dialga','Palkia','Iron Valiant','Roaring Moon','Garchomp','Bronzong']},
+  {type:'route', name:"Shadow Path", at:[5,1], tint:'origin', desc:"Your shadow walks a little ahead of you here.", pool:['Gengar','Dusknoir','Froslass','Mimikyu','Spiritomb','Banette']},
+  {type:'gym', name:"Hollow Hall", at:[5,0], center:true, tint:'origin', desc:"A grey hall where candles burn without smoke. ELEGY, the HOLLOW LANDS' CHAMPION, waits inside.", leaderName:"Elegy", leaderTeam:['Giratina','Gengar','Dragapult','Froslass','Kingambit','Hatterene']},
+  {type:'route', name:"Spear Pillar Steps", at:[4,0], tint:'origin', desc:"Broken pillars line the stairs to the last hall.", pool:['Sawsbuck','Kilowattrel','Florges','Castform','Lapras','Dragonite']},
+  {type:'gym', name:"Tempesta Hall", at:[4,-1], center:true, tint:'origin', desc:"A hall open to every wind and season. ZEPHYRA, TEMPESTA's CHAMPION, waits inside.", leaderName:"Zephyra", leaderTeam:['Articuno-Galar','Zapdos-Galar','Moltres-Galar','Sawsbuck','Kilowattrel','Dragonite']},
+  {type:'trainer', kind:'boss', name:"Hall of Origin", at:[3,-1], boss:true, shrine:true, legend:'Arceus', grunts:2, theme:'cave', tint:'origin', gruntTeam:{cls:'PILGRIM', kind:'monkOrigin', pool:['Bronzong','Chimecho','Sigilyph','Clefable','Togekiss','Altaria'],
+     intro:["Only the worthy may see the light.", "Every POKéMON began here."], after:["You are worthy.", "Go in peace."]}, bossKind:'keeperIlex',
+   desc:"A temple of light at the peak. KEEPER ILEX bars the way. \"ARCEUS made all eight lands. Show me you've earned all of them.\"",
+   leaderName:"Keeper Ilex", leaderTeam:['Togekiss','Bronzong','Clefable','Lucario','Gardevoir','Dragonite'], pool:['Chimecho','Clefairy','Bronzor','Togetic']},
+  {type:'town', name:"Origin League", at:[4,-2], center:true, league:true, champion:true, elites:ELITES_ORIGIN, championKind:'rivalKai',
+   championQuote:"Nine lands. You beat every one of them, and I followed you through all of it. Somewhere along the way I got good, too. CHAMPION... one more time. For real!",
+   desc:"The last League, at the very top of the world. Four elite trainers wait inside, and beyond them, the Champion.",
+   leaderName:"Kai", leaderTeam:['Corviknight','Dragapult','Kingambit','Garganacl','Lokix','Rayquaza']}];
+{
+  const base = LOCATIONS.length;
+  for(const loc of ORIGIN){ loc.region = 9; loc.tier = 50; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  const join = (a, b, dir, gate=false)=>{
+    (ORIGIN[a].links ||= []).push({dir, to:S(b), gate});
+    (ORIGIN[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  walk(0, [[1,'left'],[2,'left'],[3,'up'],[4,'up']]);
+  walk(0, [[5,'right'],[6,'right'],[7,'up'],[8,'up']]);
+  walk(0, [[9,'up'],[10,'up'],[15,'up'],[16,'up'],[18,'up']]);
+  walk(10, [[11,'left'],[12,'up']]);
+  walk(10, [[13,'right'],[14,'up']]);
+  join(16, 17, 'left');
+  ORIGIN[18].badges = 8;
+  for(const l of ORIGIN[16].links) if(l.to===S(18)) l.need = 'shrines';
+  Object.assign(ORIGIN[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION. We made it. Look down there... you can see every land we've been to.\"", "KAI: \"The pilgrims say every CHAMPION we beat is waiting up the mountain. All eight of them. Again.\"", "KAI: \"I'm going on ahead. Meet me at the top. I mean it this time.\""]},
+    extras:[
+      {kind:'gentleman', role:'guide_back', dx:2, dy:1, lines:[]},
+      {kind:'statue', dx:-4, dy:-3, lines:["A great stone ring with eighteen empty sockets, one for each plate.", "Carved under it: \"FROM THE ORIGINAL ONE CAME ALL THINGS. RETURN WHAT WAS SCATTERED.\""]},
+      {kind:'monkOrigin', dx:4, dy:2, lines:["Eighteen plates, scattered over eight lands. Two in each.", "The first three lands' plates were never found. Look for the plate shrines in their oldest towns."]}]});
+  Object.assign(ORIGIN[17], {rivalAfter:["You've earned it. All eight lands, and every one of their CHAMPIONS.", "If you hold every plate, ARCEUS will answer you. If not... it will wait. It's very patient."],
+    extras:[{kind:'statue', role:'altar', at:'mid', dx:3, dy:1, lines:["The altar of origin. Eighteen grooves, each the shape of a plate."]}]});
+  ORIGIN[11].treasure = ['pixieplate'];
+  ORIGIN[15].treasure = ['blankplate'];
+  // VELLORIN's, CALDERRA's and the ISLES' plates, at shrines in their first towns.
+  for(const [town, a, b] of [["Duskmere Hollow", 'FLAME', 'SPLASH'], ["Port Calder", 'MEADOW', 'ICICLE'], ["Port Keel", 'EARTH', 'DREAD']])
+    (LOCATIONS.find(l=>l.name===town).extras ||= []).push({kind:'statue', role:'plate', dx:-2, dy:4, lines:[`A small, very old shrine. Two hollows in its stone are shaped like plates: the ${a} PLATE and the ${b} PLATE.`]});
+  // The way up from TEMPESTA: the mountain guide at FAIRHAVEN.
+  (LOCATIONS.find(l=>l.name==='Fairhaven').extras ||= []).push({kind:'hiker', role:'guide_on', dx:-2, dy:3, lines:[]});
+  for(const loc of ORIGIN) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------

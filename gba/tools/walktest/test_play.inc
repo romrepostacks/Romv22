@@ -250,6 +250,21 @@ static void test_setup()
             if(sub == 13) { g.party[0] = mon::make(species_id::ARTICUNO, 800); map = play::find_person(rg, person_role::FORM, x, y); }
             if(sub == 14) { set_tempesta_season(3); map = play::find_trainer(rg, trainer_role::ROUTE, 0, x, y); }
         }
+        else
+        {
+            // ORIGIN: 4 VELLORIN's plate shrine, 5 ARCEUS with too few plates, 6 ... with all 18, 7 the altar.
+            if(sub == 4) map = play::find_person(1, person_role::PLATE, x, y);
+            if(sub >= 6)
+            {
+                constexpr item_id plates[] = { item_id::FLAMEPLATE, item_id::SPLASHPLATE, item_id::MEADOWPLATE, item_id::ICICLEPLATE,
+                    item_id::EARTHPLATE, item_id::DREADPLATE, item_id::SKYPLATE, item_id::STONEPLATE, item_id::IRONPLATE, item_id::ZAPPLATE,
+                    item_id::DRACOPLATE, item_id::MINDPLATE, item_id::SPOOKYPLATE, item_id::TOXICPLATE, item_id::FISTPLATE, item_id::INSECTPLATE,
+                    item_id::PIXIEPLATE, item_id::BLANKPLATE };
+                for(item_id p : plates) g.add_item(p, 1);
+            }
+            if(sub == 5 || sub == 6) legend_at("HALL OF ORIGIN");
+            if(sub == 7) { g.party[0] = mon::make(species_id::ARCEUS, 900); map = play::find_person(rg, person_role::ALTAR, x, y); }
+        }
     }
     else switch(sub)
     {

@@ -1,7 +1,21 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 8.0.0: Tempesta! Ride the balloon from GLOAMING to region eight.",
+  "motd": "Version 9.0.0: Origin! The mountain guide at FAIRHAVEN leads you up to the last region.",
   "changelog": [
+    {
+      "version": "GBA 9.0.0",
+      "date": "2026-10-11",
+      "title": "Origin",
+      "changes": [
+        "The ninth and last region, ORIGIN: after the TEMPESTA LEAGUE, the mountain guide at FAIRHAVEN leads you to ORIGIN GATE",
+        "Eight halls up the mountain, each kept by a CHAMPION you've beaten before, at full strength. Each counts as a badge",
+        "The Elite Four are the villains you beat along the way, each with the legend they chased. The CHAMPION is KAI, at level 900",
+        "ARCEUS waits in the HALL OF ORIGIN for whoever holds all 18 plates, and the altar there changes its type",
+        "VELLORIN, CALDERRA and the SUNDERED ISLES now have plate shrines in their first towns: two plates each",
+        "Two more plates on the mountain: the PIXIE PLATE and the BLANK PLATE",
+        "The level cap rises to 900; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 8.0.0",
       "date": "2026-10-10",

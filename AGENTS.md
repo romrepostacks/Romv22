@@ -22,7 +22,7 @@ than the last (region 1 = 100, region 2 = 200, region 3 = 300 ...).
 | 6.0.0 | Aeterna (Dialga/Palkia, one valley in two eras), level 600 | `docs/6.0.0/` |
 | 7.0.0 | The Hollow Lands (Giratina, a reverse side), level 700 | `docs/7.0.0/` |
 | 8.0.0 | Tempesta (the three birds and Lugia, seasons), level 800 | `docs/8.0.0/` |
-| 9.0.0 | themes only | `/mnt/project-files/plans/regions-4-9-themes.md` |
+| 9.0.0 | Origin (Arceus, the eight Champions again), level 900 | `docs/9.0.0/` |
 
 ## Where things are
 

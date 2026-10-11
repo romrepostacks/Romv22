@@ -210,6 +210,8 @@ public:
     void form_altar();
     void season_keeper();
     void season_post();
+    void plate_shrine();
+    void arceus_altar();
     void save_menu();
     void say(const bn::string_view& text);
     // A story line (scenes, calls, the professor, rivals' goodbyes): SKIP STORY TEXT leaves it out.

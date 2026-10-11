@@ -482,6 +482,20 @@ void overworld::talk_to(int index)
     case person_role::POST:
         season_post();
         break;
+    case person_role::PLATE:
+        for(int i = 0; i < p.lines_count; ++i)
+        {
+            say(p.lines[i]);
+        }
+        plate_shrine();
+        break;
+    case person_role::ALTAR:
+        for(int i = 0; i < p.lines_count; ++i)
+        {
+            say(p.lines[i]);
+        }
+        arceus_altar();
+        break;
     case person_role::FERRY:
         ferry();
         break;
@@ -535,6 +549,16 @@ void overworld::legend_talk(int index)
         // 8.0.0: TEMPESTA's LUGIA only rises for its CHAMPION.
         say("The sea churns around WHIRL ISLE and a great shadow moves below... but it doesn't rise.");
         say("It seems to be waiting for TEMPESTA's CHAMPION.");
+        return;
+    }
+    if(legend == species_id::ARCEUS && map_region(_map_index) == 9 && plates_held() < 18)
+    {
+        // 9.0.0: ARCEUS answers only someone holding all 18 plates.
+        say("Light pours down from the peak. Something vast is watching you... and waiting.");
+        bn::string<96> text("Plates: ");
+        text.append(bn::to_string<4>(plates_held()));
+        text.append(" of 18. The light dims again.");
+        say(text);
         return;
     }
     if(_map->room && _map->room->kind == room_kind::CHAMBER)
@@ -2792,6 +2816,82 @@ void overworld::season_post()
     say(text);
     g.flags.set(flag::SEASON_GIFT + s);
     save_game();
+}
+
+// 9.0.0: the plate shrines in VELLORIN's, CALDERRA's and the ISLES' first towns: each region's two plates.
+void overworld::plate_shrine()
+{
+    game_state& g = state();
+    int k = bn::max(0, bn::min(2, map_region(_map_index) - 1));
+    if(g.flags.test(flag::OLD_PLATE + k))
+    {
+        say("The hollows are empty. You took the plates.");
+        return;
+    }
+    constexpr item_id plates[3][2] = { { item_id::FLAMEPLATE, item_id::SPLASHPLATE }, { item_id::MEADOWPLATE, item_id::ICICLEPLATE },
+                                       { item_id::EARTHPLATE, item_id::DREADPLATE } };
+    for(item_id p : plates[k])
+    {
+        g.add_item(p, 1);
+        bn::string<64> text("You found the ");
+        text.append(game_data::items[int(p)].name);
+        text.append("!");
+        say(text);
+    }
+    g.flags.set(flag::OLD_PLATE + k);
+    save_game();
+}
+
+// 9.0.0: the altar of origin: ARCEUS in your party takes the type of the next plate you hold (Normal with none).
+void overworld::arceus_altar()
+{
+    game_state& g = state();
+    constexpr species_id forms[] = { species_id::ARCEUS, species_id::ARCEUS_FIGHTING, species_id::ARCEUS_FLYING, species_id::ARCEUS_POISON,
+        species_id::ARCEUS_GROUND, species_id::ARCEUS_ROCK, species_id::ARCEUS_BUG, species_id::ARCEUS_GHOST, species_id::ARCEUS_STEEL,
+        species_id::ARCEUS_FIRE, species_id::ARCEUS_WATER, species_id::ARCEUS_GRASS, species_id::ARCEUS_ELECTRIC, species_id::ARCEUS_PSYCHIC,
+        species_id::ARCEUS_ICE, species_id::ARCEUS_DRAGON, species_id::ARCEUS_DARK, species_id::ARCEUS_FAIRY };
+    constexpr item_id plates[] = { item_id::BLANKPLATE, item_id::FISTPLATE, item_id::SKYPLATE, item_id::TOXICPLATE, item_id::EARTHPLATE,
+        item_id::STONEPLATE, item_id::INSECTPLATE, item_id::SPOOKYPLATE, item_id::IRONPLATE, item_id::FLAMEPLATE, item_id::SPLASHPLATE,
+        item_id::MEADOWPLATE, item_id::ZAPPLATE, item_id::MINDPLATE, item_id::ICICLEPLATE, item_id::DRACOPLATE, item_id::DREADPLATE,
+        item_id::PIXIEPLATE };
+    constexpr int count = int(sizeof(forms) / sizeof(forms[0]));
+    for(int i = 0; i < g.party_count; ++i)
+    {
+        mon& m = g.party[i];
+        int now = -1;
+        for(int k = 0; k < count; ++k)
+        {
+            now = m.species_index == uint16_t(forms[k]) ? k : now;
+        }
+        if(now < 0)
+        {
+            continue;
+        }
+        int next = 0;
+        for(int k = 1; k < count; ++k)
+        {
+            int j = (now + k) % count;
+            if(j == 0 || g.item_count(plates[j]) > 0)
+            {
+                next = j;
+                break;
+            }
+        }
+        if(next == now)
+        {
+            say("The altar glows, but ARCEUS has no other plate to answer.");
+            return;
+        }
+        say("The altar blazes with light...");
+        m.set_species(int(forms[next]));
+        g.mark_owned(int(forms[next]));
+        bn::string<64> text(m.name());
+        text.append(" changed its type!");
+        say(text);
+        save_game();
+        return;
+    }
+    say("The altar is quiet. Nothing here answers it.");
 }
 
 // 5.0.0: a pink blur in one of GENOVA's ten places: MEW, there and gone. Seeing all ten wins its trust.
