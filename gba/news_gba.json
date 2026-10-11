@@ -1,7 +1,23 @@
 {
   "_howto": "The game's WHAT'S NEW: the title screen's message of the day (motd) and the changelog, newest first. Player-facing only.",
-  "motd": "Version 7.0.0: the Hollow Lands! Cross the grey lake from AETERNA to region seven.",
+  "motd": "Version 8.0.0: Tempesta! Ride the balloon from GLOAMING to region eight.",
   "changelog": [
+    {
+      "version": "GBA 8.0.0",
+      "date": "2026-10-10",
+      "title": "Tempesta",
+      "changes": [
+        "An eighth region, TEMPESTA: after the HOLLOW LEAGUE, the balloonist at GLOAMING flies you to FAIRHAVEN, the festival city",
+        "TEAM SOLSTICE has caged ARTICUNO, ZAPDOS and MOLTRES on three peaks to keep TEMPESTA in an endless spring",
+        "Free a bird and its season comes back. FAIRHAVEN's SEASON KEEPER turns the year: the weather, battles and wild POKéMON change with it",
+        "DELIBIRD's post office sends a parcel every season",
+        "Eight gyms, then the Elite Four and Champion ZEPHYRA at level 800. Rival KITE waits on the FESTIVAL ROAD",
+        "After the League, LUGIA rises at WHIRL ISLE, and the festival mirror shows the birds' Galarian forms",
+        "Tempesta trainers count the weather when they plan their moves",
+        "Two hidden plates: the FIST PLATE and the INSECT PLATE",
+        "The level cap rises to 800; earlier regions stay as they were"
+      ]
+    },
     {
       "version": "GBA 7.0.0",
       "date": "2026-10-10",

@@ -867,7 +867,7 @@ void overworld::update_weather()
     {
         int off = g.opt.weather == level4::OFF;
         amount = g.opt.weather == level4::HIGH ? 3 : g.opt.weather == level4::MID ? 2 : 1;
-        switch(a->weather)
+        switch(area_weather_now(a))
         {
         case area_weather::RAIN: kind = off ? WX_NONE : WX_RAIN; break;
         case area_weather::SNOW: kind = off ? WX_NONE : WX_SNOW; break;
@@ -925,7 +925,7 @@ void overworld::update_tint()
     if(! indoors && a)
     {
         bool off = g.opt.weather == level4::OFF;
-        switch(a->weather)
+        switch(area_weather_now(a))
         {
         case area_weather::RAIN: if(! off) layers[n++] = { 0x20, 0x30, 0x50, 0x18 }; break;
         case area_weather::ASH: if(! off) layers[n++] = { 0x40, 0x40, 0x40, 0x22 }; break;
@@ -1656,6 +1656,16 @@ void overworld::wild_battle(bool water)
     {
         constexpr int visitors = int(sizeof(game_data::night_visitors) / sizeof(game_data::night_visitors[0]));
         pool[pool_count++] = game_data::night_visitors[r.get_int(visitors)];
+    }
+    if(outdoors && _map->area->region == 8 && r.get_int(3) == 0)
+    {
+        // 8.0.0: TEMPESTA's season brings its own visitors.
+        constexpr species_id visitors[4][4] = {
+            { species_id::DEERLING, species_id::CHERUBI, species_id::COMBEE, species_id::HOPPIP },
+            { species_id::SHINX, species_id::TADBULB, species_id::CASTFORM, species_id::WATTREL },
+            { species_id::PUMPKABOO, species_id::SKWOVET, species_id::FOMANTIS, species_id::FLETCHLING },
+            { species_id::SNOVER, species_id::SNOM, species_id::CUBCHOO, species_id::DELIBIRD } };
+        pool[pool_count++] = visitors[tempesta_season()][r.get_int(4)];
     }
     e.count = time_picks(pool, pool_count, e.species, n);
     if(! water && _map->area && (_map->area->flags & area_flag::SAFARI))

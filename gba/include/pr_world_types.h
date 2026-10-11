@@ -80,7 +80,8 @@ enum class person_role : uint8_t
     FORM,           // a form changer (6.0.0 on): the area's FORM_CHANGES entry
     POST,           // 8.0.0: TEMPESTA's DELIBIRD post office: a gift each season
     PLATE,          // 9.0.0: an old plate shrine in VELLORIN, CALDERRA or the ISLES (OLD_PLATES)
-    ALTAR           // 9.0.0: the HALL OF ORIGIN's altar: ARCEUS takes the type of a plate you hold
+    ALTAR,          // 9.0.0: the HALL OF ORIGIN's altar: ARCEUS takes the type of a plate you hold
+    SEASON          // 8.0.0: FAIRHAVEN's SEASON KEEPER: turns TEMPESTA to the next season you've freed
 };
 
 // 8x8 tiles, their palette banks and 16x16 metatiles (four cells each) for an area (with what can be seen of

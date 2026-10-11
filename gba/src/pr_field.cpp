@@ -476,6 +476,12 @@ void overworld::talk_to(int index)
         }
         form_altar();
         break;
+    case person_role::SEASON:
+        season_keeper();
+        break;
+    case person_role::POST:
+        season_post();
+        break;
     case person_role::FERRY:
         ferry();
         break;
@@ -522,6 +528,13 @@ void overworld::legend_talk(int index)
         text.append(bn::to_string<4>(flag::mew_sightings));
         text.append(". It doesn't trust you yet.");
         say(text);
+        return;
+    }
+    if(legend == species_id::LUGIA && map_region(_map_index) == 8 && ! g.flags.test(flag::TEMPESTA_CHAMPION))
+    {
+        // 8.0.0: TEMPESTA's LUGIA only rises for its CHAMPION.
+        say("The sea churns around WHIRL ISLE and a great shadow moves below... but it doesn't rise.");
+        say("It seems to be waiting for TEMPESTA's CHAMPION.");
         return;
     }
     if(_map->room && _map->room->kind == room_kind::CHAMBER)
@@ -2676,13 +2689,17 @@ void overworld::ancient_seed(bool tree)
     refresh(true);
 }
 
-// 6.0.0 on: an altar that changes a legend's form: DIALGA's and PALKIA's Origin forms, GIRATINA's.
+// 6.0.0 on: an altar that changes a legend's form: DIALGA's, PALKIA's and GIRATINA's Origin forms, and (8.0.0)
+// TEMPESTA's festival mirror: the three birds' Galarian forms.
 void overworld::form_altar()
 {
     game_state& g = state();
     constexpr species_id pairs[][2] = { { species_id::DIALGA, species_id::DIALGA_ORIGIN },
                                         { species_id::PALKIA, species_id::PALKIA_ORIGIN },
-                                        { species_id::GIRATINA, species_id::GIRATINA_ORIGIN } };
+                                        { species_id::GIRATINA, species_id::GIRATINA_ORIGIN },
+                                        { species_id::ARTICUNO, species_id::ARTICUNO_GALAR },
+                                        { species_id::ZAPDOS, species_id::ZAPDOS_GALAR },
+                                        { species_id::MOLTRES, species_id::MOLTRES_GALAR } };
     bool any = false;
     for(int i = 0; i < g.party_count; ++i)
     {
@@ -2711,6 +2728,70 @@ void overworld::form_altar()
     {
         save_game();
     }
+}
+
+// 8.0.0: FAIRHAVEN's SEASON KEEPER turns TEMPESTA to the next season whose bird is free.
+void overworld::season_keeper()
+{
+    constexpr const char* names[] = { "SPRING", "SUMMER", "AUTUMN", "WINTER" };
+    int now = tempesta_season(), next = now;
+    for(int k = 1; k <= 4; ++k)
+    {
+        if(season_open((now + k) % 4))
+        {
+            next = (now + k) % 4;
+            break;
+        }
+    }
+    bn::string<128> text("SEASON KEEPER: \"It's ");
+    text.append(names[now]);
+    if(next == now)
+    {
+        text.append(" in TEMPESTA, and it will stay that way. The birds that bring the other seasons are still caged.\"");
+        say(text);
+        return;
+    }
+    text.append(". Shall I turn the year to ");
+    text.append(names[next]);
+    text.append("?\"");
+    ui& u = gui();
+    u.show_text(text);
+    bool yes = u.yes_no();
+    u.clear_text();
+    if(! yes)
+    {
+        return;
+    }
+    set_tempesta_season(next);
+    save_game();
+    update_weather();
+    update_tint();
+    bn::string<64> done("The air changes... It's ");
+    done.append(names[next]);
+    done.append(" in TEMPESTA.");
+    say(done);
+}
+
+// 8.0.0: FAIRHAVEN's DELIBIRD post office: a gift for each season, once.
+void overworld::season_post()
+{
+    game_state& g = state();
+    int s = tempesta_season();
+    if(g.flags.test(flag::SEASON_GIFT + s))
+    {
+        say("DELIBIRD POST: \"Deli!\" There's no more mail for you this season.");
+        return;
+    }
+    constexpr item_id gifts[] = { item_id::LEAFSTONE, item_id::THUNDERSTONE, item_id::FIRESTONE, item_id::ICESTONE };
+    say("DELIBIRD: \"Deli-bird!\" It hands you a parcel wrapped in the season's colours.");
+    g.add_item(gifts[s], 1);
+    g.add_item(item_id::RARECANDY, 3);
+    bn::string<64> text("Inside: a ");
+    text.append(game_data::items[int(gifts[s])].name);
+    text.append(" and 3 RARE CANDY!");
+    say(text);
+    g.flags.set(flag::SEASON_GIFT + s);
+    save_game();
 }
 
 // 5.0.0: a pink blur in one of GENOVA's ten places: MEW, there and gone. Seeing all ten wins its trust.

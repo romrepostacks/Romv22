@@ -823,6 +823,66 @@ bool legend_caught(species_id legend)
     return f >= 0 ? g.flags.test(f) : g.has(story::LEGEND_CAUGHT);
 }
 
+int tempesta_season()
+{
+    const game_state& g = state();
+    return int(g.flags.test(flag::SEASON)) + 2 * int(g.flags.test(flag::SEASON + 1));
+}
+
+void set_tempesta_season(int season)
+{
+    game_state& g = state();
+    g.flags.set(flag::SEASON, season & 1);
+    g.flags.set(flag::SEASON + 1, (season >> 1) & 1);
+}
+
+bool season_open(int season)
+{
+    if(season <= 0)
+    {
+        return true;
+    }
+    // Summer comes back with ZAPDOS, autumn with MOLTRES, winter with ARTICUNO: their peak's boss beaten.
+    constexpr species_id birds[] = { species_id::ZAPDOS, species_id::MOLTRES, species_id::ARTICUNO };
+    for(int i : world_data::area_maps)
+    {
+        const map_def& m = world_data::maps[i];
+        if(m.area->region == 8 && m.area->legend_x >= 0 && m.area->legend == birds[season - 1])
+        {
+            return m.leader_id >= 0 && state().beaten.test(m.leader_id);
+        }
+    }
+    return false;
+}
+
+area_weather area_weather_now(const area_info* a)
+{
+    if(! a)
+    {
+        return area_weather::NONE;
+    }
+    if(a->region == 8 && a->weather == area_weather::NONE && a->theme != area_theme::CAVE)
+    {
+        constexpr area_weather season[] = { area_weather::NONE, area_weather::RAIN, area_weather::FOG, area_weather::SNOW };
+        return season[tempesta_season()];
+    }
+    return a->weather;
+}
+
+int plates_held()
+{
+    constexpr item_id plates[] = { item_id::FLAMEPLATE, item_id::SPLASHPLATE, item_id::MEADOWPLATE, item_id::ICICLEPLATE,
+        item_id::EARTHPLATE, item_id::DREADPLATE, item_id::SKYPLATE, item_id::STONEPLATE, item_id::IRONPLATE, item_id::ZAPPLATE,
+        item_id::DRACOPLATE, item_id::MINDPLATE, item_id::SPOOKYPLATE, item_id::TOXICPLATE, item_id::FISTPLATE, item_id::INSECTPLATE,
+        item_id::PIXIEPLATE, item_id::BLANKPLATE };
+    int n = 0;
+    for(item_id p : plates)
+    {
+        n += state().item_count(p) > 0;
+    }
+    return n;
+}
+
 bool shrines_cleared(int region)
 {
     const game_state& g = state();

@@ -325,8 +325,18 @@ namespace flag
     constexpr int MEW_SIGHTING = 30;        // 5.0.0: 30-39, the ten places GENOVA's MEW was spotted
     constexpr int mew_sightings = 10;
     constexpr int OLD_PLATE = 40;           // 9.0.0: 40-45, the plates VELLORIN, CALDERRA and the ISLES gave
-    constexpr int SEASON_GIFT = 48;         // 8.0.0: 48-50, the DELIBIRD post office's gift for each season
+    constexpr int SEASON_GIFT = 48;         // 8.0.0: 48-51, the DELIBIRD post office's gift for each season
+    constexpr int SEASON = 52;              // 8.0.0: 52-53, TEMPESTA's season (0 spring, 1 summer, 2 autumn, 3 winter)
 }
+
+// 8.0.0: TEMPESTA's season (0 spring ... 3 winter), whether its bird is free (spring always is), and an area's
+// weather now (TEMPESTA's open-air areas take the season's).
+int tempesta_season();
+void set_tempesta_season(int season);
+bool season_open(int season);
+area_weather area_weather_now(const area_info* a);
+// 9.0.0: how many of the 18 plates you hold.
+int plates_held();
 
 // 5.0.0: a region's name for the player ("SKYREACH"), and its CHAMPION flag (-1 for VELLORIN: story::CHAMPION).
 const char* region_name(int region);

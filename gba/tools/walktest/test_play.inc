@@ -240,6 +240,16 @@ static void test_setup()
             if(sub == 5) legend_at("DISTORTION WORLD");
             if(sub == 6) { g.party[0] = mon::make(species_id::GIRATINA, 700); map = play::find_person(rg, person_role::FORM, x, y); }
         }
+        else if(rg == 8)
+        {
+            // TEMPESTA: 4 the SEASON KEEPER with ZAPDOS free, 5 the DELIBIRD post, 6 LUGIA before the League,
+            // 7 ... and after, 13 the festival mirror with ARTICUNO, 14 a road in winter.
+            if(sub == 4) { beat_area("THUNDER PEAK"); map = play::find_person(rg, person_role::SEASON, x, y); }
+            if(sub == 5) map = play::find_person(rg, person_role::POST, x, y);
+            if(sub == 6 || sub == 7) { if(sub == 7) g.flags.set(flag::TEMPESTA_CHAMPION); legend_at("WHIRL ISLE"); }
+            if(sub == 13) { g.party[0] = mon::make(species_id::ARTICUNO, 800); map = play::find_person(rg, person_role::FORM, x, y); }
+            if(sub == 14) { set_tempesta_season(3); map = play::find_trainer(rg, trainer_role::ROUTE, 0, x, y); }
+        }
     }
     else switch(sub)
     {

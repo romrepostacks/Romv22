@@ -453,7 +453,7 @@ def build_world(exp, data, out_inc):
                     'tutor': 'TUTOR', 'ferry': 'FERRY', 'prof': 'PROF', 'captain': 'CAPTAIN', 'pilot': 'PILOT',
                     'shard0': 'SHARD_NORMAL', 'shard1': 'SHARD_ATTACK', 'shard2': 'SHARD_DEFENSE', 'shard3': 'SHARD_SPEED',
                     'guide_on': 'GUIDE_ON', 'guide_back': 'GUIDE_BACK', 'mew': 'MEW_SIGHT', 'twin': 'TWIN', 'seed': 'SEED',
-                    'tree': 'TREE', 'form': 'FORM', 'post': 'POST', 'plate': 'PLATE', 'altar': 'ALTAR'}.get(n.get('role', ''), 'NONE')
+                    'tree': 'TREE', 'form': 'FORM', 'post': 'POST', 'plate': 'PLATE', 'altar': 'ALTAR', 'season': 'SEASON'}.get(n.get('role', ''), 'NONE')
             rows.append('{%d, %d, person_kind::%s, direction::%s, person_role::%s, %s, %sperson%d_lines, %d}' % (
                 n['x'], n['y'], n['kind'], n['facing'].upper(), role, 'true' if n.get('wander') else 'false', p, i, count))
         L.append('constexpr person %speople[] = {%s};' % (p, nonempty(', '.join(rows),

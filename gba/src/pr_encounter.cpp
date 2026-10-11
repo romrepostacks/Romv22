@@ -409,11 +409,12 @@ battle_report battle_scene(const encounter& e)
         const area_info* a = here.is_room() ? world_data::maps[here.exit_map].area : here.area;
         if(a && a->region >= 3 && ! s->free)
         {
-            s->weather = a->weather == area_weather::RAIN ? battle_weather::RAIN
-                       : a->weather == area_weather::ASH ? battle_weather::SUN
+            area_weather w = area_weather_now(a);   // (8.0.0: TEMPESTA's season)
+            s->weather = w == area_weather::RAIN ? battle_weather::RAIN
+                       : w == area_weather::ASH ? battle_weather::SUN
                        // 4.0.0: the SKYREACH's strong winds over the clouds, and hail on the snowy spire.
-                       : a->weather == area_weather::WIND ? battle_weather::WIND
-                       : a->weather == area_weather::SNOW && a->region >= 4 ? battle_weather::HAIL : battle_weather::NONE;
+                       : w == area_weather::WIND ? battle_weather::WIND
+                       : w == area_weather::SNOW && a->region >= 4 ? battle_weather::HAIL : battle_weather::NONE;
         }
     }
     clear_pending_moves();

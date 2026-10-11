@@ -847,8 +847,13 @@ const AETERNA_FORMS = [
   ["Palkia-Origin", "Palkia", 10246, ["Water","Dragon"], [90,100,100,150,120,120]]];
 // 7.0.0: GIRATINA's Origin form, taken at the DISTORTION WORLD's altar.
 const HOLLOW_FORMS = [["Giratina-Origin", "Giratina", 10007, ["Ghost","Dragon"], [150,120,100,120,100,90]]];
+// 8.0.0: the three birds' Galarian forms (PokeAPI's 10169-10171), at TEMPESTA's festival mirror.
+const TEMPESTA_FORMS = [
+  ["Articuno-Galar", "Articuno", 10169, ["Psychic","Flying"], [90,85,85,125,100,95]],
+  ["Zapdos-Galar", "Zapdos", 10170, ["Fighting","Flying"], [90,125,90,85,90,100]],
+  ["Moltres-Galar", "Moltres", 10171, ["Dark","Flying"], [90,85,90,100,125,90]]];
 // Each later region's forms, in order: they come after everything older so species indices in saves stay put.
-const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS, HOLLOW_FORMS];
+const FORM_LISTS = [SUNDERED_FORMS, SKYREACH_FORMS, GENOVA_FORMS, AETERNA_FORMS, HOLLOW_FORMS, TEMPESTA_FORMS];
 const ALL_FORMS = FORM_LISTS.flat();
 const PROC_RAW_FORMS = ALL_FORMS.map(([n, , , [t1, t2], s])=>[n, t1, t2 || null, ...s]);
 for(const [n, orig, num, types, [hp,atk,def,spa,spd,spe], to, level] of ALL_FORMS){
@@ -7010,6 +7015,130 @@ Object.assign(WEATHER, {"Pale Way":'fog', "Hushed Road":'fog', "Lost Road":'fog'
   // The way on from AETERNA: the ferryman at AETERNA VILLAGE.
   (LOCATIONS.find(l=>l.name==='Aeterna Village').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:3, lines:[]});
   for(const loc of HOLLOW) getMap(loc);
+}
+
+// ---------- Tempesta (8.0.0): the eighth region, a round land of seasons, reached by balloon from GLOAMING ----------
+// FAIRHAVEN, the festival city, sits in the middle; three spokes run out to three peaks, where TEAM SOLSTICE has
+// caged ARTICUNO (west, winter), ZAPDOS (east, summer) and MOLTRES (north, autumn) to keep TEMPESTA in one endless
+// spring. Each bird you free brings its season back, and FAIRHAVEN's SEASON KEEPER (role 'season') turns the land
+// to any season you've freed: the weather, the wild POKéMON and the battles follow. The DELIBIRD post office (role
+// 'post') sends a gift each season. LUGIA rises at WHIRL ISLE once you're CHAMPION. Levels: 700, then 12 more per
+// Tempesta badge, up to 800.
+Object.assign(CHARS, {
+  gruntSolstice: {head:'cap',   K:'#282830',R:'#f8f8f8',W:'#f0b030',S:'#e8b080',H:'#c06020',B:'#f8f0d8',D:'#f0b030',Y:'#e05030'},
+  adminSolstice: {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d0b8',H:'#e8f0f8',B:'#f8f0d8',D:'#4080c0',Y:'#f0b030'},
+  bossHelios:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a070',H:'#f8d040',B:'#c04020',D:'#f0b030',Y:'#f8f8f8'},
+  leaderBryony:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e8e8',H:'#a8d0f0',B:'#f0f8ff',D:'#5088c0',Y:'#d0e8f8'},
+  leaderHaze:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e0c0a0',H:'#888898',B:'#a8b0c0',D:'#505868',Y:'#d0e0f0'},
+  leaderNimbus:  {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#f8e050',B:'#484858',D:'#f8e050',Y:'#88c8f8'},
+  leaderGale:    {head:'cap',   K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c88858',H:'#f8f8f8',B:'#68a8e0',D:'#305888',Y:'#f8f8f8'},
+  leaderPippa:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#e06020',B:'#f8c050',D:'#a04020',Y:'#f8f0a0'},
+  leaderCalla:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#c89068',H:'#a06838',B:'#e0c040',D:'#607830',Y:'#f8f0b0'},
+  leaderAurora:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8e0d8',H:'#f8b8d8',B:'#f8f0f8',D:'#c870b0',Y:'#a8f0d0'},
+  leaderSolace:  {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#d8a880',H:'#205890',B:'#58a8d8',D:'#183858',Y:'#f8f8f8'},
+  rivalKite:     {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8b080',H:'#e88830',B:'#58b8e8',D:'#f0f0f0',Y:'#e04040'},
+  eliteCirrus:   {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f8f0f0',H:'#f0f0f8',B:'#a8c8e8',D:'#6888b0',Y:'#f8f8f8'},
+  eliteTempo:    {head:'short', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#b07850',H:'#282828',B:'#f8d040',D:'#383848',Y:'#58e0f8'},
+  eliteAshe:     {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#902818',B:'#d06030',D:'#502010',Y:'#f8b040'},
+  eliteVerna:    {head:'long',  K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#f0d0b8',H:'#78b848',B:'#f8c8e0',D:'#508030',Y:'#f8f0a0'},
+  championZephyra:{head:'long', K:'#282830',R:'#e04040',W:'#f8f8f8',S:'#e8c0a0',H:'#f8f8f8',B:'#4090d0',D:'#f0b030',Y:'#f2d64b'}});
+Object.assign(GYM_STYLE, {
+  Bryony:{kind:'leaderBryony', type:'Ice', theme:'ice', juniors:{cls:'SKIER', kind:'girl', team:['Snover','Snom','Cubchoo','Bergmite','Sneasel','Swinub']}},
+  Haze:{kind:'leaderHaze', type:'Steel and Ice', theme:'steel', juniors:{cls:'MOUNTAINEER', kind:'hiker', team:['Bergmite','Klink','Bronzor','Cufant','Aron','Snorunt']}},
+  Nimbus:{kind:'leaderNimbus', type:'Electric', theme:'electric', juniors:{cls:'STORM CHASER', kind:'boy', team:['Wattrel','Shinx','Blitzle','Emolga','Tadbulb','Joltik']}},
+  Gale:{kind:'leaderGale', type:'Flying', theme:'flying', juniors:{cls:'KITE FLYER', kind:'boy', team:['Swablu','Tropius','Hoppip','Bombirdier','Flittle','Starly']}},
+  Pippa:{kind:'leaderPippa', type:'Fire', theme:'fire', juniors:{cls:'FIRE DANCER', kind:'girl', team:['Litleo','Fletchinder','Pansear','Torkoal','Capsakid','Litwick']}},
+  Calla:{kind:'leaderCalla', type:'Grass', theme:'grass', juniors:{cls:'HARVESTER', kind:'hiker', team:['Deerling','Seedot','Bounsweet','Gossifleur','Nymble','Smoliv']}},
+  Aurora:{kind:'leaderAurora', type:'Fairy', theme:'fairy', juniors:{cls:'FLOWER GIRL', kind:'lass', team:['Cutiefly','Flabebe','Spritzee','Swirlix','Comfey','Fidough']}},
+  Solace:{kind:'leaderSolace', type:'Water', theme:'water', juniors:{cls:'SAILOR', kind:'boy', team:['Wingull','Finizen','Mantyke','Wailmer','Lapras','Remoraid']}}});
+const SOLSTICE_TEAM = {cls:'SOLSTICE GRUNT', kind:'gruntSolstice', pool:['Sunkern','Cherubi','Combee','Petilil','Castform','Bounsweet'],
+  intro:["Spring forever! No cold, no storms, no falling leaves. What's wrong with that?", "TEAM SOLSTICE keeps the sun high and the flowers blooming.", "Leave the birds be. They're safer in the cages."],
+  after:["Did you feel that? The wind changed.", "It's getting... chilly.", "Fine. Let it rain, then."]};
+const ELITES_TEMPESTA = [
+  {kind:'eliteCirrus', title:'ELITE FOUR CIRRUS', team:['Articuno','Glaceon','Cetitan','Altaria-Sky','Froslass','Baxcalibur'],
+   intro:"Winter's my season. Long nights, still air. Let's have a quiet battle.", after:"A thaw. It was bound to come."},
+  {kind:'eliteTempo', title:'ELITE FOUR TEMPO', team:['Zapdos','Kilowattrel','Bellibolt','Thundurus','Electivire','Rotom'],
+   intro:"Summer storms! Thunder every afternoon! Don't blink!", after:"The storm passes. You're still standing."},
+  {kind:'eliteAshe', title:'ELITE FOUR ASHE', team:['Moltres','Pyroar','Talonflame','Arcanine','Ceruledge','Volcarona'],
+   intro:"Autumn burns the year down, so spring can start again. I'll burn you down too.", after:"Embers. Good ones."},
+  {kind:'eliteVerna', title:'ELITE FOUR VERNA', team:['Florges','Lilligant','Ribombee','Tsareena','Comfey','Enamorus'],
+   intro:"TEAM SOLSTICE loved spring. I love it too, but only because it ends.", after:"And so it ends. Go see the CHAMPION."}];
+const TEMPESTA = [
+  // 0: FAIRHAVEN; 1-5: the west spoke to FROST PEAK; 6-10: the east spoke to THUNDER PEAK; 11-15: the north spoke to EMBER PEAK
+  {type:'town', name:"Fairhaven", at:[4,1], center:true, desc:"A round city in the middle of TEMPESTA, all bunting and lanterns. The festival here never stops, and the flowers never wilt."},
+  {type:'route', name:"Frostwind Path", at:[3,1], desc:"West toward the snow peaks. The air should be cold here. It isn't.", pool:['Snover','Swinub','Sneasel','Deerling','Snom','Cubchoo']},
+  {type:'gym', name:"Rimehold", at:[2,1], center:true, desc:"A town of ice houses, slowly melting in the endless spring. Leader Bryony is worried.", leaderName:"Bryony", leaderTeam:['Weavile','Abomasnow','Frosmoth','Chien-Pao']},
+  {type:'route', name:"Snowdrift Trail", at:[1,1], desc:"Up into the hills. Patches of snow cling on in the shade.", pool:['Bergmite','Snorunt','Cryogonal','Vanillite','Delibird','Snover']},
+  {type:'gym', name:"Glacier Point", at:[1,0], center:true, desc:"A mountain lodge below FROST PEAK. Leader Haze guides climbers up.", leaderName:"Haze", leaderTeam:['Avalugg','Corviknight','Copperajah','Cetitan']},
+  {type:'trainer', kind:'boss', name:"Frost Peak", at:[0,0], boss:true, shrine:true, legend:'Articuno', grunts:3, theme:'rocky', gruntTeam:SOLSTICE_TEAM, bossKind:'adminSolstice',
+   desc:"The western peak. ARTICUNO is chained under a sun lamp. Admin HIEMS stands guard. \"No more winters! Not while I'm here!\"",
+   leaderName:"Admin Hiems", leaderTeam:['Sunflora','Castform','Ninetales','Lilligant','Torkoal','Cherrim'], pool:['Snover','Swinub','Bergmite','Snorunt']},
+  {type:'route', name:"Thunderhead Road", at:[5,1], desc:"East toward the storm peaks. The sky is clear, and the weathervanes point every way.", pool:['Shinx','Blitzle','Wattrel','Emolga','Pachirisu','Joltik']},
+  {type:'gym', name:"Stormport", at:[6,1], center:true, desc:"A harbour town full of lightning rods. Leader Nimbus misses the storms.", leaderName:"Nimbus", leaderTeam:['Kilowattrel','Electivire','Bellibolt','Iron Hands']},
+  {type:'route', name:"Galeway", at:[7,1], desc:"Windmills line the road. Most of them stand still.", pool:['Wattrel','Swablu','Tropius','Hoppip','Flittle','Starly']},
+  {type:'gym', name:"Windmill Downs", at:[7,0], center:true, desc:"Grassy hills and the biggest windmill in TEMPESTA. Leader Gale's gym is inside it.", leaderName:"Gale", leaderTeam:['Staraptor','Altaria','Tornadus','Bombirdier']},
+  {type:'trainer', kind:'boss', name:"Thunder Peak", at:[8,0], boss:true, shrine:true, legend:'Zapdos', grunts:3, theme:'rocky', gruntTeam:SOLSTICE_TEAM, bossKind:'adminSolstice',
+   desc:"The eastern peak. ZAPDOS crackles in a rubber cage. Admin FULGOR guards it. \"Storms break things. We're doing everyone a favour.\"",
+   leaderName:"Admin Fulgor", leaderTeam:['Ribombee','Golurk','Sandaconda','Lilligant','Bellossom','Garganacl'], pool:['Shinx','Blitzle','Joltik','Tadbulb']},
+  {type:'route', name:"Ember Road", at:[4,0], desc:"North from FAIRHAVEN, through orchards where the leaves should be turning.", pool:['Deerling','Skwovet','Fletchinder','Litleo','Pumpkaboo','Nickit']},
+  {type:'gym', name:"Cinderfield", at:[4,-1], center:true, desc:"Bonfire town, where the harvest festival used to be. Leader Pippa keeps a fire lit for it.", leaderName:"Pippa", leaderTeam:['Pyroar','Talonflame','Scovillain','Armarouge']},
+  {type:'route', name:"Ashen Climb", at:[5,-1], desc:"Up the northern peak. Old ash crunches underfoot.", pool:['Torkoal','Numel','Slugma','Fletchinder','Rolycoly','Larvesta']},
+  {type:'trainer', kind:'boss', name:"Ember Peak", at:[5,-2], boss:true, shrine:true, legend:'Moltres', grunts:3, theme:'rocky', gruntTeam:SOLSTICE_TEAM, bossKind:'bossHelios',
+   desc:"The northern peak. MOLTRES burns low in a cage of ice. TEAM SOLSTICE's leader HELIOS waits. \"Every autumn, my village burned. Never again.\"",
+   leaderName:"Helios", leaderTeam:['Ninetales','Torkoal','Florges','Cetitan','Lilligant','Volcarona'], pool:['Slugma','Numel','Torkoal','Larvesta']},
+  {type:'gym', name:"Goldenreach", at:[3,-1], center:true, desc:"Wheat fields and a mill. Leader Calla is waiting for a harvest that never comes.", leaderName:"Calla", leaderTeam:['Sawsbuck','Meowscarada','Tsareena','Ogerpon']},
+  // 16-21: south: the festival road, the League, and the sea
+  {type:'trainer', kind:'rival', name:"Festival Road", at:[4,2], desc:"South through the festival stalls. A kid with a kite runs into you. \"Watch it! Wait, you're the one freeing the birds? Battle!\"",
+   leaderName:"Kite", rivalKind:'rivalKite', leaderTeam:['Corviknight','Sawsbuck','Kilowattrel','Castform','Lapras'], pool:['Castform','Hoppip','Swablu','Combee']},
+  {type:'gym', name:"Bloomtide", at:[4,3], center:true, desc:"A town drowning in flowers. Leader Aurora loves spring, but even she is tired of it.", leaderName:"Aurora", leaderTeam:['Florges','Sylveon','Hatterene','Enamorus']},
+  {type:'route', name:"Equinox Way", at:[5,3], badges:8, desc:"East along the shore toward the League. Day and night are exactly the same length here.", pool:['Sawsbuck','Castform','Altaria','Lapras','Togekiss','Comfey']},
+  {type:'town', name:"Tempesta League", at:[6,3], center:true, league:true, champion:true, elites:ELITES_TEMPESTA, championKind:'championZephyra',
+   championQuote:"Spring, summer, autumn, winter. You gave them all back. Now let's see what you do with a storm. I am ZEPHYRA, CHAMPION of TEMPESTA!",
+   desc:"The Pokémon League of TEMPESTA, on the southern shore. Four elite trainers wait inside, one for each season, and beyond them, the Champion.",
+   leaderName:"Zephyra", leaderTeam:['Articuno-Galar','Zapdos-Galar','Moltres-Galar','Sawsbuck','Kilowattrel','Dragonite']},
+  {type:'gym', name:"Tidewater", at:[3,3], center:true, desc:"A fishing town on the southern sea. Leader Solace reads the tides.", leaderName:"Solace", leaderTeam:['Lapras','Pelipper','Kingdra','Palafin']},
+  {type:'trainer', kind:'boss', name:"Whirl Isle", at:[2,3], boss:true, legend:'Lugia', grunts:2, theme:'rocky', gruntTeam:SOLSTICE_TEAM, bossKind:'gentleman',
+   desc:"A ring of rocks off the coast. A rich man with a flying fortress hovers overhead. \"The beast of the sea. The last piece of my collection!\"",
+   leaderName:"Collector Lawrence", leaderTeam:['Porygon-Z','Magnezone','Metagross','Rotom','Gholdengo','Tyranitar'], pool:['Wingull','Tentacool','Mantyke','Finizen']}];
+Object.assign(WEATHER, {"Frost Peak":'snow', "Thunder Peak":'rain', "Ember Peak":'ash'});
+{
+  const base = LOCATIONS.length;
+  for(const loc of TEMPESTA){ loc.region = 8; loc.tier = 49; LOCATIONS.push(loc); }
+  const S = i=>base + i;
+  const join = (a, b, dir, gate=false)=>{
+    (TEMPESTA[a].links ||= []).push({dir, to:S(b), gate});
+    (TEMPESTA[b].links ||= []).push({dir:OPPOSITE[dir], to:S(a), gate:false});
+  };
+  const walk = (from, steps)=>{ for(const [to, dir, gate] of steps){ join(from, to, dir, gate); from = to; } };
+  walk(0, [[1,'left'],[2,'left'],[3,'left'],[4,'up'],[5,'left']]);
+  walk(0, [[6,'right'],[7,'right'],[8,'right'],[9,'up'],[10,'right']]);
+  walk(0, [[11,'up'],[12,'up'],[13,'right'],[14,'up']]);
+  join(12, 15, 'left');
+  walk(0, [[16,'down'],[17,'down',true],[18,'right'],[19,'right']]);
+  join(17, 20, 'left'); join(20, 21, 'left');
+  for(const l of TEMPESTA[17].links) if(l.to===S(18)) l.need = 'shrines';
+  Object.assign(TEMPESTA[16], {rivalAfter:["Okay, okay, you're good. I'm KITE. My kite's been stuck in the sky for a year. No wind to bring it down.", "Grandma says the birds bring the seasons. TEAM SOLSTICE locked them up on the three peaks.", "Free them, and I'll finally get my kite back!"]});
+  Object.assign(TEMPESTA[0], {storyNpc:{kind:'rivalKai', lines:["KAI: \"CHAMPION! The balloon landed right in the middle of a festival! Again! They say it's been spring here for a whole year.\"", "KAI: \"Doesn't that sound nice? Except the farmers can't harvest, and the skiers have no snow, and nobody's seen rain.\"", "KAI: \"There are three peaks. West, east, north. I bet that's where the birds are.\""]},
+    extras:[
+      {kind:'gentleman', role:'guide_back', dx:2, dy:1, lines:[]},
+      {kind:'oldwoman', role:'season', dx:-3, dy:2, lines:[]},
+      {kind:'clerk', role:'post', dx:4, dy:2, lines:[]},
+      {kind:'statue', dx:-4, dy:-3, lines:["A statue of three birds around a fourth, much larger one, rising from the sea.", "The plaque: \"THE WORLD SHALL TURN TO RUIN IF THE BALANCE OF FIRE, ICE AND LIGHTNING IS DISTURBED.\""]}]});
+  // The three peaks' orbs, and the old man who saw MOLTRES.
+  for(const [i, orb] of [[5, 'ICE'], [10, 'LIGHTNING'], [14, 'FIRE']]) (TEMPESTA[i].extras ||= []).push({kind:'statue', at:'mid', dx:-3, dy:2,
+    lines:[`A glass orb on a stone stand: the ${orb} ORB. It's dim.`, "Words carved on the stand: \"GATHER THE THREE TREASURES, AND THE BEAST OF THE SEA SHALL SING.\""]});
+  (TEMPESTA[13].extras ||= []).push({kind:'gentleman', at:'spawn', dx:2, dy:-2, lines:["I saw MOLTRES once, as a boy. It flew so close, a feather fell right in my hand.", "I've kept it all these years. It's still warm. See?"]});
+  Object.assign(TEMPESTA[5], {rivalAfter:["The lamp's off... ARTICUNO's free. Feel that? Snow.", "HELIOS says the cold killed his crops. I just wanted to help him."]});
+  Object.assign(TEMPESTA[10], {rivalAfter:["ZAPDOS is loose. Here come the storms.", "HELIOS is on EMBER PEAK, with the last bird. He won't let that one go."]});
+  Object.assign(TEMPESTA[14], {rivalAfter:["My village burned every autumn. I thought if I stopped autumn...", "But the fields need the fire. The seed needs the winter. I see that now. Go on. Let the year turn."]});
+  Object.assign(TEMPESTA[21], {rivalAfter:["My fortress! My collection! Bah. The beast doesn't even want me.", "It only rises for TEMPESTA's CHAMPION, they say. Hmph."]});
+  // The mirror at the festival: the three birds' Galarian forms, once you're CHAMPION.
+  (TEMPESTA[19].extras ||= []).push({kind:'statue', role:'form', at:'spawn', dx:3, dy:-2, lines:["A tall festival mirror. In it, the three birds look different: darker, stranger."]});
+  TEMPESTA[13].treasure = ['insectplate'];
+  TEMPESTA[8].treasure = ['fistplate'];
+  // The way on from the HOLLOW LANDS: the balloonist at GLOAMING.
+  (LOCATIONS.find(l=>l.name==='Gloaming').extras ||= []).push({kind:'gentleman', role:'guide_on', dx:-2, dy:3, lines:[]});
+  for(const loc of TEMPESTA) getMap(loc);
 }
 
 // ---------- The CHALLENGE TOWER (ADVENTURE MODE; first built for the GBA) ----------
